@@ -1,0 +1,260 @@
+{
+  "schema_version": 4,
+  "requirements": [
+    {
+      "id": "REQ-PLT-001",
+      "title": "Python/FastAPI 后端；LangChain `create_agent` + LangGraph；MySQL；用户和管理员各有独立 Vue 3 前端项目，共享同一个后端",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-AUTH-001",
+      "title": "用户/管理员角色；服务端验证角色及资源归属；普通用户仅访问自己的偏好、简报、运行和记忆",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-PREF-001",
+      "title": "用户定义主题、包含/排除关键词、关注背景、来源偏好、语言、时间窗口、条数、摘要深度；保存后对新运行生效",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-BRIEF-001",
+      "title": "每日自动及手动生成简报；展示摘要、推荐理由、可追溯来源、发布时间/抓取时间及缺失信息；保留历史和偏好快照",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-DELIVERY-001",
+      "title": "站内收件箱与可选邮件；时间+时区、暂停/恢复、测试发送、失败重试；生成状态与投递状态分离",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-ADMIN-001",
+      "title": "管理模型、兼容提供商、端点、API key、默认/摘要/评估模型角色；密钥只写不回显，可替换/撤销，连接测试由管理员触发",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-ADMIN-002",
+      "title": "版本化 Agent 系统提示词、工具开关、预算、摘要阈值、模型/子 Agent 参数；新运行绑定配置快照，已运行任务不被热修改",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-SRC-001",
+      "title": "NewsNow 定时抓取并缓存，按不同源的真实配置间隔分别调度；管理员能看间隔、最近成功、下次到期、失败状态",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-SRC-002",
+      "title": "RSS 使用合理轮询、条件请求与失败退避；原始文件落地服务器，目录按源/日期/快照管理；Agent 读取稳定快照",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-SRC-003",
+      "title": "Tavily 作为 `web_search`，限制结果数、调用次数、超时与开销，保留来源和查询证据",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-AGENT-001",
+      "title": "Gateway 处理 HTTP/鉴权/DTO；Harness 负责组装、运行、模型、工具、沙箱、记忆、子 Agent；核心 Agent 使用 `create_agent(model, tools, middleware, system_prompt, context_schema, ...)`",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-AGENT-002",
+      "title": "支持模型与工具自主循环；能在预算内重复检索/分析、处理工具错误、取消/恢复、子任务委派；不以预设线性流程伪装自主执行",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-TOOL-001",
+      "title": "实现 `list_dir`、`read_file`、`search_content`、`write_file`、`bash`、`web_search` 六个必需工具",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-FS-001",
+      "title": "虚拟路径映射，拒绝 `..`、宿主绝对路径、盘符/UNC 与解析后根目录外路径；校验存在性/类型，RSS 只读、运行工作区隔离",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-FS-002",
+      "title": "read 返回并记录文件全量内容哈希；覆盖前比较最新哈希，不一致报冲突并要求重新读取；检查与替换不可出现竞态",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-FS-003",
+      "title": "read 支持行范围并有字节上限；list/search/bash/web_search 都有输出和结果数量上限，显示截断与续读指示",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-FS-004",
+      "title": "bash 在进程隔离环境中运行，不能越过映射根、读取其他用户、接触密钥或绕过 CAS 覆盖持久文件",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-MEM-001",
+      "title": "thread 状态包含消息、摘要、子任务、预算、文件读取版本；runtime context 包含用户、线程、运行参数；长期记忆跨会话且按用户隔离",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-MSG-001",
+      "title": "消息记录有单调自增序号；保留 user/AI 相对顺序，按 tool_call_id 将结果放回对应 AI 后；补全中断造成的缺失结果，处理孤儿/重复并保留审计",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-SUM-001",
+      "title": "继承 SummarizationMiddleware；支持消息数/token/容量比例触发；保留最新用户原始消息；旧摘要与早期消息一起更新摘要；摘要独立状态，由另一中间件渲染",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-OBS-001",
+      "title": "记录父子运行、工具调用与结果摘要、模型用量/延迟/失败/取消、摘要事件与预算；SSE 可回放；不展示私有思维链与秘密",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-EVAL-001",
+      "title": "管理固定来源样例和偏好组成的评估集；执行实验并对比配置/模型版本；检查相关性、新鲜度、去重、来源覆盖、引用准确性、延迟及成本",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "REQ-UX-001",
+      "title": "两端沿用 design.md；正常/加载/空/失败与关键交互状态完整，手机/桌面和键盘可用，模拟数据明确标注",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": []
+    }
+  ],
+  "acceptance": [],
+  "note": "DISCOVER 初始需求清单；ITERATE/SPECIFY 补齐双向验收关联后才可冻结。"
+}

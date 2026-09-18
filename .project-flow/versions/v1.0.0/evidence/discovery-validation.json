@@ -1,0 +1,19 @@
+{
+  "schema_version": 4,
+  "stage": "DISCOVER",
+  "version": "v1.0.0",
+  "checked_at": "2026-09-18T12:18:46.272274+00:00",
+  "markdown_files_checked": 8,
+  "local_links_checked": 19,
+  "json_files_checked": 7,
+  "unique_requirement_count": 23,
+  "workflow_doctor": {
+    "ok": true,
+    "problems": [],
+    "repairs_performed": false
+  },
+  "errors": [],
+  "application_tests_run": false,
+  "baseline_complete": false,
+  "note": "仅文档链接/编码、JSON、编号和工作流完整性检查；非应用/数据库/沙箱验收。"
+}

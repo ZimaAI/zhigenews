@@ -1,0 +1,40 @@
+{
+  "schema_version": 4,
+  "version": "v1.0.0",
+  "tasks": [],
+  "planning_tasks": [
+    {
+      "id": "TASK-DISC-001",
+      "title": "恢复工作区并读取技能/设计/已有资料",
+      "status": "done",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/session-notes.md"
+      ]
+    },
+    {
+      "id": "TASK-DISC-002",
+      "title": "联网调研 Agent、新闻采集、沙箱及监测",
+      "status": "done",
+      "evidence": [
+        "docs/research/agent-runtime.md",
+        "docs/research/news-ingestion.md",
+        "docs/research/sandbox-observability.md"
+      ]
+    },
+    {
+      "id": "TASK-DISC-003",
+      "title": "合并需求、双端流程、架构和可评审入口",
+      "status": "done",
+      "evidence": [
+        "docs/releases/v1.0.0/draft/DISCOVERY.md"
+      ]
+    },
+    {
+      "id": "TASK-ITER-001",
+      "title": "用户选择进入后制作双端交互原型并同步契约/验收",
+      "status": "pending",
+      "evidence": []
+    }
+  ],
+  "note": "正式 backend/frontend/integration 任务在具体基线形成后建立；planning_tasks 仅记录当前探索阶段，不能代替构建验收。"
+}

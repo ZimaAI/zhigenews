@@ -1,0 +1,11 @@
+{
+  "files": {
+    "RESUME.md": "eb5d41f09502b2969f58083928ff06da283ac86b83ec8ca2a7580d8265b81d22",
+    "checkpoint.json": "28ae9f7e9fd7b2de7e6fcc48b0fbbae79bd0f60a3bc1c0c3818c2cf2cdc5b4d4",
+    "notes.md": "f16130b8fbb700b544ac74d5f0be8148cadaf3477e5d4b81f835854cf39c9d45"
+  },
+  "id": "c0001",
+  "kind": "checkpoint-manifest",
+  "schema_version": 4,
+  "version": "v1.0.0"
+}

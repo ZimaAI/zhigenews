@@ -1,0 +1,99 @@
+{
+  "schema_version": 4,
+  "version": "v1.0.0",
+  "stage": "ITERATE",
+  "prototype_revision": 2,
+  "date": "2026-09-18",
+  "pre_change_commit": "2bfb26d",
+  "scope": "参考用户截图拆分两端设计规范并改版用户端原型；不作为正式前后端验收",
+  "changed": [
+    "design-user.md 新增用户端规范；design.md 改为管理员端规范",
+    "用户专属 ReaderShell/user-tokens，订阅搜索、主题封面及小卡",
+    "四张本地原创封面，生成提示词保存 ASSETS.md",
+    "AGENTS 与需求/UX/AC/追踪/续接文档同步"
+  ],
+  "commands": [
+    {
+      "command": "npm run build",
+      "cwd": "docs/releases/v1.0.0/draft/prototype",
+      "exit_code": 0,
+      "result": "vue-tsc、用户1631模块、管理员1608模块构建通过"
+    },
+    {
+      "command": "git diff --check",
+      "cwd": ".",
+      "exit_code": 0,
+      "result": "无空白错误，Git仅提示LF/CRLF转换"
+    },
+    {
+      "command": "python .agents/skills/prototype-to-product/scripts/version_flow.py doctor --root .",
+      "cwd": ".",
+      "exit_code": 0,
+      "result": {
+        "ok": true,
+        "problems": [],
+        "repairs_performed": false
+      }
+    }
+  ],
+  "browser": {
+    "engine": "Codex In-app Browser / CUA",
+    "passed": [
+      "4张封面加载成功",
+      "搜索芯片只显示算力与芯片，已选3、版本3不变，保存仍禁用",
+      "点击主题后已选3变4，已保存版本仍3；未保存离开弹窗出现",
+      "无匹配搜索保留4个选择；清除搜索恢复目录",
+      "显式保存后版本4，跳转返回仍保留4主题",
+      "Space键可切换主题；模拟error保存失败后草稿保留；重试加载后再次保存成功",
+      "账户弹窗Escape关闭，焦点回到账户与设置按钮",
+      "重置可恢复初始seed；最终两端error日志为空；视口恢复默认"
+    ],
+    "responsive": {
+      "widths": [
+        320,
+        375,
+        768,
+        1024,
+        1440,
+        1920
+      ],
+      "routes": [
+        "/preferences",
+        "/today",
+        "/delivery"
+      ],
+      "observations": 18,
+      "result": "所有组合scrollWidth等于clientWidth，无整页横向溢出"
+    },
+    "admin_isolation": {
+      "primary": "#0F766E",
+      "background": "rgb(247, 248, 245)",
+      "desktop_sidebar": true,
+      "reader_shell": false,
+      "application_source_changed": false
+    },
+    "screenshots": "桌面1440和手机320目视检查，截图仅留工具会话，未导出PNG"
+  },
+  "contrast": {
+    "muted": "#697075",
+    "ratios": {
+      "#FFFFFF": 5.03,
+      "#F7F8F8": 4.73,
+      "#F3F4F4": 4.56
+    },
+    "scope": "用sRGB相对亮度公式检查指定颜色组合，不代表整站完整无障碍认证"
+  },
+  "assets": {
+    "tool": "built-in image_gen",
+    "directory": "docs/releases/v1.0.0/draft/prototype/user-web/public/images",
+    "prompts": "ASSETS.md"
+  },
+  "contract_change": false,
+  "known_limits": [
+    "继续使用mock；双端localStorage独立",
+    "未接真实模型、采集、HTTP服务或邮件",
+    "封面为主题示意，不是新闻照片"
+  ],
+  "unresolved_observed_blockers": [],
+  "next_action": "继续ITERATE r2，按用户反馈调整原型和方案"
+}

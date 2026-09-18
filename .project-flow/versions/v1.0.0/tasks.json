@@ -40,7 +40,17 @@
     },
     {
       "id": "TASK-ITER-002",
-      "title": "接收用户反馈，调整原型和方案并形成下一修订",
+      "title": "按参考图改版用户端并拆分两端设计规范（r2）",
+      "status": "done",
+      "evidence": [
+        "design-user.md",
+        "design.md",
+        ".project-flow/versions/v1.0.0/evidence/prototype-r2-validation.json"
+      ]
+    },
+    {
+      "id": "TASK-ITER-003",
+      "title": "按下一轮用户反馈继续调整 r2 原型与方案",
       "status": "pending",
       "evidence": []
     }

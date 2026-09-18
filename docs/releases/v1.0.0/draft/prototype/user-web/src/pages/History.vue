@@ -31,7 +31,7 @@ function clear() { Object.assign(filters, { search: '', topic: '', from: '', to:
 .search-field input { padding-left: 40px; }
 .filter-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 20px; }
 .filter-result { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
-.history-list { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; }
+.history-list { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-card); }
 .history-row { display: flex; gap: 24px; padding: 24px; border-bottom: 1px solid var(--color-border); }
 .history-row:last-child { border: 0; }
 .history-date { flex: 0 0 64px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-right: 1px solid var(--color-border); padding-right: 24px; color: var(--color-text-muted); }

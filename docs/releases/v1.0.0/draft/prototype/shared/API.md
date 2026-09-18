@@ -21,7 +21,7 @@
 
 共享组件：
 
-- `@shared/AppShell.vue`：prop `app="user"|"admin"`，default slot 放 router-view；内含导航、原型场景/重置、toast。
+- `@shared/AppShell.vue`：保留原侧栏控制台壳，当前由管理员项目使用；prop `app="user"|"admin"`，default slot 放 router-view。r2 用户端改用 `user-web/src/components/ReaderShell.vue` 和独立 `user-tokens.css`，两壳保留导航、原型场景/重置、toast。
 - `@shared/Badge.vue`：prop `status: string`，自动状态中文文本/色。
 - `@shared/EmptyState.vue`：props `title`, `description?`, `error?`；default slot 放操作。
 - `@shared/RunTimeline.vue`：props `run: AgentRun`, `technical?: boolean`，含事件/子任务。

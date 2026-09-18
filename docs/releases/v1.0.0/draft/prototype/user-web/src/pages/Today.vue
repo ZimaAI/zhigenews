@@ -35,9 +35,9 @@ async function generate() { if (busy.value || activeRun.value) return; busy.valu
   </div>
 </template>
 <style scoped>
-.run-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid var(--color-primary-border); background: var(--color-primary-soft); border-radius: 8px; margin-bottom: 24px; font-size: 13px; }
+.run-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid var(--color-primary-border); background: var(--color-primary-soft); border-radius: var(--radius-card); margin-bottom: 24px; font-size: 13px; }
 .run-strip a { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
-.brief-intro { padding: 24px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); }
+.brief-intro { padding: 24px; border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); }
 .intro-date { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; color: var(--color-text-muted); }
 .intro-divider { margin-inline: 4px; color: var(--color-border-control); }
 .intro-link { display: flex; align-items: center; gap: 4px; margin-left: auto; text-decoration: none; }
@@ -52,7 +52,7 @@ async function generate() { if (busy.value || activeRun.value) return; busy.valu
 .topic-tabs button span { font-size: 11px; padding: 0 6px; background: var(--color-surface-muted); border-radius: 4px; }
 .unread-filter { margin-left: auto; white-space: nowrap; display: flex; align-items: center; gap: 8px; font-size: 13px; min-height: 44px; color: var(--color-text-secondary); cursor: pointer; }
 .unread-filter input { accent-color: var(--color-primary); width: 16px; height: 16px; }
-.news-list { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; overflow: hidden; }
+.news-list { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-card); overflow: hidden; }
 .feed-end { display: flex; align-items: center; justify-content: center; gap: 16px; color: var(--color-text-muted); font-size: 12px; margin: 32px auto; max-width: 320px; }
 .end-line { flex: 1; height: 1px; background: var(--color-border); }
 .preference-footer { display: flex; align-items: center; gap: 16px; margin-top: 16px; padding-bottom: 16px; }

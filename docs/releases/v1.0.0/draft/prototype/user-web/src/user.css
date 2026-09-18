@@ -1,4 +1,12 @@
 .user-feed { max-width: 900px; margin-inline: auto; min-width: 0; }
+.reader-main .eyebrow { color: var(--color-text-muted); font-size: 11px; letter-spacing: .06em; }
+.reader-main .page-header { align-items: center; margin-bottom: 32px; }
+.reader-main .page-header p { line-height: 1.6; }
+.reader-main .card { box-shadow: none; }
+.reader-main .button { font-weight: 500; }
+.reader-main .field-control:focus { border-color: var(--color-primary); }
+.reader-main .empty-state { border-style: dashed; }
+.toast { border-radius: var(--radius-card); }
 .user-reading, .user-form { max-width: 760px; margin-inline: auto; min-width: 0; }
 .user-feed > .page-header, .user-reading > .page-header, .user-form > .page-header { margin-bottom: 24px; }
 .user-feed > .alert, .user-form > .alert, .user-reading > .alert { margin-bottom: 24px; }
@@ -28,6 +36,8 @@
 .user-key-values dt { color: var(--color-text-muted); }
 .user-key-values dd { margin: 0; overflow-wrap: anywhere; }
 @media (max-width: 767px) {
+  .reader-main .page-header { align-items: flex-start; }
+  .toast { bottom: calc(16px + env(safe-area-inset-bottom)); }
   .user-topic-grid .chip { min-height: 44px; }
   .user-form .form-actions { align-items: stretch; }
   .user-form .form-actions .button--primary { flex: 1; }

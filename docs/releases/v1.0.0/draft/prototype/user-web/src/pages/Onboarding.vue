@@ -59,7 +59,7 @@ async function finish() {
 .onboarding-page .card > p:first-child { margin-top: 0; }
 .onboarding-page .form-grid { margin-top: 24px; }
 .onboarding-email { margin-top: 16px; }
-.setup-summary { display: flex; gap: 12px; background: var(--color-surface-muted); border-radius: 8px; padding: 16px; margin-top: 24px; }
+.setup-summary { display: flex; gap: 12px; background: var(--color-surface-muted); border-radius: var(--radius-card); padding: 16px; margin-top: 24px; }
 .setup-summary svg { color: var(--color-primary); flex-shrink: 0; margin-top: 4px; }
 .setup-summary p { margin: 0; font-size: 14px; color: var(--color-text-secondary); }
 .draft-note { text-align: center; }

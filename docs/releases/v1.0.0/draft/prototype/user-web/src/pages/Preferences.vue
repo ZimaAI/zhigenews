@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
-import { Check, Plus, Save, Trash2, Brain, ArrowUpRight } from 'lucide-vue-next';
-import { api, state, TOPICS } from '@shared/mock';
+import { Save, Trash2, Brain, ArrowUpRight } from 'lucide-vue-next';
+import { api, state } from '@shared/mock';
 import type { Preferences } from '@shared/types';
 import Modal from '@shared/Modal.vue';
 import EmptyState from '@shared/EmptyState.vue';
 import KeywordInput from '../components/KeywordInput.vue';
 import UnsavedDialog from '../components/UnsavedDialog.vue';
+import TopicDiscovery from '../components/TopicDiscovery.vue';
 const form = reactive<Preferences>(JSON.parse(JSON.stringify(state.preferences)));
 const original = ref(JSON.stringify(form));
 const dirty = computed(() => JSON.stringify(form) !== original.value);
@@ -15,7 +16,6 @@ const invalid = ref('');
 const deleteId = ref(''), deleteBusy = ref(false), deleteError = ref('');
 const memory = computed(() => state.memories.find((m) => m.id === deleteId.value));
 watch(form, () => { success.value = ''; if (form.topics.length || form.keywords.length) invalid.value = ''; });
-function toggleTopic(topic: string) { form.topics = form.topics.includes(topic) ? form.topics.filter((t) => t !== topic) : [...form.topics, topic]; }
 async function save() {
   if (busy.value) return;
   invalid.value = ''; error.value = ''; success.value = '';
@@ -29,13 +29,13 @@ async function save() {
 async function removeMemory() { if (deleteBusy.value) return; deleteBusy.value = true; deleteError.value = ''; try { await api.deleteMemory(deleteId.value); deleteId.value = ''; } catch (e) { deleteError.value = (e as Error).message; } finally { deleteBusy.value = false; } }
 </script>
 <template>
-  <div class="user-form">
-    <header class="page-header"><div><p class="eyebrow">MAKE IT YOURS</p><h1>兴趣订阅</h1><p class="muted">决定你关心什么，也决定什么可以略过。</p></div><span class="meta">已保存版本 {{ state.preferences.version }}</span></header>
+  <div class="user-form preferences-page">
+    <header class="page-header"><div><h1>找到你想关注的方向</h1><p class="muted">从感兴趣的主题开始，让每一份简报更懂你的关注。</p></div><span class="meta saved-version">已保存版本 {{ state.preferences.version }}</span></header>
     <form @submit.prevent="save">
       <div v-if="error" class="alert alert--danger" role="alert">{{ error }} 修改保留，可再次保存重试。</div>
       <div v-if="success" class="alert alert--success" role="status">{{ success }}</div>
-      <section class="card"><h2>你的关注方向</h2><p class="section-note">作为筛选背景，不是你的实名身份。越具体，推荐理由越容易解释。</p><div class="field"><label for="interest-role">角色或关注背景</label><textarea id="interest-role" v-model="form.role" class="field-control" maxlength="500" rows="3" placeholder="例如：正在构建 AI 应用的 Python 开发者，关注 Agent 工程化和开源模型。"></textarea><span class="meta">{{ form.role.length }} / 500</span></div></section>
-      <section class="card"><h2>关注主题</h2><p class="section-note">主题和包含关键词至少设置一项。也可以不选主题，只通过关键词定义关注方向。</p><div id="topic-options" tabindex="-1" class="user-topic-grid" role="group" aria-label="关注主题" :aria-describedby="invalid ? 'topic-error' : undefined"><button v-for="topic in TOPICS" :key="topic" type="button" class="chip" :class="{ 'chip--active': form.topics.includes(topic) }" :aria-pressed="form.topics.includes(topic)" @click="toggleTopic(topic)"><Check v-if="form.topics.includes(topic)" :size="14" aria-hidden="true" /><Plus v-else :size="14" aria-hidden="true" />{{ topic }}</button></div><p v-if="invalid" id="topic-error" class="user-field-error" role="alert">{{ invalid }}</p></section>
+      <TopicDiscovery v-model="form.topics" :error="invalid" :disabled="busy" />
+      <section class="card background-section"><h2>再多了解你的关注背景</h2><p class="section-note">作为筛选背景，不是你的实名身份。越具体，推荐理由越容易解释。</p><div class="field"><label for="interest-role">角色或关注背景</label><textarea id="interest-role" v-model="form.role" class="field-control" maxlength="500" rows="3" placeholder="例如：正在构建 AI 应用的 Python 开发者，关注 Agent 工程化和开源模型。"></textarea><span class="meta">{{ form.role.length }} / 500</span></div></section>
       <section class="card"><h2>关键词与排除项</h2><p class="section-note">关键词不支持复杂布尔表达式。排除规则优先于包含规则。</p><div class="stack"><KeywordInput v-model="form.keywords" id="include-keywords" label="包含关键词" description="希望更多看到的技术、公司或产品。" /><fieldset><legend>包含关键词的匹配方式</legend><label class="check-label"><input v-model="form.keywordMode" type="radio" value="prefer" />优先推荐相关内容，允许主题内其他重要消息</label><label class="check-label"><input v-model="form.keywordMode" type="radio" value="required" />必须包含至少一个关键词</label></fieldset><KeywordInput v-model="form.excludedKeywords" id="exclude-keywords" label="排除关键词" description="命中这些词的内容不进入本期简报。" /></div></section>
       <section class="card"><h2>简报偏好</h2><p class="section-note">控制来源、阅读篇幅与信息范围。</p><div class="stack"><fieldset><legend>使用的来源类型</legend><div class="source-checks"><label class="check-label"><input v-model="form.sourceTypes" type="checkbox" value="newsnow" />NewsNow 热榜</label><label class="check-label"><input v-model="form.sourceTypes" type="checkbox" value="rss" />RSS 订阅</label><label class="check-label"><input v-model="form.sourceTypes" type="checkbox" value="search" />Agent 网络搜索</label></div></fieldset><div class="form-grid"><div class="field"><label for="window-hours">新闻时间范围</label><select id="window-hours" v-model.number="form.windowHours" class="field-control"><option :value="24">最近 24 小时</option><option :value="48">最近 48 小时</option><option :value="72">最近 3 天</option><option :value="168">最近 7 天</option></select></div><div class="field"><label for="max-items">每期最多条数</label><input id="max-items" v-model.number="form.maxItems" type="number" min="1" max="30" required class="field-control" /><span class="meta">1–30 条；不足时不凑数。</span></div><div class="field"><label for="language">简报语言</label><select id="language" v-model="form.language" class="field-control"><option value="简体中文">简体中文</option><option value="English">English</option></select></div><div class="field"><label for="depth">摘要深度</label><select id="depth" v-model="form.depth" class="field-control"><option>精简</option><option>标准</option><option>深入</option></select></div></div></div></section>
       <div class="form-actions"><p class="meta">{{ dirty ? '有未保存的修改' : '所有修改已保存' }} · 保存后下次生成生效</p><button class="button button--primary" type="submit" :disabled="busy || !dirty"><Save :size="16" aria-hidden="true" />{{ busy ? '正在保存…' : '保存订阅' }}</button></div>
@@ -47,6 +47,13 @@ async function removeMemory() { if (deleteBusy.value) return; deleteBusy.value =
   </div>
 </template>
 <style scoped>
+.preferences-page { max-width: 1024px; }
+.preferences-page > .page-header { margin-bottom: var(--space-8); }
+.saved-version { flex-shrink: 0; padding-top: var(--space-2); }
+.preferences-page form > .card { padding: var(--space-8); }
+.background-section { margin-top: var(--space-8); }
+.preferences-page form > .card + .card { margin-top: var(--space-6); }
+.preferences-page .form-actions { padding: var(--space-5) var(--space-6); background: var(--color-surface-muted); border: 1px solid var(--color-border); border-radius: var(--radius-card); }
 .source-checks { display: flex; flex-wrap: wrap; gap: 12px 24px; }
 .memory-section { margin-top: 24px; }
 .memory-heading { display: flex; align-items: center; gap: 8px; }
@@ -60,4 +67,11 @@ async function removeMemory() { if (deleteBusy.value) return; deleteBusy.value =
 .preference-link { margin-block: 24px; }
 .preference-link a svg { vertical-align: middle; margin-left: 4px; }
 form > .alert { margin-bottom: 24px; }
+@media (max-width: 767px) {
+  .preferences-page form > .card { padding: var(--space-4); }
+  .preferences-page .form-actions { padding: var(--space-4); }
+  .saved-version { padding: 0; }
+  .memory-list li { flex-wrap: wrap; }
+  .memory-list li > div { flex-basis: 100%; }
+}
 </style>

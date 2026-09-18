@@ -24,7 +24,7 @@ async function submit() { if (busy.value) return; busy.value = true; error.value
 .auth-intro > p:not(.eyebrow) { font-size: 16px; line-height: 28px; max-width: 380px; color: var(--color-text-secondary); }
 .auth-preview { margin-top: 40px; padding-left: 20px; border-left: 2px solid var(--color-primary-border); }
 .auth-preview p { margin: 8px 0; font-size: 16px; }
-.auth-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; padding: 32px; }
+.auth-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-card); padding: 32px; }
 .auth-card h2 { margin: 0 0 8px; font-size: 24px; }
 .auth-card > .muted { margin: 0 0 24px; font-size: 14px; }
 .auth-card .field { margin-bottom: 20px; }

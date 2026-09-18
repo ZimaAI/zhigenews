@@ -24,7 +24,7 @@ function domain(url: string) { try { return new URL(url).hostname; } catch { ret
 .news-article { padding: 24px; border-bottom: 1px solid var(--color-border); scroll-margin-top: 100px; }
 .news-article:last-child { border-bottom: 0; }
 .news-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--color-text-muted); font-size: 12px; line-height: 20px; }
-.source-letter { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-text-secondary); font-size: 11px; background: var(--color-surface-muted); }
+.source-letter { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); color: var(--color-text-secondary); font-size: 11px; background: var(--color-surface-muted); }
 .topic-label { margin-left: auto; color: var(--color-primary); }
 .read-label { font-size: 11px; }
 h2 { margin: 12px 0 8px; font-size: 18px; line-height: 28px; font-weight: 600; overflow-wrap: anywhere; }
@@ -40,7 +40,7 @@ h2 a:hover { color: var(--color-primary); text-decoration: underline; text-under
 .expanded { padding: 32px 0; }
 .expanded h2 { margin-block: 16px; font-size: 20px; line-height: 32px; }
 .expanded .news-summary { display: block; font-size: 18px; line-height: 32px; }
-.citation-section { padding: 16px; background: var(--color-surface-muted); border-radius: 8px; margin-top: 24px; }
+.citation-section { padding: 16px; background: var(--color-surface-muted); border-radius: var(--radius-card); margin-top: 24px; }
 .citation-section h3 { font-size: 14px; margin: 0 0 12px; }
 .citation-section h3 span { margin-left: 8px; font-weight: 400; }
 .citation-section > p:last-child { margin-bottom: 0; }

@@ -29,8 +29,8 @@ function remove(value: string) { emit('update:modelValue', props.modelValue.filt
 .keyword-input-row input { flex: 1; }
 .keyword-input-row .button { flex: 0 0 auto; }
 .keyword-list { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-.keyword-token { display: inline-flex; align-items: center; gap: 4px; padding-left: 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface-muted); font-size: 13px; min-width: 0; max-width: 100%; }
+.keyword-token { display: inline-flex; align-items: center; gap: 4px; padding-left: 12px; border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface-muted); font-size: 13px; min-width: 0; max-width: 100%; }
 .keyword-token span { overflow-wrap: anywhere; }
-.keyword-token button { display: flex; align-items: center; justify-content: center; border: 0; color: var(--color-text-secondary); background: none; width: 36px; min-width: 36px; height: 36px; cursor: pointer; border-radius: 8px; }
+.keyword-token button { display: flex; align-items: center; justify-content: center; border: 0; color: var(--color-text-secondary); background: none; width: 36px; min-width: 36px; height: 36px; cursor: pointer; border-radius: var(--radius-card); }
 @media (max-width: 767px) { .keyword-token button { width: 44px; min-width: 44px; height: 44px; } }
 </style>

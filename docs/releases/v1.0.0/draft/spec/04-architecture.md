@@ -51,7 +51,7 @@ backend/src/zhigenews/
   workers/         # 任务入口和调度器
 apps/user-web/     # 独立 package / 构建 / 部署入口
 apps/admin-web/    # 独立 package / 构建 / 部署入口
-packages/ui/       # 共用 design.md tokens 和基础组件
+packages/ui/       # 共用语义组件；两端主题分别遵循 design-user.md / design.md
 packages/api-client/ # 从唯一契约生成的客户端
 ```
 

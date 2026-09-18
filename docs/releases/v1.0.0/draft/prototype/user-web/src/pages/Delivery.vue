@@ -43,7 +43,7 @@ function mask(email: string) { return email.replace(/^(.{1,2}).*(@.*)$/, '$1â€¢â
 .email-fields { padding: 0 0 4px 36px; }
 .email-status { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; font-size: 13px; }
 .verified { color: var(--color-success); }
-.schedule-preview { display: flex; align-items: flex-start; gap: 12px; margin-top: 24px; padding: 16px; border-radius: 8px; background: var(--color-surface-muted); }
+.schedule-preview { display: flex; align-items: flex-start; gap: 12px; margin-top: 24px; padding: 16px; border-radius: var(--radius-card); background: var(--color-surface-muted); }
 .schedule-preview > svg { color: var(--color-primary); margin-top: 2px; flex-shrink: 0; }
 .schedule-preview strong { font-size: 13px; font-weight: 500; }
 .schedule-preview p { margin: 4px 0 0; font-size: 14px; overflow-wrap: anywhere; }

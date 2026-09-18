@@ -1,6 +1,12 @@
-# 知更双端交互原型 · r1
+# 知更双端交互原型 · r2
 
-v1.0.0 当前处于 ITERATE，未冻结基线。用户要求先提交 DISCOVER 成果（Git `98fd673`），再制作原型，下一轮继续调整原型和方案。本目录与计划中的正式应用源码隔离。
+v1.0.0 当前处于 ITERATE，未冻结基线。DISCOVER 成果已提交（Git `98fd673`），原型 r1 在本轮改版前提交（Git `2bfb26d`）。r2 按用户提供的截图调整用户端视觉，并将双端设计规范分开；仍可继续调整原型和方案。本目录与计划中的正式应用源码隔离。
+
+## 本轮视觉调整
+
+用户端遵循根目录 [design-user.md](../../../../../design-user.md)：浅冷灰外背景、白色画布、横向图标导航、绿色下划线、小圆角与主题发现卡片。可先查看 [兴趣订阅](http://127.0.0.1:5173/preferences)：搜索只过滤候选主题，选择封面或小卡只修改草稿，点击“保存订阅”后生效；明亮封面只表达主题，不代表新闻照片。今日、详情、历史、推送、运行及账户页沿用同一用户主题。
+
+管理员端遵循根目录 [design.md](../../../../../design.md)，继续使用原深青绿、暖白、侧栏、表格及运行监测风格。用户主题和壳在 `user-web/` 中独立加载，共享基础组件、类型及 mock adapter 保持双端可用。
 
 ## 启动
 
@@ -48,9 +54,9 @@ npm run dev:admin
 
 ```text
 prototype/
-  user-web/           用户端 Vue 3 / Vite 项目
+  user-web/           用户端 Vue 3 / Vite 项目、独立主题与布局
   admin-web/          管理员端 Vue 3 / Vite 项目
-  shared/             设计样式、共享组件、types、fixtures、mock adapter
+  shared/             管理默认样式、共享原语、types、fixtures、mock adapter
   scripts/check-contract.mjs
   package.json        npm workspaces 与统一检查命令
   package-lock.json
@@ -64,4 +70,4 @@ npm run build
 
 `check` 执行 `vue-tsc --noEmit`；`build` 先执行相同类型检查，再构建两个工作区。`check:contract` 读取唯一 OpenAPI 契约，校验 14 个 synthetic 固定样例与实际 `shared/fixtures.ts` seed，并检查操作 ID、简报运行归属和新闻时间关系；当前契约包含 48 schemas、54 操作。这些命令检查原型一致性，不证明后端或生产验收通过。浏览器交互、响应式布局和键盘操作的实际结果在阶段证据中另行记录。
 
-设计规则见仓库 `design.md`；当前页面与候选行为见 [02-ux.md](../spec/02-ux.md)，领域和验收见 [03-domain.md](../spec/03-domain.md)、[05-acceptance.md](../spec/05-acceptance.md)。[contracts/openapi.json](../contracts/openapi.json) 为唯一交换主源，[契约说明](../contracts/README.md)记录内存方法到未来 HTTP 的映射与未定事项；共享开发接口见 [shared/API.md](shared/API.md)。
+用户与管理员设计规则分别见根目录 [design-user.md](../../../../../design-user.md)、[design.md](../../../../../design.md)；当前页面与候选行为见 [02-ux.md](../spec/02-ux.md)，领域和验收见 [03-domain.md](../spec/03-domain.md)、[05-acceptance.md](../spec/05-acceptance.md)。[contracts/openapi.json](../contracts/openapi.json) 为唯一交换主源，[契约说明](../contracts/README.md)记录内存方法到未来 HTTP 的映射与未定事项；共享开发接口见 [shared/API.md](shared/API.md)。

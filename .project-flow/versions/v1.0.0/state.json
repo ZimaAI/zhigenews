@@ -16,6 +16,11 @@
       "id": "c0002",
       "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0002/manifest.json",
       "sha256": "ff3e057b2dc391084c1762f9a3b8711a90c4000fbd658eb5025fb05ded65257a"
+    },
+    {
+      "id": "c0003",
+      "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0003/manifest.json",
+      "sha256": "25cc65a2e322668f4dbd210251427daf69b3bc72f6961a07600e903f05f0d85f"
     }
   ],
   "code_start_ref": null,
@@ -95,14 +100,14 @@
     }
   ],
   "last_checkpoint": {
-    "id": "c0002",
-    "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0002/manifest.json",
-    "sha256": "ff3e057b2dc391084c1762f9a3b8711a90c4000fbd658eb5025fb05ded65257a"
+    "id": "c0003",
+    "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0003/manifest.json",
+    "sha256": "25cc65a2e322668f4dbd210251427daf69b3bc72f6961a07600e903f05f0d85f"
   },
-  "next_action": "继续 ITERATE r1，按用户反馈调整双端原型和方案；未要求定稿，不进入 SPECIFY。",
+  "next_action": "继续 ITERATE r2，按用户反馈调整用户端原型和双端设计方案。",
   "open_questions": [],
   "pending_stage_review": null,
-  "prototype_revision": 1,
+  "prototype_revision": 2,
   "resume_stage": null,
   "schema_version": 4,
   "stage": "ITERATE",

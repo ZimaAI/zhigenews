@@ -17,7 +17,7 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
 </script>
 <template>
   <Modal :open="open" title="还有未保存的修改" @close="finish(false)">
-    <p>离开后，这次编辑不会应用到你的订阅。可以留下继续编辑，或放弃修改。</p>
+    <p>离开将丢弃未保存的修改。</p>
     <template #footer><button class="button" @click="finish(true)">放弃修改并离开</button><button class="button button--primary" @click="finish(false)">继续编辑</button></template>
   </Modal>
 </template>

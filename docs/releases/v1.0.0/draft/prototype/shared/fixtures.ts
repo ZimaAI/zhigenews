@@ -2,7 +2,7 @@ import type { DemoState, NewsItem, Preferences, RunEvent } from './types';
 
 export const FIXED_NOW = '2026-09-18T08:12:00+08:00';
 export const TOPICS = ['Agent 工程', '大语言模型', '开源生态', 'AI 产品', '多模态', '算力与芯片', 'AI 安全', '研究论文'];
-const preferences: Preferences = { version: 3, role: '关注 AI 应用落地的开发者，希望了解 Agent 工程实践和开源进展。', topics: TOPICS.slice(0, 3), keywords: ['LangGraph', 'Agent', '开源'], excludedKeywords: ['股价', '营销课程'], keywordMode: 'prefer', sourceTypes: ['rss', 'newsnow', 'search'], language: '简体中文', windowHours: 24, maxItems: 10, depth: '标准' };
+const preferences: Preferences = { version: 3, role: '关注 AI 应用落地的开发者，希望了解 Agent 工程实践和开源进展。', topics: TOPICS.slice(0, 3), keywords: ['LangGraph', 'Agent', '开源'] };
 const articles = [
   { id: 'n-01', topic: 'Agent 工程', title: 'Agent 的可靠性，从可恢复的每一次工具调用开始', summary: '当一次检索被打断，系统需要知道哪些工具已经执行、哪些结果尚未返回。这份示例聚焦检查点、调用关联与恢复边界，整理可用于新闻 Agent 的工程思路。', reason: '与你关注的 Agent 工程、LangGraph 相关', source: 'LangChain 文档', sourceType: 'rss', url: 'https://docs.langchain.com/oss/python/langgraph/persistence' },
   { id: 'n-02', topic: '大语言模型', title: '上下文窗口之外：如何让长任务记住真正重要的信息', summary: '保留最新用户输入，将较早的工具结果压缩成可追溯摘要，并把长期偏好与单次会话分开。这份示例对比了几种上下文管理方式及其取舍。', reason: '与你关注的大语言模型、上下文工程相关', source: 'LangChain 文档', sourceType: 'search', url: 'https://docs.langchain.com/oss/python/langchain/short-term-memory' },
@@ -26,9 +26,10 @@ export const EXAMPLE_EVENTS: RunEvent[] = [
 
 export function createSeed(): DemoState {
   return structuredClone({
-    scenario: 'normal', loaded: true, authenticated: true, preferences,
-    delivery: { dailyEnabled: true, emailEnabled: true, email: 'reader@example.com', verified: true, time: '08:00', timezone: 'Asia/Shanghai', nextRunAt: '2026-09-19 08:00 · Asia/Shanghai' },
-    briefs: [0, 1, 2, 3].map((offset) => ({ id: `brief-${18 - offset}`, title: ['在变化中，找到值得关注的进展', '让 Agent 从演示走向日常工作', '开源工具与模型应用的一天', '从模型能力到产品体验'][offset], date: `2026-09-${18 - offset}`, version: 1, summary: '今天的示例简报聚焦 Agent 的可靠运行、上下文管理与开源工具。我们将相关资料整理为若干阅读线索，并为每条内容保留推荐理由和参考入口。以下全部为交互演示内容，不是当天真实新闻。', items: news.slice(0, 6 - offset).map(item => ({ ...item, id: `${item.id}-${18 - offset}`, publishedAt: item.publishedAt?.replace('2026-09-18', `2026-09-${18 - offset}`) || null, citations: item.citations.map(c => ({ ...c })) })), generationStatus: offset === 2 ? 'partial' : 'completed', deliveryStatus: offset === 0 ? 'failed' : 'submitted', generatedAt: `2026-09-${18 - offset}T08:00:12+08:00`, runId: offset === 0 ? 'run-001' : `run-history-${18-offset}`, preferenceSnapshot: preferences })),
+    scenario: 'normal', loaded: true, authenticated: true, onboardingCompleted: false,
+    preferences: { version: 0, role: '', topics: [], keywords: [] },
+    delivery: { time: '08:00' },
+    briefs: [0, 1, 2, 3].map((offset) => ({ id: `brief-${18 - offset}`, title: ['在变化中，找到值得关注的进展', '让 Agent 从演示走向日常工作', '开源工具与模型应用的一天', '从模型能力到产品体验'][offset], date: `2026-09-${18 - offset}`, version: 1, summary: '从可靠的工具调用到上下文管理，关注 Agent 工程与开源工具的最新进展。', items: news.slice(0, 6 - offset).map(item => ({ ...item, id: `${item.id}-${18 - offset}`, publishedAt: item.publishedAt?.replace('2026-09-18', `2026-09-${18 - offset}`) || null, citations: item.citations.map(c => ({ ...c })) })), generationStatus: offset === 2 ? 'partial' : 'completed', deliveryStatus: offset === 0 ? 'failed' : 'submitted', generatedAt: `2026-09-${18 - offset}T08:00:12+08:00`, runId: offset === 0 ? 'run-001' : `run-history-${18-offset}`, preferenceSnapshot: preferences })),
     runs: [
       { id: 'run-001', userName: '林序', status: 'completed', model: 'news-editor', configVersion: 'v3', startedAt: '2026-09-18T08:00:00+08:00', elapsedSeconds: 12, inputTokens: 12640, outputTokens: 2180, cost: 0.086, searchCount: 2, events: EXAMPLE_EVENTS, subtasks: [{ id: 'sub-001', name: '开源生态研究', status: 'completed', detail: '3 条候选 · 研究模型 · 共享主任务预算' }] },
       { id: 'run-002', userName: '陈予', status: 'partial', model: 'news-editor', configVersion: 'v3', startedAt: '2026-09-18T08:00:00+08:00', elapsedSeconds: 18, inputTokens: 8300, outputTokens: 1420, cost: 0.059, searchCount: 1, events: EXAMPLE_EVENTS.slice(0, 5), subtasks: [] },
@@ -66,8 +67,8 @@ export function createSeed(): DemoState {
       { id: 'user-03', name: '周可', email: 'zhou@example.com', role: 'user', status: 'disabled', topics: ['AI 产品'] },
     ],
     deliveries: [
-      { id: 'delivery-01', briefId: 'brief-18', userName: '林序', destination: 'r•••@example.com', channel: 'email', status: 'failed', attempts: 1, time: '2026-09-18T08:00:15+08:00', error: '示例：SMTP 连接超时。简报已生成，可重试同一份内容。' },
-      { id: 'delivery-02', briefId: 'brief-17', userName: '林序', destination: 'r•••@example.com', channel: 'email', status: 'submitted', attempts: 1, time: '2026-09-17T08:00:15+08:00', error: '' },
+      { id: 'delivery-01', briefId: 'brief-18', userName: '林序', destination: '站内简报', channel: 'in_app', status: 'failed', attempts: 1, time: '2026-09-18T08:00:15+08:00', error: '示例：站内通知写入失败。简报仍可阅读，重试仅补发通知。' },
+      { id: 'delivery-02', briefId: 'brief-17', userName: '林序', destination: '站内简报', channel: 'in_app', status: 'submitted', attempts: 1, time: '2026-09-17T08:00:15+08:00', error: '' },
     ],
     memories: [{ id: 'mem-01', text: '偏好工程实现细节和可复用的开源方案。', source: '示例用户反馈', updatedAt: '2026-09-16T09:00:00+08:00' }, { id: 'mem-02', text: '减少重复事件，优先解释相比已有方案的变化。', source: '示例用户反馈', updatedAt: '2026-09-17T09:00:00+08:00' }],
   } as DemoState);

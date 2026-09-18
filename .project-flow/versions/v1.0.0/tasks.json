@@ -50,7 +50,17 @@
     },
     {
       "id": "TASK-ITER-003",
-      "title": "按下一轮用户反馈继续调整 r2 原型与方案",
+      "title": "极简用户端、三字段订阅、站内时间设置与首次引导（r3）",
+      "status": "done",
+      "evidence": [
+        "design-user.md",
+        "docs/releases/v1.0.0/draft/spec/07-changes.md",
+        ".project-flow/versions/v1.0.0/evidence/prototype-r3-validation.json"
+      ]
+    },
+    {
+      "id": "TASK-ITER-004",
+      "title": "根据下一轮反馈继续调整 r3 原型和方案",
       "status": "pending",
       "evidence": []
     }

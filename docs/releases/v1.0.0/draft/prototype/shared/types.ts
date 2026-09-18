@@ -2,11 +2,9 @@ export type Scenario = 'normal' | 'loading' | 'empty' | 'error' | 'partial' | 'u
 export type RunStatus = 'queued' | 'running' | 'completed' | 'partial' | 'failed' | 'cancelling' | 'cancelled';
 export type DeliveryStatus = 'disabled' | 'pending' | 'submitted' | 'failed' | 'unknown';
 export interface Preferences {
-  version: number; role: string; topics: string[]; keywords: string[]; excludedKeywords: string[];
-  keywordMode: 'prefer' | 'required'; sourceTypes: string[]; language: string;
-  windowHours: number; maxItems: number; depth: string;
+  version: number; role: string; topics: string[]; keywords: string[];
 }
-export interface DeliverySettings { dailyEnabled: boolean; emailEnabled: boolean; email: string; verified: boolean; time: string; timezone: string; nextRunAt: string; }
+export interface DeliverySettings { time: string; }
 export interface Citation { id: string; name: string; title: string; url: string; publishedAt: string | null; }
 export interface NewsItem { id: string; title: string; summary: string; reason: string; topic: string; source: string; sourceType: string; publishedAt: string | null; url: string; read: boolean; citations: Citation[]; }
 export interface Brief { id: string; title: string; date: string; version: number; summary: string; items: NewsItem[]; generationStatus: RunStatus; deliveryStatus: DeliveryStatus; generatedAt: string; runId: string; preferenceSnapshot: Preferences; }
@@ -22,7 +20,7 @@ export interface DemoUser { id: string; name: string; email: string; role: strin
 export interface Delivery { id: string; briefId: string; userName: string; destination: string; channel: string; status: DeliveryStatus; attempts: number; time: string; error: string; }
 export interface Memory { id: string; text: string; source: string; updatedAt: string; }
 export interface DemoState {
-  scenario: Scenario; loaded: boolean; authenticated: boolean; preferences: Preferences; delivery: DeliverySettings;
+  scenario: Scenario; loaded: boolean; authenticated: boolean; onboardingCompleted: boolean; preferences: Preferences; delivery: DeliverySettings;
   briefs: Brief[]; runs: AgentRun[]; sources: Source[]; models: ModelConfig[]; configs: AgentConfig[];
   evaluations: Evaluation[]; evalCases: EvalCase[]; users: DemoUser[]; deliveries: Delivery[]; memories: Memory[];
 }

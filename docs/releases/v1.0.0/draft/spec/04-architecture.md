@@ -25,7 +25,7 @@ flowchart TB
   V --> F
   V --> W[用户 / 运行工作区]
   H --> D
-  P --> E[站内收件箱 / SMTP]
+  P --> E[站内简报发布]
   D --> G
 ```
 
@@ -47,7 +47,7 @@ backend/src/zhigenews/
     memory/        # MySQL checkpointer/store、用户记忆
     models/        # 提供商适配、模型能力与 usage
   ingestion/       # newsnow、rss、规范化、快照管理
-  infrastructure/ # SQLAlchemy、队列、凭据、HTTP、邮件
+  infrastructure/ # SQLAlchemy、队列、凭据、HTTP
   workers/         # 任务入口和调度器
 apps/user-web/     # 独立 package / 构建 / 部署入口
 apps/admin-web/    # 独立 package / 构建 / 部署入口
@@ -57,11 +57,11 @@ packages/api-client/ # 从唯一契约生成的客户端
 
 ## 数据库与执行一致性
 
-SQLAlchemy 2 + Alembic，目标 MySQL 8.4 LTS/InnoDB/utf8mb4；UTC 存储时间，用户设置 IANA 时区。初步实体如下，不冒充完整迁移定义：
+SQLAlchemy 2 + Alembic，目标 MySQL 8.4 LTS/InnoDB/utf8mb4；UTC 存储时间，每日计划按系统时区 Asia/Shanghai 解释。初步实体如下，不冒充完整迁移定义：
 
 | 组 | 主要对象 | 关键不变量 |
 | --- | --- | --- |
-| 账户 | users、sessions、user_preferences、delivery_settings | user/admin 权限；偏好有 version；目的地验证状态独立 |
+| 账户 | users、sessions、user_preferences、delivery_settings | user/admin 权限；偏好有 version；首次完成标记持久化；推送设置仅每日时间 |
 | 采集 | sources、source_fetches、source_snapshots、news_items | 源 ID 固定；快照不可变；新闻原链接/来源时间/抓取时间分别记录 |
 | Agent 配置 | model_endpoints、secret_refs、agent_config_versions | 数据库存加密凭据；主加密密钥来自环境；运行绑定配置版本 |
 | 运行 | agent_runs、run_events、message_journal、subtasks | 每条 run 归属用户；事件和原始消息序号单调递增；子任务归属父 run |
@@ -73,9 +73,9 @@ MySQL durable checkpointer 优先评估社区 `langgraph-checkpoint-mysql`，外
 
 调度器按 `next_due_at` 查源和用户；每项任务持有租约和幂等业务键。源的并发采集限制为 1；用户每日唯一键包含 user、计划槽位和简报类型。手动运行另有 idempotency key。MySQL 事务写运行与 outbox，派发器发布到 Celery，worker 验证业务键，队列采用至少一次投递语义。
 
-短事务用行锁/唯一约束协调，模型/网络请求不持有数据库锁。Worker 心跳与租约用于识别意外退出；恢复依据检查点和已记录副作用。外部 SMTP 没有完整幂等/回执保证时不能宣称绝对不重发。
+短事务用行锁/唯一约束协调，模型/网络请求不持有数据库锁。Worker 心跳与租约用于识别意外退出；恢复依据检查点和已记录副作用。站内发布以用户与精确简报版本唯一键去重，不重复创建收件记录。
 
-每日计划：按用户时区计算 UTC `next_run_at`；夏令时跳过的时间前移到首个有效时刻，重复时刻只执行一次；暂停恢复不补发全部历史。以上为待原型确认的计划语义。
+每日计划：首次有效偏好保存后启用，默认 08:00，按系统时区 Asia/Shanghai 计算 UTC `next_run_at`。用户仅修改 HH:mm；未完成引导或被禁用账户不调度，修改时间不补发历史。浏览器原型只演示设置，真实定时任务仍待后端实现。
 
 ## 本地资料与运行文件
 
@@ -110,7 +110,7 @@ RSS 以配置周期为起点，遵守 ETag/Last-Modified、304、缓存头/可�
 
 运行 state 保存 messages、summary、summary_revision、子任务状态、预算用量、文件读取版本和产物引用。runtime context 注入 user_id、run_id、thread_id、配置/偏好快照、授权挂载、取消令牌和适配器；秘密不作为可序列化 state/message 写入检查点。
 
-Agent 输出结构化简报和 Markdown。服务端在发布前校验条目数、有效证据 ID/URL、用户排除规则与工作区归属。只写出一个文件不等于简报已发布。投递由应用层按用户设置触发，Agent 本身没有任意收件人发送工具。
+Agent 输出结构化简报和 Markdown。服务端在发布前校验条目数、有效证据 ID/URL、话题和关键词相关性与工作区归属。只写出一个文件不等于简报已发布。站内发布由应用层完成，Agent 本身没有任意收件人发送工具。用户偏好只含话题/背景/关键词；24 小时、10 条、全部来源等当前原型参数属于系统内部默认值。
 
 子 Agent 通过受控 `delegate_research` 额外工具委派检索/主题核对；共享父级预算，限制并发/深度，拥有独立 thread 和受限子工作区，默认不递归委派。结果只返回有界摘要及证据引用，不把全部子消息拼回父上下文。
 
@@ -146,11 +146,11 @@ bash 每次运行在最小 Linux 容器环境：无模型/数据库凭据、无�
 
 模型首版支持 OpenAI 兼容 chat/tool calling 端点，通过 LangChain adapter 隔离；每模型记录真实 model ID、context window、工具/结构化输出能力和价格配置来源。端点连接成功不代表工具调用能力验证通过。敏感配置只在受信 worker 解密，用量缺失记录 unknown，费用是基于配置价格的估算。
 
-长期记忆按 user namespace 保存显式关注背景、反馈和简报去重指纹；新任务将当前偏好放在更高优先级。RSS/搜索文本标识为不可信资料，不能写入系统指令或提升为用户偏好。记忆有来源/更新时间，用户可查看与清理。
+长期记忆按 user namespace 保存显式关注背景、反馈和简报去重指纹；新任务将当前偏好放在更高优先级。RSS/搜索文本标识为不可信资料，不能写入系统指令或提升为用户偏好。记忆有来源/更新时间与删除能力，不在本轮用户设置中展示记忆管理。
 
 观测记录实际模型/工具事件、耗时、tokens、状态、错误、摘要覆盖范围和子 run 关联。用户只见本人的简化事件，管理员看脱敏细节；不采集/展示模型私有思维链。SSE 的 Last-Event-ID/游标可补拉已持久化事件，断线不改变 run 状态。
 
-评估先做确定性检查（引用存在/来源可追溯/排除词/重复/时效/预算），再做人工或明确标注的模型评分（相关性、摘要忠实度）。固定样例包含来源快照与时间，评估过程不实时发送邮件。实验比较绑定模型与配置、提示词、dataset 版本和评分器版本；评分器故障不能记成 0 分或通过。
+评估先做确定性检查（引用存在/来源可追溯/相关性/重复/时效/预算），再做人工或明确标注的模型评分（相关性、摘要忠实度）。固定样例包含来源快照与时间，评估过程不向用户发布真实简报。实验比较绑定模型与配置、提示词、dataset 版本和评分器版本；评分器故障不能记成 0 分或通过。
 
 ## 后续需要证明的行为
 
@@ -160,7 +160,7 @@ bash 每次运行在最小 Linux 容器环境：无模型/数据库凭据、无�
 - 跨用户资源拒绝、目录穿越、编码/盘符/UNC、符号链接、路径替换竞态、CAS 双写冲突、bash 写回绕过。
 - 多工具并行结果错序/缺失/孤儿/重复、中断重启、消息修复幂等；最新用户原文保留、旧摘要并入、压缩后工具配对和 token 总预算。
 - MySQL checkpoint 重启恢复、线程归属、子任务预算与取消；工具与模型超时且不重复外部副作用。
-- 引用与偏好校验、生成和投递分离、队列重投、邮件提交不冒充送达、SSE 断线回放。
+- 引用与偏好校验、生成和投递分离、队列重投、站内发布不冒充已读、SSE 断线回放。
 - 原型/正式前端交互与设计规范；正式前端真实后端对接，不把 mock 通过当生产功能通过。
 
 ## 主要依据

@@ -4,7 +4,7 @@
   "info": {
     "title": "ZhigeNews v1.0.0 draft exchange contract",
     "version": "1.0.0-prototype.1",
-    "description": "ITERATE 草稿；唯一交换契约。当前 Vue 原型采用内存 adapter，未提供 HTTP 后端。所有 examples 为 synthetic，不代表新闻事实或真实执行。"
+    "description": "v1.0.0 ITERATE r3 候选契约，尚未冻结或实现 HTTP。用户偏好仅话题/背景/关键词，推送仅每日时间且只站内；首次设置完成状态持久化。"
   },
   "servers": [
     {
@@ -266,7 +266,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Preferences"
+                "$ref": "#/components/schemas/PreferencesWrite"
               }
             }
           }
@@ -303,7 +303,8 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "description": "原样回传版本进行乐观并发校验；至少一个话题或关键词。成功保存与首次引导完成标记在同一事务持久化，仅后续新运行使用新偏好。"
       }
     },
     "/me/delivery-settings": {
@@ -353,8 +354,8 @@
         "tags": [
           "User"
         ],
-        "summary": "保存时间、渠道和暂停状态",
-        "description": "变更邮箱时 verified 重置为 false；暂停仅影响未来调度。nextRunAt 由服务端计算。",
+        "summary": "保存每日站内推送时间",
+        "description": "只接受 HH:mm；每日启用，系统时区 Asia/Shanghai。保存不会立即生成或发布简报，不补发历史槽位。",
         "x-required-role": "authenticated",
         "requestBody": {
           "required": true,
@@ -373,158 +374,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DeliverySettings"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthenticated"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/me/email-verification": {
-      "post": {
-        "operationId": "sendEmailVerification",
-        "tags": [
-          "User"
-        ],
-        "summary": "发送邮箱验证凭证",
-        "x-required-role": "authenticated",
-        "responses": {
-          "202": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VerificationSent"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthenticated"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/me/email-verification/confirm": {
-      "post": {
-        "operationId": "confirmEmailVerification",
-        "tags": [
-          "User"
-        ],
-        "summary": "核实邮箱验证凭证",
-        "x-required-role": "authenticated",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VerificationRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeliverySettings"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthenticated"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/me/delivery-test": {
-      "post": {
-        "operationId": "testDelivery",
-        "tags": [
-          "User"
-        ],
-        "summary": "为已验证的本人目的地创建测试投递",
-        "x-required-role": "authenticated",
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 8,
-              "maxLength": 128
-            },
-            "description": "同身份、同路由和相同请求体的重放返回原任务；同 key 不同请求体返回 409。"
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Delivery"
                 }
               }
             }
@@ -1167,7 +1016,7 @@
           "User"
         ],
         "summary": "重试同一期简报投递",
-        "description": "保持 briefId 和简报内容版本；已 submitted/pending 不重复提交，unknown 须提示无法确认并由用户明确发起重试。",
+        "description": "保持 briefId 和内容版本，重试站内发布；已 submitted/pending 不重复创建，unknown 先核对发布记录。",
         "x-required-role": "authenticated",
         "parameters": [
           {
@@ -3195,7 +3044,8 @@
           "submitted",
           "failed",
           "unknown"
-        ]
+        ],
+        "description": "站内发布状态；submitted 表示已发布，不表示用户已阅读。failed/unknown 可由管理员核对后重试原简报；disabled 仅用于历史或被停用账户。"
       },
       "Preferences": {
         "type": "object",
@@ -3204,24 +3054,17 @@
           "version",
           "role",
           "topics",
-          "keywords",
-          "excludedKeywords",
-          "keywordMode",
-          "sourceTypes",
-          "language",
-          "windowHours",
-          "maxItems",
-          "depth"
+          "keywords"
         ],
         "properties": {
           "version": {
             "type": "integer",
-            "minimum": 1,
-            "description": "并发更新版本；成功保存由服务端递增。"
+            "minimum": 0,
+            "description": "服务端版本，0 表示尚未配置；提交时原样回传作并发校验，成功保存由服务端递增。"
           },
           "role": {
             "type": "string",
-            "maxLength": 1000,
+            "maxLength": 500,
             "description": "关注背景/职业说明，并非鉴权角色。"
           },
           "topics": {
@@ -3230,113 +3073,38 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 80
-            }
+            },
+            "maxItems": 20,
+            "uniqueItems": true
           },
           "keywords": {
             "type": "array",
             "items": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 80
-            }
-          },
-          "excludedKeywords": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 80
-            }
-          },
-          "keywordMode": {
-            "type": "string",
-            "enum": [
-              "prefer",
-              "required"
-            ],
-            "default": "prefer"
-          },
-          "sourceTypes": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "rss",
-                "newsnow",
-                "search"
-              ]
-            }
-          },
-          "language": {
-            "type": "string",
-            "default": "简体中文"
-          },
-          "windowHours": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 168,
-            "default": 24
-          },
-          "maxItems": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 30,
-            "default": 8
-          },
-          "depth": {
-            "enum": [
-              "精简",
-              "标准",
-              "深入"
-            ],
-            "default": "标准",
-            "type": "string"
+              "maxLength": 40
+            },
+            "maxItems": 20,
+            "uniqueItems": true
           }
-        }
+        },
+        "description": "用户偏好仅话题、背景与关键词。读取未配置偏好允许空数组与 version 0；保存至少一个话题或关键词。"
       },
       "DeliverySettings": {
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "dailyEnabled",
-          "emailEnabled",
-          "email",
-          "verified",
-          "time",
-          "timezone",
-          "nextRunAt"
+          "time"
         ],
         "properties": {
-          "dailyEnabled": {
-            "type": "boolean",
-            "default": true
-          },
-          "emailEnabled": {
-            "type": "boolean",
-            "default": false
-          },
-          "email": {
-            "type": "string",
-            "description": "用户本人的完整地址仅本人设置页可返回；未配置时空串。"
-          },
-          "verified": {
-            "type": "boolean"
-          },
           "time": {
             "type": "string",
             "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
-            "default": "08:00"
-          },
-          "timezone": {
-            "type": "string",
-            "default": "Asia/Shanghai",
-            "description": "IANA 时区名称；后端校验实际时区库。"
-          },
-          "nextRunAt": {
-            "description": "原型下一次计划展示文本，包含日期和 IANA 时区；暂停时为空串。正式调度不得解析该展示文本，后端使用 UTC 时间和时区。",
-            "type": "string"
+            "default": "08:00",
+            "description": "每日站内自动推送时间，按系统时区 Asia/Shanghai 解释。"
           }
-        }
+        },
+        "description": "仅支持站内发布。每日任务默认启用；不提供邮箱、渠道、时区或开关字段。"
       },
       "Citation": {
         "type": "object",
@@ -4114,13 +3882,12 @@
           },
           "destination": {
             "type": "string",
-            "description": "脱敏目的地。"
+            "description": "站内简报位置，不包含邮件地址。"
           },
           "channel": {
             "type": "string",
             "enum": [
-              "inbox",
-              "email"
+              "in_app"
             ]
           },
           "status": {
@@ -4171,7 +3938,8 @@
         "additionalProperties": false,
         "required": [
           "user",
-          "expiresAt"
+          "expiresAt",
+          "onboardingCompleted"
         ],
         "properties": {
           "user": {
@@ -4180,6 +3948,10 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "onboardingCompleted": {
+            "type": "boolean",
+            "description": "首次有效偏好保存后持久化为 true；注册为 false，刷新或重新登录不重置。"
           }
         }
       },
@@ -4502,36 +4274,17 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "dailyEnabled",
-          "emailEnabled",
-          "email",
-          "time",
-          "timezone"
+          "time"
         ],
         "properties": {
-          "dailyEnabled": {
-            "type": "boolean",
-            "default": true
-          },
-          "emailEnabled": {
-            "type": "boolean",
-            "default": false
-          },
-          "email": {
-            "type": "string",
-            "description": "用户本人的完整地址仅本人设置页可返回；未配置时空串。"
-          },
           "time": {
             "type": "string",
             "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
-            "default": "08:00"
-          },
-          "timezone": {
-            "type": "string",
-            "default": "Asia/Shanghai",
-            "description": "IANA 时区名称；后端校验实际时区库。"
+            "default": "08:00",
+            "description": "每日站内自动推送时间，按系统时区 Asia/Shanghai 解释。"
           }
-        }
+        },
+        "description": "仅支持站内发布。每日任务默认启用；不提供邮箱、渠道、时区或开关字段。"
       },
       "EnabledWrite": {
         "type": "object",
@@ -4571,21 +4324,6 @@
           "read": {
             "type": "boolean",
             "default": true
-          }
-        }
-      },
-      "VerificationRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "code"
-        ],
-        "properties": {
-          "code": {
-            "type": "string",
-            "minLength": 6,
-            "maxLength": 12,
-            "writeOnly": true
           }
         }
       },
@@ -4640,23 +4378,6 @@
             "items": {
               "type": "string"
             }
-          }
-        }
-      },
-      "VerificationSent": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "destination",
-          "expiresAt"
-        ],
-        "properties": {
-          "destination": {
-            "type": "string"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },
@@ -4921,6 +4642,65 @@
             ]
           }
         }
+      },
+      "PreferencesWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "role",
+          "topics",
+          "keywords"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "服务端版本，0 表示尚未配置；提交时原样回传作并发校验，成功保存由服务端递增。"
+          },
+          "role": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "关注背景/职业说明，并非鉴权角色。"
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "maxItems": 20,
+            "uniqueItems": true
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "maxItems": 20,
+            "uniqueItems": true
+          }
+        },
+        "description": "提交当前版本及三个偏好字段；有效保存同时持久化 onboardingCompleted=true，背景可为空。",
+        "anyOf": [
+          {
+            "properties": {
+              "topics": {
+                "minItems": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "keywords": {
+                "minItems": 1
+              }
+            }
+          }
+        ]
       }
     },
     "responses": {

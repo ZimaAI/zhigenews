@@ -1,0 +1,48 @@
+{
+  "schema_version": 4,
+  "version": "v1.0.0",
+  "stage": "ITERATE",
+  "prototype_revision": 3,
+  "date": "2026-09-18",
+  "pre_change_commit": "72b512a",
+  "scope": "极简用户端、三字段订阅、仅每日时间的站内推送、首次引导；不作为正式后端验收",
+  "commands": [
+    {"command": "npm run build", "cwd": "docs/releases/v1.0.0/draft/prototype", "exit_code": 0, "result": "vue-tsc 与双端构建通过；用户1632模块，管理员1608模块"},
+    {"command": "npm run check:contract", "cwd": "docs/releases/v1.0.0/draft/prototype", "exit_code": 0, "result": {"examples": 14, "schemas": 47, "operations": 51, "instancesChecked": 48, "failures": []}},
+    {"command": "git diff --check", "exit_code": 0, "result": "无空白错误"},
+    {"command": "python .agents/skills/prototype-to-product/scripts/version_flow.py doctor --root .", "exit_code": 0, "result": {"ok": true, "problems": [], "repairs_performed": false}}
+  ],
+  "browser": {
+    "engine": "Codex In-app Browser / CUA",
+    "passed": [
+      "未完成配置进入onboarding；空提交给出错误并聚焦话题组；Space可切换选择",
+      "背景与未点击添加的LangGraph关键词随开始阅读一起保存，进入today；刷新仍为today",
+      "头像直达settings/preferences，主导航仅今日/历史，表单只话题/背景/关键词",
+      "未添加RSS关键词时切换推送时间触发未保存对话框；继续编辑后保存成功",
+      "settings/schedule只有time输入；09:30保存刷新仍保留",
+      "error场景保存失败保留Agent工程/开源生态选择、背景、关键词；重试加载再保存成功",
+      "更新简报得到4条话题或关键词匹配示例，旧阅读状态保持；详情来源可见，标记已读可操作",
+      "历史搜索不存在内容显示无匹配；清除可恢复列表",
+      "旧preferences入口转到settings/preferences；全部重置回onboarding，直接访问旧delivery仍被引导保护",
+      "管理员站内通知补发后brief-18不变、尝试1到2、submitted显示已发布",
+      "最终用户与管理员error日志均为空"
+    ],
+    "responsive": {
+      "widths": [320, 375, 768, 1024, 1440, 1920],
+      "routes": ["/settings/preferences", "/settings/schedule", "/today"],
+      "observations": 18,
+      "result": "全部实际视口尺寸下document.scrollWidth不大于innerWidth，无整页横向溢出"
+    },
+    "visual_review": "1440设置、375阅读与375首次引导目视检查；截图仅留工具会话",
+    "admin_isolation": {"primary": "#0F766E", "reader_shell": false, "change": "仅站内文案/图标和共享字段语义，保留原管理布局"},
+    "cleanup": "管理端恢复默认尺寸；旧用户测试标签页关闭；新的无尺寸覆盖用户预览保留在首次引导"
+  },
+  "contract_change": true,
+  "known_limits": [
+    "当前是可交互mock，双端localStorage按origin独立",
+    "未执行真实HTTP后端、模型、新闻采集或站内定时发布",
+    "背景仅保存，原型没有模型语义改写；匹配采用固定资料的标题/摘要关键词或话题"
+  ],
+  "unresolved_observed_blockers": [],
+  "next_action": "继续ITERATE r3，按用户反馈调整原型和方案"
+}

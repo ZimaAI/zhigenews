@@ -16,17 +16,30 @@ const router = createRouter({
     { path: '/today', component: Today, meta: { title: '今日简报' } },
     { path: '/briefs', component: History, meta: { title: '历史简报' } },
     { path: '/briefs/:id', component: Brief, meta: { title: '阅读简报' } },
-    { path: '/preferences', component: Preferences, meta: { title: '兴趣订阅' } },
-    { path: '/delivery', component: Delivery, meta: { title: '推送设置' } },
-    { path: '/onboarding', component: Onboarding, meta: { title: '首次配置' } },
+    { path: '/preferences', redirect: '/settings/preferences' },
+    { path: '/delivery', redirect: '/settings/schedule' },
+    { path: '/onboarding', component: Onboarding, meta: { title: '订阅偏好' } },
     { path: '/runs/:id', component: Run, meta: { title: '整理过程' } },
-    { path: '/settings', component: Settings, meta: { title: '设置' } },
+    { path: '/settings', component: Settings, meta: { title: '个人设置' }, children: [
+      { path: '', redirect: '/settings/preferences' },
+      { path: 'preferences', component: Preferences, meta: { title: '订阅偏好' } },
+      { path: 'schedule', component: Delivery, meta: { title: '推送时间' } },
+    ] },
     { path: '/login', component: Auth, meta: { title: '登录', standalone: true } },
     { path: '/register', component: Auth, meta: { title: '创建账户', standalone: true } },
     { path: '/:pathMatch(.*)*', redirect: '/today' },
   ],
-  scrollBehavior(to, from, saved) { if (to.path === from.path) return; return saved ?? { top: 0 }; },
+  scrollBehavior(to, from, saved) {
+    if (to.hash) return { el: to.hash, top: 24 };
+    if (to.path === from.path) return;
+    return saved ?? { top: 0 };
+  },
 });
-router.beforeEach((to) => { if (!to.meta.standalone && !state.authenticated) return '/login'; });
+router.beforeEach((to) => {
+  if (to.meta.standalone) return;
+  if (!state.authenticated) return '/login';
+  if (!state.onboardingCompleted && to.path !== '/onboarding') return '/onboarding';
+  if (state.onboardingCompleted && to.path === '/onboarding') return '/today';
+});
 router.afterEach((to) => { document.title = `${to.meta.title || '简报'} · 知更`; });
 export default router;

@@ -2,12 +2,6 @@
   "synthetic": true,
   "schema": "DeliverySettings",
   "data": {
-    "dailyEnabled": true,
-    "emailEnabled": true,
-    "email": "reader@example.com",
-    "verified": true,
-    "time": "08:00",
-    "timezone": "Asia/Shanghai",
-    "nextRunAt": "2026-09-19 08:00 · Asia/Shanghai"
+    "time": "08:00"
   }
 }

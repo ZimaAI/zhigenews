@@ -2,7 +2,10 @@ import { reactive, ref, watch } from 'vue';
 import { createSeed, EXAMPLE_EVENTS, FIXED_NOW, TOPICS } from './fixtures';
 import type { AgentConfig, AgentRun, Brief, DeliverySettings, DemoState, EvalCase, ModelConfig, Preferences, Scenario, Source } from './types';
 export { FIXED_NOW, TOPICS };
-const STORAGE = 'zhigenews-prototype-r1.1';
+const STORAGE = 'zhigenews-prototype-r3';
+const TIMEZONE = 'Asia/Shanghai';
+const READING_WINDOW_HOURS = 24;
+const MAX_BRIEF_ITEMS = 10;
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 function initialState(): DemoState {
   try {
@@ -30,20 +33,22 @@ async function guard() {
   const currentEpoch = epoch;
   await sleep();
   if (currentEpoch !== epoch) throw new Error('示例已重置，请重新操作。');
-  if (state.scenario === 'error') throw new Error('模拟服务暂不可用，输入已保留。请切回正常场景后重试。');
-  if (state.scenario === 'unauthorized') throw new Error('模拟权限校验失败：当前身份不能执行此操作。');
+  if (state.scenario === 'error') throw new Error('保存失败，请重试。输入已保留。');
+  if (state.scenario === 'unauthorized') throw new Error('当前账户没有操作权限。');
 }
 function get<T extends { id: string }>(items: T[], key: string): T { const value = items.find(x => x.id === key); if (!value) throw new Error('示例记录不存在，请返回列表。'); return value; }
 export function resetDemo() {
   epoch++; for (const timer of timers) clearTimeout(timer); timers.clear();
-  Object.assign(state, createSeed()); resetRevision.value++; notify('已恢复初始示例，时钟回到 2026-09-18 08:12。');
+  Object.assign(state, createSeed()); resetRevision.value++; notify('已重置示例。');
 }
 export function setScenario(scenario: Scenario) {
+  const preferences = clone(state.preferences);
+  const onboardingCompleted = state.onboardingCompleted;
   resetDemo(); state.scenario = scenario;
+  state.preferences = preferences; state.onboardingCompleted = onboardingCompleted;
   if (scenario === 'loading') { state.loaded = false; schedule(() => state.loaded = true, 1800); }
   if (scenario === 'empty') {
     state.briefs = []; state.runs = []; state.sources = []; state.models = []; state.configs = []; state.evaluations = []; state.evalCases = []; state.users = []; state.deliveries = []; state.memories = [];
-    state.preferences.topics = []; state.preferences.keywords = [];
   }
   if (scenario === 'partial') { state.briefs[0]!.generationStatus = 'partial'; state.runs[0]!.status = 'partial'; }
   notify(`已切换为${{ normal: '正常', loading: '加载', empty: '空内容', error: '请求失败', partial: '部分完成', unauthorized: '无权限' }[scenario]}示例。`);
@@ -52,48 +57,34 @@ export function formatDate(value: string | null | undefined) {
   if (!value) return '未知';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: state.delivery.timezone || 'Asia/Shanghai' }).format(date);
+  return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: TIMEZONE }).format(date);
 }
 export function statusLabel(status: string) {
-  return ({ completed: '已完成', running: '运行中', queued: '排队中', partial: '部分完成', failed: '失败', cancelling: '正在取消', cancelled: '已取消', pending: '待提交', submitted: '已提交发送', disabled: '已停用', unknown: '状态未知', healthy: '正常', syncing: '同步中', unverified: '待验证', published: '已发布', draft: '草稿', active: '正常', verified: '已验证', success: '成功' } as Record<string, string>)[status] || status;
-}
-function nextRun(setting: DeliverySettings): string {
-  if (!setting.dailyEnabled) return '已暂停 · 恢复后安排下一次，不补发历史';
-  // Use the deterministic demo instant, then find the next matching local minute.
-  const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: setting.timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
-  const start = new Date(FIXED_NOW).getTime();
-  for (let minute = 1; minute <= 60 * 49; minute++) {
-    const text = formatter.format(new Date(start + minute * 60000));
-    if (text.slice(-5) === setting.time) return `${text} · ${setting.timezone}`;
-  }
-  return `下一个有效的 ${setting.time} · ${setting.timezone}（模拟）`;
+  return ({ completed: '已完成', running: '运行中', queued: '排队中', partial: '部分完成', failed: '失败', cancelling: '正在取消', cancelled: '已取消', pending: '待发布', submitted: '已发布', disabled: '已停用', unknown: '状态未知', healthy: '正常', syncing: '同步中', unverified: '待验证', published: '已发布', draft: '草稿', active: '正常', verified: '已验证', success: '成功' } as Record<string, string>)[status] || status;
 }
 function emailValid(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }
 
 export const api = {
   async load() { state.loaded = false; try { await guard(); } finally { state.loaded = true; } },
   async login(email: string, password: string) { await guard(); if (!emailValid(email) || password.length < 8) throw new Error('请输入有效邮箱和至少 8 位演示密码。'); state.authenticated = true; notify('已进入演示账户，不执行真实身份认证。'); },
-  async register(email: string, password: string, name?: string) { await this.login(email, password); state.preferences.topics = []; state.preferences.keywords = []; state.briefs = []; if (!state.users.length) state.users.push({ id: 'user-demo', name: name?.trim() || '新读者', email, role: 'user', status: 'active', topics: [] }); else { state.users[0]!.email = email; if (name?.trim()) state.users[0]!.name = name.trim(); } notify('演示账户已创建，请完成首次订阅。'); },
+  async register(email: string, password: string, name?: string) { await this.login(email, password); state.preferences = { version: 0, role: '', topics: [], keywords: [] }; state.onboardingCompleted = false; state.delivery = { time: '08:00' }; state.briefs = []; if (!state.users.length) state.users.push({ id: 'user-demo', name: name?.trim() || '新读者', email, role: 'user', status: 'active', topics: [] }); else { state.users[0]!.email = email; state.users[0]!.topics = []; if (name?.trim()) state.users[0]!.name = name.trim(); } notify('账户已创建。'); },
   logout() { state.authenticated = false; },
   async savePreferences(value: Preferences) {
-    await guard(); if (!value.topics.length && !value.keywords.length) throw new Error('至少选择一个主题或添加一个关键词。');
-    if (value.maxItems < 1 || value.maxItems > 30 || value.windowHours < 1 || value.windowHours > 168) throw new Error('条数范围为 1–30，时间窗口为 1–168 小时。');
+    await guard();
     const clean = (xs: string[]) => [...new Set(xs.map(x => x.trim()).filter(Boolean))];
-    state.preferences = { ...clone(value), topics: clean(value.topics), keywords: clean(value.keywords), excludedKeywords: clean(value.excludedKeywords), version: state.preferences.version + 1 };
-    notify('订阅已保存，下次生成将使用新偏好。');
+    const topics = clean(value.topics); const keywords = clean(value.keywords);
+    if (!topics.length && !keywords.length) throw new Error('请选择一个话题或添加关键词。');
+    if (keywords.length > 20 || keywords.some(x => x.length > 40) || value.role.trim().length > 500) throw new Error('关键词最多 20 个，每个不超过 40 字；背景不超过 500 字。');
+    state.preferences = { role: value.role.trim(), topics, keywords, version: state.preferences.version + 1 };
+    state.onboardingCompleted = true;
+    if (state.users[0]) state.users[0].topics = [...topics];
+    notify('订阅已保存。');
   },
   async saveDelivery(value: DeliverySettings) {
-    await guard(); if (value.emailEnabled && !emailValid(value.email)) throw new Error('请输入有效的收件邮箱。');
+    await guard();
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value.time)) throw new Error('请选择有效的每日推送时间。');
-    const verified = value.email === state.delivery.email ? state.delivery.verified : false;
-    state.delivery = { ...clone(value), verified, nextRunAt: nextRun(value) };
-    notify('推送设置已保存（模拟），没有发送邮件。');
-  },
-  async verifyEmail() { await guard(); if (!emailValid(state.delivery.email)) throw new Error('请先保存有效邮箱。'); state.delivery.verified = true; notify('邮箱验证演示完成，没有真实验证邮件。'); },
-  async testDelivery() {
-    await guard(); if (!state.delivery.emailEnabled || !state.delivery.verified) throw new Error('请先启用邮件、保存地址并完成模拟验证。');
-    state.deliveries.unshift({ id: id('test'), briefId: '', userName: '林序', destination: state.delivery.email.replace(/^(.).+@/, '$1•••@'), channel: 'email', status: 'submitted', attempts: 1, time: FIXED_NOW, error: '' });
-    notify('模拟测试已提交发送；没有向外部邮箱发送消息。');
+    state.delivery = { time: value.time };
+    notify('推送时间已保存。');
   },
   async deleteMemory(key: string) { await guard(); state.memories = state.memories.filter(x => x.id !== key); notify('这条示例记忆已清理。'); },
   async generateBrief() {
@@ -106,26 +97,26 @@ export const api = {
     state.runs.unshift(run);
     EXAMPLE_EVENTS.forEach((event, index) => schedule(() => {
       const current = state.runs.find(x => x.id === runId); if (!current || current.status !== 'running') return;
-      const eventTime = new Intl.DateTimeFormat('en-GB', { timeZone: state.delivery.timezone, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(new Date(FIXED_NOW).getTime() + index * 1000));
+      const eventTime = new Intl.DateTimeFormat('en-GB', { timeZone: TIMEZONE, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(new Date(FIXED_NOW).getTime() + index * 1000));
       current.events.push({ ...clone(event), time: eventTime }); current.elapsedSeconds = index + 1;
       if (index !== EXAMPLE_EVENTS.length - 1) return;
       current.status = state.scenario === 'partial' ? 'partial' : 'completed'; current.inputTokens = 12640; current.outputTokens = 2180; current.cost = 0.086; current.searchCount = 2; current.subtasks = clone(seed.runs[0]!.subtasks);
       const items = clone(seed.briefs[0]!.items).filter(item => {
         const text = `${item.title} ${item.summary}`.normalize('NFKC').toLowerCase();
-        return !!item.publishedAt && new Date(item.publishedAt).getTime() >= new Date(FIXED_NOW).getTime() - prefs.windowHours * 3600000 && !prefs.excludedKeywords.some(k => text.includes(k.toLowerCase())) && prefs.sourceTypes.includes(item.sourceType) &&
-          (prefs.keywordMode !== 'required' || !prefs.keywords.length || prefs.keywords.some(k => text.includes(k.toLowerCase()))) &&
-          (!prefs.topics.length || prefs.topics.includes(item.topic));
-      }).slice(0, prefs.maxItems);
+        return !!item.publishedAt && new Date(item.publishedAt).getTime() >= new Date(FIXED_NOW).getTime() - READING_WINDOW_HOURS * 3600000 &&
+          (prefs.topics.includes(item.topic) || prefs.keywords.some(k => text.includes(k.normalize('NFKC').toLowerCase())));
+      }).slice(0, MAX_BRIEF_ITEMS);
       current.events[current.events.length - 1]!.detail = `${items.length} 条示例内容已保存。投递结果单独记录。`;
-      for (const item of items) item.read = state.briefs.flatMap(x => x.items).find(x => x.id === item.id)?.read || false;
-      const completedAt = new Date(new Date(FIXED_NOW).getTime() + index * 1000).toISOString();
-      const brief: Brief = { ...clone(seed.briefs[0]!), id: id('brief'), date: '2026-09-18', version: state.briefs.filter(x => x.date === '2026-09-18').length + 1, runId, items, summary: items.length ? `根据本次订阅，从固定示例资料中整理出 ${items.length} 条阅读线索，每条保留推荐理由与参考入口。以下为交互演示内容，不是当天真实新闻。` : '固定示例资料中没有符合当前订阅条件的内容。可以调整订阅后重新生成，系统不会自动放宽筛选条件。', generationStatus: current.status, preferenceSnapshot: prefs, generatedAt: completedAt, deliveryStatus: state.delivery.emailEnabled ? 'pending' : 'disabled' };
-      state.briefs.unshift(brief);
-      if (state.delivery.emailEnabled) {
-        const enabled = state.delivery.verified; brief.deliveryStatus = enabled ? 'submitted' : 'failed'; state.briefs[0]!.deliveryStatus = brief.deliveryStatus;
-        state.deliveries.unshift({ id: id('delivery'), briefId: brief.id, userName: run.userName, destination: state.delivery.email.replace(/^(.).+@/, '$1•••@'), channel: 'email', status: brief.deliveryStatus, attempts: 1, time: FIXED_NOW, error: enabled ? '' : '收件地址尚未完成模拟验证。' });
+      for (const item of items) {
+        item.read = state.briefs.flatMap(x => x.items).find(x => x.id === item.id)?.read || false;
+        const keywords = prefs.keywords.filter(k => `${item.title} ${item.summary}`.normalize('NFKC').toLowerCase().includes(k.normalize('NFKC').toLowerCase()));
+        item.reason = keywords.length ? `关键词：${keywords.join('、')}` : `关注话题：${item.topic}`;
       }
-      notify(items.length ? `已生成 ${items.length} 条示例内容，未执行真实模型或邮件。` : '未找到匹配的示例内容，没有自动放宽订阅条件。');
+      const completedAt = new Date(new Date(FIXED_NOW).getTime() + index * 1000).toISOString();
+      const brief: Brief = { ...clone(seed.briefs[0]!), id: id('brief'), date: '2026-09-18', version: state.briefs.filter(x => x.date === '2026-09-18').length + 1, runId, items, summary: items.length ? `今日 ${items.length} 条精选，关注${[...new Set(items.map(item => item.topic))].join('、')}。` : '今天暂无匹配内容。', generationStatus: current.status, preferenceSnapshot: prefs, generatedAt: completedAt, deliveryStatus: 'submitted' };
+      state.briefs.unshift(brief);
+      state.deliveries.unshift({ id: id('delivery'), briefId: brief.id, userName: run.userName, destination: '站内简报', channel: 'in_app', status: 'submitted', attempts: 1, time: completedAt, error: '' });
+      notify(items.length ? `简报已更新，共 ${items.length} 条。` : '今天暂无匹配内容。');
     }, 1200 * (index + 1)));
     return runId;
   },
@@ -133,8 +124,7 @@ export const api = {
   async retryDelivery(key: string) {
     await guard(); const delivery = state.deliveries.find(x => x.id === key || x.briefId === key); if (!delivery) throw new Error('找不到投递记录。');
     if (!['failed', 'unknown'].includes(delivery.status)) throw new Error('只有失败或状态未知的记录需要重试。');
-    if (delivery.channel === 'email' && (!state.delivery.emailEnabled || !state.delivery.verified)) throw new Error('请先启用邮件并完成收件地址的模拟验证，再重试投递。');
-    delivery.attempts++; delivery.status = 'submitted'; delivery.error = ''; const brief = state.briefs.find(x => x.id === delivery.briefId); if (brief) brief.deliveryStatus = 'submitted'; notify('同一份简报已模拟重新提交，尚无送达回执。');
+    delivery.attempts++; delivery.status = 'submitted'; delivery.error = ''; const brief = state.briefs.find(x => x.id === delivery.briefId); if (brief) brief.deliveryStatus = 'submitted'; notify('站内通知已重新发布。');
   },
   async markRead(key: string) { await guard(); const first = state.briefs.flatMap(x => x.items).find(x => x.id === key); if (!first) return; const next = !first.read; for (const brief of state.briefs) for (const item of brief.items) if (item.id === key) item.read = next; },
   async saveSource(value: Source) { await guard(); if (!value.name.trim() || !/^https?:\/\//.test(value.url)) throw new Error('请填写来源名称与 HTTP(S) 地址。'); if (value.interval < Math.max(60, value.upstreamInterval)) throw new Error('轮询间隔不能低于上游更新间隔，且至少 60 秒。'); const old = state.sources.find(x => x.id === value.id); if (old) { const changed = old.url !== value.url || old.kind !== value.kind || old.sourceId !== value.sourceId; Object.assign(old, clone(value), changed ? { status: 'unverified' } : {}); } else state.sources.unshift({ ...clone(value), id: id('src'), status: 'unverified' }); notify('来源配置已保存（模拟）。'); },

@@ -22,7 +22,7 @@ async function retry() { state.scenario = 'normal'; await api.load(); }
   <a class="skip-link" href="#main-content">跳转到主要内容</a>
   <div class="app-shell" :class="`app-shell--${app}`">
     <aside class="sidebar"><RouterLink class="brand" :to="app === 'user' ? '/today' : '/overview'"><span class="brand-mark"><BookOpen :size="23" :stroke-width="1.7" /></span><span class="brand-name">知更<span>ZHIGE BRIEF</span></span></RouterLink><div class="sidebar-section-label">{{ app === 'user' ? '你的每日阅读' : '工作空间' }}</div><nav class="desktop-nav" aria-label="主要导航"><RouterLink v-for="item in nav" :key="item.path" :to="item.path" :aria-current="active(item.path) ? 'page' : undefined" :class="{ selected: active(item.path) }" :title="item.label"><component :is="item.icon" :size="20" :stroke-width="1.7" /><span>{{ item.label }}</span><span v-if="item.path === '/today' && state.briefs[0]" class="nav-count">{{ state.briefs[0].items.length }}</span></RouterLink></nav>
-      <div v-if="app === 'user'" class="sidebar-note"><CalendarDays :size="18"/><span>每天一点，保持好奇。</span><p>下一期 · {{ state.delivery.dailyEnabled ? state.delivery.time : '已暂停' }}<br/>{{ state.delivery.timezone }}</p></div>
+      <div v-if="app === 'user'" class="sidebar-note"><CalendarDays :size="18"/><span>每天一点，保持好奇。</span><p>每天 {{ state.delivery.time }}</p></div>
       <div v-else class="sidebar-note"><span class="small-caps">PROTOTYPE / R1</span><p>独立管理端<br/>所有运行与指标均为示例</p></div>
       <div class="sidebar-account"><span class="avatar">{{ app === 'user' ? '林' : '管' }}</span><div><strong>{{ app === 'user' ? '林序' : '管理员' }}</strong><p>演示账户</p></div><RouterLink to="/login" class="icon-button" aria-label="切换演示账户" title="切换演示账户"><LogOut :size="17" /></RouterLink></div>
     </aside>

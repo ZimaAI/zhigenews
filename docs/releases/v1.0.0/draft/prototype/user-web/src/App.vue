@@ -5,6 +5,7 @@ import { state } from '@shared/mock';
 import ReaderShell from './components/ReaderShell.vue';
 const route = useRoute();
 const router = useRouter();
+watch(() => state.authenticated, active => { if (!active && !route.meta.standalone) void router.replace('/login'); });
 watch(() => state.onboardingCompleted, completed => {
   if (!completed && state.authenticated && !route.meta.standalone && route.path !== '/onboarding') void router.replace('/onboarding');
 }, { flush: 'post' });

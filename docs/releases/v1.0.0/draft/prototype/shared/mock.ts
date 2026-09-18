@@ -1,13 +1,17 @@
 import { reactive, ref, watch } from 'vue';
 import { createSeed, EXAMPLE_EVENTS, FIXED_NOW, TOPICS } from './fixtures';
 import type { AgentConfig, AgentRun, Brief, DeliverySettings, DemoState, EvalCase, ModelConfig, Preferences, Scenario, Source } from './types';
+import { anonymousApi, anonymousAdminApi, DemoHttpError } from './anonymous';
 export { FIXED_NOW, TOPICS };
-const STORAGE = 'zhigenews-prototype-r3';
+const IS_USER = import.meta.env.VITE_APP_KIND === 'user';
+export const anonymousEntry = reactive({ busy: false, error: '', retryAt: 0 });
+let STORAGE = 'zhigenews-prototype-r5:admin';
 const TIMEZONE = 'Asia/Shanghai';
 const READING_WINDOW_HOURS = 24;
 const MAX_BRIEF_ITEMS = 10;
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 function initialState(): DemoState {
+  if (IS_USER) return { ...createSeed(), authenticated: false };
   try {
     const data = JSON.parse(localStorage.getItem(STORAGE) || 'null');
     if (data?.preferences && Array.isArray(data?.briefs) && data?.sources) {
@@ -24,7 +28,7 @@ export const resetRevision = ref(0);
 let toastTimer: ReturnType<typeof setTimeout>;
 let epoch = 0;
 const timers = new Set<ReturnType<typeof setTimeout>>();
-watch(state, () => { try { localStorage.setItem(STORAGE, JSON.stringify(state)); } catch { /* private browsing */ } }, { deep: true });
+watch(state, () => { try { if (!IS_USER || state.session) localStorage.setItem(STORAGE, JSON.stringify(state)); } catch { /* private browsing */ } }, { deep: true });
 export function notify(message: string) { toast.value = message; clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.value = '', 6000); }
 function schedule(callback: () => void, delay: number) { const timer = setTimeout(() => { timers.delete(timer); callback(); }, delay); timers.add(timer); }
 const sleep = (ms = 350) => new Promise<void>(resolve => setTimeout(resolve, ms));
@@ -35,11 +39,13 @@ async function guard() {
   if (currentEpoch !== epoch) throw new Error('示例已重置，请重新操作。');
   if (state.scenario === 'error') throw new Error('保存失败，请重试。输入已保留。');
   if (state.scenario === 'unauthorized') throw new Error('当前账户没有操作权限。');
+  if (IS_USER) { try { await anonymousApi.touch(); } catch (error) { recordSessionError(error); throw error; } }
 }
 function get<T extends { id: string }>(items: T[], key: string): T { const value = items.find(x => x.id === key); if (!value) throw new Error('示例记录不存在，请返回列表。'); return value; }
 export function resetDemo() {
   epoch++; for (const timer of timers) clearTimeout(timer); timers.clear();
-  Object.assign(state, createSeed()); resetRevision.value++; notify('已重置示例。');
+  const session = state.session; const generation = state.generation; const generationPreferences = state.generationPreferences;
+  Object.assign(state, createSeed(), IS_USER ? { session, generation, generationPreferences, authenticated: !!session } : {}); resetRevision.value++; notify('已重置示例。');
 }
 export function setScenario(scenario: Scenario) {
   const preferences = clone(state.preferences);
@@ -62,19 +68,85 @@ export function formatDate(value: string | null | undefined) {
 export function statusLabel(status: string) {
   return ({ completed: '已完成', running: '运行中', queued: '排队中', partial: '部分完成', failed: '失败', cancelling: '正在取消', cancelled: '已取消', pending: '待发布', submitted: '已发布', disabled: '已停用', unknown: '状态未知', healthy: '正常', syncing: '同步中', unverified: '待验证', published: '已发布', draft: '草稿', active: '正常', verified: '已验证', success: '成功' } as Record<string, string>)[status] || status;
 }
-function emailValid(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }
+
+let sessionRequest: Promise<void> | null = null;
+let progressTimer: ReturnType<typeof setTimeout>;
+function recordSessionError(error: unknown) {
+  if (error instanceof DemoHttpError && [401, 403].includes(error.status)) {
+    anonymousEntry.error = error.message; anonymousEntry.retryAt = 0; state.authenticated = false;
+  }
+}
+async function ensureAnonymousSession() {
+  if (sessionRequest) return sessionRequest;
+  anonymousEntry.busy = true; anonymousEntry.error = '';
+  sessionRequest = (async () => {
+    try {
+      const result = await anonymousApi.session();
+      if (state.session?.userId !== result.session.userId) {
+        STORAGE = 'zhigenews-prototype-r5:user:' + result.session.userId;
+        let saved: Partial<DemoState> = {};
+        try { saved = JSON.parse(localStorage.getItem(STORAGE) || '{}'); } catch { /* New local reading space. */ }
+        Object.assign(state, createSeed(), saved, { session: result.session, scenario: 'normal', loaded: true });
+      }
+      state.session = result.session; state.authenticated = true;
+      state.onboardingCompleted = result.session.onboardingCompleted && !!(state.preferences.topics.length || state.preferences.keywords.length);
+      state.users = [{ id: result.session.userId, name: result.session.name, email: '', role: 'user', status: 'active', topics: [...state.preferences.topics] }];
+      state.generation = result.generation;
+      if (result.generation && ['running', 'queued'].includes(result.generation.status)) startProgressPolling();
+      else materializeBrief();
+    } catch (error) {
+      state.authenticated = false; anonymousEntry.error = (error as Error).message;
+      anonymousEntry.retryAt = error instanceof DemoHttpError && error.retryAfter > 0 ? Date.now() + error.retryAfter * 1000 : 0;
+      throw error;
+    } finally { anonymousEntry.busy = false; sessionRequest = null; }
+  })();
+  return sessionRequest;
+}
+function materializeBrief() {
+  const progress = state.generation;
+  if (!progress?.briefId || !['completed', 'partial'].includes(progress.status) || state.briefs.some(b => b.id === progress.briefId)) return;
+  const prefs = clone(state.generationPreferences || state.preferences), seed = createSeed();
+  const items = clone(seed.briefs[0]!.items).filter(item => {
+    const text = `${item.title} ${item.summary}`.normalize('NFKC').toLowerCase();
+    return !!item.publishedAt && new Date(item.publishedAt).getTime() >= new Date(FIXED_NOW).getTime() - READING_WINDOW_HOURS * 3600000 &&
+      (prefs.topics.includes(item.topic) || prefs.keywords.some(k => text.includes(k.normalize('NFKC').toLowerCase())));
+  }).slice(0, MAX_BRIEF_ITEMS);
+  for (const item of items) {
+    const keywords = prefs.keywords.filter(k => `${item.title} ${item.summary}`.normalize('NFKC').toLowerCase().includes(k.normalize('NFKC').toLowerCase()));
+    item.reason = keywords.length ? `关键词：${keywords.join('、')}` : `关注话题：${item.topic}`;
+  }
+  const brief: Brief = { ...clone(seed.briefs[0]!), id: progress.briefId, items, version: state.briefs.filter(x => x.date === '2026-09-18').length + 1, summary: items.length ? `今日 ${items.length} 条精选。` : '今天暂无匹配内容。', generationStatus: progress.status, preferenceSnapshot: prefs, generatedAt: progress.updatedAt, runId: 'demo-' + progress.id, deliveryStatus: 'submitted' };
+  state.briefs.unshift(brief);
+  notify(items.length ? `简报已更新，共 ${items.length} 条。` : '今天暂无匹配内容。');
+}
+function startProgressPolling() {
+  clearTimeout(progressTimer);
+  const poll = async () => {
+    try { state.generation = await anonymousApi.progress(); materializeBrief(); }
+    catch (error) {
+      recordSessionError(error);
+      if (state.generation) Object.assign(state.generation, { percent: null, remainingSeconds: null, error: '进度暂时无法更新，正在重试。' });
+      if (!state.authenticated) return;
+      const wait = error instanceof DemoHttpError ? Math.max(3, error.retryAfter) : 3;
+      progressTimer = setTimeout(poll, wait * 1000); return;
+    }
+    if (state.generation && ['queued', 'running', 'cancelling'].includes(state.generation.status)) progressTimer = setTimeout(poll, 1500);
+  };
+  progressTimer = setTimeout(poll, 1000);
+}
 
 export const api = {
   async load() { state.loaded = false; try { await guard(); } finally { state.loaded = true; } },
-  async login(email: string, password: string) { await guard(); if (!emailValid(email) || password.length < 8) throw new Error('请输入有效邮箱和至少 8 位演示密码。'); state.authenticated = true; notify('已进入演示账户，不执行真实身份认证。'); },
-  async register(email: string, password: string, name?: string) { await this.login(email, password); state.preferences = { version: 0, role: '', topics: [], keywords: [] }; state.onboardingCompleted = false; state.delivery = { time: '08:00' }; state.briefs = []; if (!state.users.length) state.users.push({ id: 'user-demo', name: name?.trim() || '新读者', email, role: 'user', status: 'active', topics: [] }); else { state.users[0]!.email = email; state.users[0]!.topics = []; if (name?.trim()) state.users[0]!.name = name.trim(); } notify('账户已创建。'); },
-  logout() { state.authenticated = false; },
+  async login(email: string, password: string) { await anonymousAdminApi.login(email, password); state.authenticated = true; },
+  async ensureAnonymousSession() { return ensureAnonymousSession(); },
+  logout() { state.authenticated = false; void anonymousAdminApi.logout(); },
   async savePreferences(value: Preferences) {
     await guard();
     const clean = (xs: string[]) => [...new Set(xs.map(x => x.trim()).filter(Boolean))];
     const topics = clean(value.topics); const keywords = clean(value.keywords);
     if (!topics.length && !keywords.length) throw new Error('请选择一个话题或添加关键词。');
     if (keywords.length > 20 || keywords.some(x => x.length > 40) || value.role.trim().length > 500) throw new Error('关键词最多 20 个，每个不超过 40 字；背景不超过 500 字。');
+    if (IS_USER) await anonymousApi.onboard();
     state.preferences = { role: value.role.trim(), topics, keywords, version: state.preferences.version + 1 };
     state.onboardingCompleted = true;
     if (state.users[0]) state.users[0].topics = [...topics];
@@ -88,37 +160,15 @@ export const api = {
   },
   async deleteMemory(key: string) { await guard(); state.memories = state.memories.filter(x => x.id !== key); notify('这条示例记忆已清理。'); },
   async generateBrief() {
-    const existing = state.runs.find(x => ['queued', 'running', 'cancelling'].includes(x.status)); if (existing) return existing.id;
     await guard();
-    const raced = state.runs.find(x => ['queued', 'running', 'cancelling'].includes(x.status)); if (raced) return raced.id;
-    if (!state.preferences.topics.length && !state.preferences.keywords.length) throw new Error('请先设置关注主题或关键词。');
-    const prefs = clone(state.preferences); const seed = createSeed(); const runId = id('run'); const activeConfig = [...state.configs].reverse().find(x => x.status === 'published');
-    const run: AgentRun = { ...clone(seed.runs[0]!), id: runId, userName: state.users[0]?.name || '林序', status: 'running', configVersion: activeConfig?.version || 'v3', startedAt: FIXED_NOW, events: [], subtasks: [], elapsedSeconds: 0, inputTokens: 0, outputTokens: 0, cost: 0, searchCount: 0 };
-    state.runs.unshift(run);
-    EXAMPLE_EVENTS.forEach((event, index) => schedule(() => {
-      const current = state.runs.find(x => x.id === runId); if (!current || current.status !== 'running') return;
-      const eventTime = new Intl.DateTimeFormat('en-GB', { timeZone: TIMEZONE, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(new Date(FIXED_NOW).getTime() + index * 1000));
-      current.events.push({ ...clone(event), time: eventTime }); current.elapsedSeconds = index + 1;
-      if (index !== EXAMPLE_EVENTS.length - 1) return;
-      current.status = state.scenario === 'partial' ? 'partial' : 'completed'; current.inputTokens = 12640; current.outputTokens = 2180; current.cost = 0.086; current.searchCount = 2; current.subtasks = clone(seed.runs[0]!.subtasks);
-      const items = clone(seed.briefs[0]!.items).filter(item => {
-        const text = `${item.title} ${item.summary}`.normalize('NFKC').toLowerCase();
-        return !!item.publishedAt && new Date(item.publishedAt).getTime() >= new Date(FIXED_NOW).getTime() - READING_WINDOW_HOURS * 3600000 &&
-          (prefs.topics.includes(item.topic) || prefs.keywords.some(k => text.includes(k.normalize('NFKC').toLowerCase())));
-      }).slice(0, MAX_BRIEF_ITEMS);
-      current.events[current.events.length - 1]!.detail = `${items.length} 条示例内容已保存。投递结果单独记录。`;
-      for (const item of items) {
-        item.read = state.briefs.flatMap(x => x.items).find(x => x.id === item.id)?.read || false;
-        const keywords = prefs.keywords.filter(k => `${item.title} ${item.summary}`.normalize('NFKC').toLowerCase().includes(k.normalize('NFKC').toLowerCase()));
-        item.reason = keywords.length ? `关键词：${keywords.join('、')}` : `关注话题：${item.topic}`;
-      }
-      const completedAt = new Date(new Date(FIXED_NOW).getTime() + index * 1000).toISOString();
-      const brief: Brief = { ...clone(seed.briefs[0]!), id: id('brief'), date: '2026-09-18', version: state.briefs.filter(x => x.date === '2026-09-18').length + 1, runId, items, summary: items.length ? `今日 ${items.length} 条精选，关注${[...new Set(items.map(item => item.topic))].join('、')}。` : '今天暂无匹配内容。', generationStatus: current.status, preferenceSnapshot: prefs, generatedAt: completedAt, deliveryStatus: 'submitted' };
-      state.briefs.unshift(brief);
-      state.deliveries.unshift({ id: id('delivery'), briefId: brief.id, userName: run.userName, destination: '站内简报', channel: 'in_app', status: 'submitted', attempts: 1, time: completedAt, error: '' });
-      notify(items.length ? `简报已更新，共 ${items.length} 条。` : '今天暂无匹配内容。');
-    }, 1200 * (index + 1)));
-    return runId;
+    if (!state.preferences.topics.length && !state.preferences.keywords.length) throw new Error('请先设置关注话题或关键词。');
+    const progress = await anonymousApi.generate(state.scenario === 'partial');
+    if (progress.id !== state.generation?.id) state.generationPreferences = clone(state.preferences);
+    state.generation = progress; startProgressPolling(); return progress.id;
+  },
+  async cancelGeneration() {
+    if (!state.generation || !['running', 'queued'].includes(state.generation.status)) return;
+    state.generation = await anonymousApi.cancel(); clearTimeout(progressTimer);
   },
   async cancelRun(key: string) { const run = get(state.runs, key); if (!['running', 'queued'].includes(run.status)) return; const previous = run.status; run.status = 'cancelling'; try { await guard(); } catch (error) { run.status = previous; throw error; } run.status = 'cancelled'; run.events.push({ id: run.events.length + 1, time: '08:12:00', title: '运行已取消', detail: '示例任务已停止，已有简报仍可阅读。', status: 'cancelled', duration: '' }); notify('示例运行已取消。'); },
   async retryDelivery(key: string) {
@@ -126,7 +176,6 @@ export const api = {
     if (!['failed', 'unknown'].includes(delivery.status)) throw new Error('只有失败或状态未知的记录需要重试。');
     delivery.attempts++; delivery.status = 'submitted'; delivery.error = ''; const brief = state.briefs.find(x => x.id === delivery.briefId); if (brief) brief.deliveryStatus = 'submitted'; notify('站内通知已重新发布。');
   },
-  async markRead(key: string) { await guard(); const first = state.briefs.flatMap(x => x.items).find(x => x.id === key); if (!first) return; const next = !first.read; for (const brief of state.briefs) for (const item of brief.items) if (item.id === key) item.read = next; },
   async saveSource(value: Source) { await guard(); if (!value.name.trim() || !/^https?:\/\//.test(value.url)) throw new Error('请填写来源名称与 HTTP(S) 地址。'); if (value.interval < Math.max(60, value.upstreamInterval)) throw new Error('轮询间隔不能低于上游更新间隔，且至少 60 秒。'); const old = state.sources.find(x => x.id === value.id); if (old) { const changed = old.url !== value.url || old.kind !== value.kind || old.sourceId !== value.sourceId; Object.assign(old, clone(value), changed ? { status: 'unverified' } : {}); } else state.sources.unshift({ ...clone(value), id: id('src'), status: 'unverified' }); notify('来源配置已保存（模拟）。'); },
   async toggleSource(key: string) { await guard(); const source = get(state.sources, key); source.status = source.status === 'disabled' ? 'unverified' : 'disabled'; source.nextFetch = source.status === 'disabled' ? '' : FIXED_NOW; notify(source.status === 'disabled' ? '来源已停用，保留历史快照。' : '来源已启用，等待模拟验证。'); },
   async fetchSource(key: string) { await guard(); const source = get(state.sources, key); if (source.status === 'disabled') throw new Error('请先启用来源。'); source.status = 'syncing'; await sleep(700); if (!state.sources.includes(source)) return; source.status = source.url.includes('36kr') ? 'failed' : 'healthy'; source.error = source.status === 'failed' ? '示例响应为 HTML，解析失败，保留旧快照。' : ''; if (source.status === 'healthy') { source.lastSuccess = FIXED_NOW; source.nextFetch = new Date(new Date(FIXED_NOW).getTime() + source.interval * 1000).toISOString(); source.items = source.items || 12; } notify(source.status === 'healthy' ? '模拟同步完成。' : '模拟同步失败：响应不是 RSS。'); },

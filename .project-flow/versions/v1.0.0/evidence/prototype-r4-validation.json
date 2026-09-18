@@ -1,0 +1,71 @@
+{
+  "schema_version": 4,
+  "version": "v1.0.0",
+  "stage": "ITERATE",
+  "prototype_revision": 4,
+  "date": "2026-09-18",
+  "pre_change_commit": "e7251f3",
+  "branch": "main",
+  "scope": "保留 r3 简约流程，为用户端恢复图标、按钮和标签层次；原型视觉迭代",
+  "commands": [
+    {
+      "command": "npm run build",
+      "cwd": "docs/releases/v1.0.0/draft/prototype",
+      "exit_code": 0,
+      "result": "vue-tsc 与双端最终构建通过；用户 1632 模块，管理员 1608 模块"
+    },
+    {
+      "command": "git -c core.safecrlf=false diff --check",
+      "exit_code": 0,
+      "result": "无空白错误"
+    }
+  ],
+  "browser": {
+    "engine": "Codex In-app Browser / CUA",
+    "passed": [
+      "首次引导的话题选择图标、已选数量与 aria-pressed 同步，Space 可选择话题",
+      "话题和 LangGraph 关键词保存后进入今日页",
+      "320px 通过 Space 选择 AI 安全过滤器，仅显示一条匹配新闻",
+      "标记已读后按钮显示已读、aria-pressed 为 true，操作名称变为标为未读",
+      "头像直达个人设置，新增话题后保存成功，显示已保存图标标签",
+      "导航两个图标可见，320px 修正后八个话题名称均为 20px 单行高度",
+      "用户预览控制台只有 Vite debug 信息，无 error"
+    ],
+    "responsive": {
+      "widths": [
+        320,
+        375,
+        768,
+        1024,
+        1440,
+        1920
+      ],
+      "routes": [
+        "/settings/preferences",
+        "/settings/schedule",
+        "/today"
+      ],
+      "observations": 18,
+      "result": "所有实际视口宽度下 document.scrollWidth <= innerWidth；另核对 375px /briefs 无整页横向溢出"
+    },
+    "visual_review": "1440 设置与阅读、320 引导与阅读、375 历史页目视检查；截图仅在工具会话",
+    "corrected_observations": [
+      "320px 话题加图标后长名称换行，缩小图标槽与间距后全部单行"
+    ],
+    "cleanup": "当前用户标签页尺寸覆盖已 reset，实际恢复宽度 670px，停留 /settings/preferences"
+  },
+  "contract_change": false,
+  "admin_code_change": false,
+  "checkpoint_maintenance": {
+    "observed": "切回 main 后 resume 报 Checkpoint manifest drift",
+    "cause": "Git core.autocrlf 将 c0004 JSON 的 LF 换成 CRLF；原 Git blob 和 state 哈希一致",
+    "resolution": "恢复 c0004 两个 JSON 的原始 LF 字节，resume 通过；.gitattributes 固定检查点 JSON LF 与 Markdown 原有 CRLF",
+    "historical_hashes_changed": false
+  },
+  "known_limits": [
+    "当前为 localStorage mock，未执行真实 HTTP、模型、采集或定时推送",
+    "本轮契约无变化，未重复执行契约验证；r3 契约结果另有证据"
+  ],
+  "unresolved_observed_blockers": [],
+  "next_action": "继续 ITERATE r4，按用户反馈调整用户端原型和方案"
+}

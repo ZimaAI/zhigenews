@@ -60,7 +60,33 @@
     },
     {
       "id": "TASK-ITER-004",
-      "title": "根据下一轮反馈继续调整 r3 原型和方案",
+      "title": "回到最新 main，为极简用户端恢复图标、按钮和标签层次（r4）",
+      "status": "done",
+      "evidence": [
+        "design-user.md",
+        ".project-flow/versions/v1.0.0/evidence/prototype-r4-validation.json"
+      ]
+    },
+    {
+      "id": "TASK-ITER-005",
+      "title": "按截图去掉来源字母方块并恢复更新简报魔杖图标",
+      "status": "done",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/prototype-r4-icons-validation.json"
+      ]
+    },
+    {
+      "id": "TASK-ITER-006",
+      "title": "r5 自动匿名会话、新闻弹窗、公开生成进度和匿名防滥用监测",
+      "status": "done",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/prototype-r5-validation.json",
+        "docs/releases/v1.0.0/draft/spec/07-changes.md"
+      ]
+    },
+    {
+      "id": "TASK-ITER-007",
+      "title": "按后续反馈继续调整 r5 原型及方案",
       "status": "pending",
       "evidence": []
     }

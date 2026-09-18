@@ -18,7 +18,7 @@
     },
     {
       "id": "REQ-AUTH-001",
-      "title": "用户/管理员角色；服务端验证角色及资源归属；普通用户仅访问自己的偏好、简报、运行和记忆",
+      "title": "用户自动创建/恢复匿名 Cookie 会话，拥有全部用户端功能；管理员独立认证；服务端验证角色和本人资源归属，不向用户开放 Agent 运行详情",
       "status": "active",
       "change": "added",
       "since": "v1.0.0",
@@ -29,6 +29,7 @@
         "AC-UI-002",
         "AC-UI-016",
         "AC-BE-002",
+        "AC-BE-017",
         "AC-INT-003"
       ]
     },
@@ -49,7 +50,7 @@
     },
     {
       "id": "REQ-BRIEF-001",
-      "title": "每日自动及手动生成简报；展示摘要、推荐理由、可追溯来源、发布时间/抓取时间及缺失信息；保留历史和偏好快照",
+      "title": "每日自动及手动生成简报；展示摘要、推荐理由、可追溯来源、发布时间/抓取时间及缺失信息；保留历史和内部偏好快照；点击新闻打开详情弹窗；删除阅读标记",
       "status": "active",
       "change": "added",
       "since": "v1.0.0",
@@ -283,7 +284,7 @@
     },
     {
       "id": "REQ-OBS-001",
-      "title": "记录父子运行、工具调用与结果摘要、模型用量/延迟/失败/取消、摘要事件与预算；SSE 可回放；不展示私有思维链与秘密",
+      "title": "仅管理员查看父子运行、工具调用与结果摘要、模型用量/延迟/失败/取消、摘要事件与预算；管理 SSE 可回放；用户只见生成进度及预计剩余时间，不见 Agent 运行过程",
       "status": "active",
       "change": "added",
       "since": "v1.0.0",
@@ -326,6 +327,22 @@
         "AC-UI-010",
         "AC-INT-003"
       ]
+    },
+    {
+      "id": "REQ-ABUSE-001",
+      "title": "管理员监测匿名账户的请求、生成量、并发、限流和风险事件，配置账户/IP配额并封禁或恢复；服务端强制执行且操作可审计",
+      "status": "active",
+      "change": "added",
+      "since": "v1.0.0",
+      "spec_refs": [
+        "spec/01-requirements.md"
+      ],
+      "acceptance_ids": [
+        "AC-UI-016",
+        "AC-BE-016",
+        "AC-BE-017",
+        "AC-INT-003"
+      ]
     }
   ],
   "acceptance": [
@@ -345,7 +362,7 @@
     },
     {
       "id": "AC-UI-002",
-      "title": "登录/注册有必填与格式校验、提交中、失败保留输入和退出；未完成首次偏好的用户进入单页引导，成功保存后进入今日，刷新/登录不重复引导，注册重新引导；原型不宣称真实鉴权。",
+      "title": "首次访问自动建立匿名 Cookie 会话；无邮箱/密码/注册/退出表单。欢迎页采用旧版视觉，显示自动进入、加载或失败重试；未配置时进入引导，保存后进入今日；同Cookie刷新保持完成状态，丢失Cookie创建新身份。",
       "phase": "frontend",
       "status": "active",
       "required": true,
@@ -385,7 +402,7 @@
     },
     {
       "id": "AC-UI-005",
-      "title": "今日页面展示摘要、推荐理由、来源入口与发布时间未知提示；按主题筛选；生成中保留旧简报；完成后可打开新一期。",
+      "title": "今日展示新闻摘要、来源、发布时间及主题筛选；点击单条新闻打开该条详情弹窗，显示推荐理由和引用，关闭后保留筛选与滚动；移除已读/未读、只看未读及任何相关计数。",
       "phase": "frontend",
       "status": "active",
       "required": true,
@@ -398,7 +415,7 @@
     },
     {
       "id": "AC-UI-006",
-      "title": "历史提供紧凑列表与必要搜索/筛选，无结果和分页可操作；详情保留内容版本和引用；返回保持筛选，不展示邮件状态或重复说明。",
+      "title": "历史可搜索、筛选和分页，无历史/无结果可操作；简报详情点击单条新闻打开该条弹窗；来源链接单独可用，不误开详情；没有整理记录或Agent运行入口。",
       "phase": "frontend",
       "status": "active",
       "required": true,
@@ -439,7 +456,7 @@
     },
     {
       "id": "AC-UI-009",
-      "title": "运行时间线可见有界事件与子任务；点击取消先显示取消中，随后取消；连接状态与运行状态分开。",
+      "title": "生成展示进度条和预计剩余时间，未知估计为正在估算；保留旧简报、刷新恢复进度；完成/部分完成可读结果，失败可重试；页面不显示运行事件、工具、子任务、配置或工作区。",
       "phase": "frontend",
       "status": "active",
       "required": true,
@@ -532,13 +549,14 @@
     },
     {
       "id": "AC-UI-016",
-      "title": "管理员可切换用户状态并查看投递故障；重试使用同一期简报，目的地脱敏；无运行样本不显示虚构完成率。",
+      "title": "管理员可查看匿名账户状态、请求/生成计数、限流/并发、风险和脱敏来源；可修改有效配额、封禁/解封并看到审计事件；投递重试仍沿用同一期，不制造运行完成率。",
       "phase": "frontend",
       "status": "active",
       "required": true,
       "requirement_ids": [
         "REQ-AUTH-001",
-        "REQ-DELIVERY-001"
+        "REQ-DELIVERY-001",
+        "REQ-ABUSE-001"
       ],
       "spec_refs": [
         "spec/05-acceptance.md"
@@ -560,7 +578,7 @@
     },
     {
       "id": "AC-BE-002",
-      "title": "未登录 401、普通用户管理操作 403、跨账号资源不可见；伪造 userId/threadId 不能访问他人文件、记忆、简报或运行。",
+      "title": "首次无Cookie请求由服务器建立匿名账号并签发HttpOnly Cookie；生产Secure/SameSite=Lax，服务器只存token哈希且执行过期/撤销；同Cookie幂等恢复，封禁403不换号。匿名全部用户功能可用但管理接口403；跨用户简报/进度/记忆404，CSRF跨源写请求拒绝。",
       "phase": "backend",
       "status": "active",
       "required": true,
@@ -721,7 +739,7 @@
     },
     {
       "id": "AC-BE-014",
-      "title": "运行事件持久化并脱敏，记录真实延迟、用量与预算；未知指标保持未知；SSE 断线用 Last-Event-ID 无重复遗漏地追赶，不改变运行终态。",
+      "title": "管理运行事件持久化并脱敏，真实延迟/用量/预算可查、未知保持未知；管理SSE用Last-Event-ID追赶。用户接口不接受run/events请求，公开生成/简报响应不含内部运行数据；进度与预计剩余时间由服务器提供，null不冒充0，未发布不显示100%。",
       "phase": "backend",
       "status": "active",
       "required": true,
@@ -774,13 +792,41 @@
     },
     {
       "id": "AC-INT-003",
-      "title": "两个正式前端接同一真实 Gateway；交换请求/响应通过权威 schema，真实角色、保存失败、取消、SSE 与投递错误可操作；不依赖 mock 即可完成核心流程。",
+      "title": "两个正式前端对接同一真实Gateway；匿名Cookie可恢复本人偏好/历史/生成进度，管理员独立认证后监测和封禁影响用户请求；schema、失败/429、角色隔离及发布错误可验证，不依赖mock。",
       "phase": "integration",
       "status": "active",
       "required": true,
       "requirement_ids": [
         "REQ-PLT-001",
         "REQ-UX-001",
+        "REQ-AUTH-001",
+        "REQ-ABUSE-001"
+      ],
+      "spec_refs": [
+        "spec/05-acceptance.md"
+      ]
+    },
+    {
+      "id": "AC-BE-016",
+      "title": "配额在账号/IP维度原子执行：并发重放同意图只扣一次；新意图超限429并返回Retry-After，未入队不计成功生成；清Cookie不能重置IP新号门槛；封禁403停止新任务/调度，解除仍受配额限制。",
+      "phase": "backend",
+      "status": "active",
+      "required": true,
+      "requirement_ids": [
+        "REQ-ABUSE-001"
+      ],
+      "spec_refs": [
+        "spec/05-acceptance.md"
+      ]
+    },
+    {
+      "id": "AC-BE-017",
+      "title": "管理监测按真实请求汇总，风险/限流/封禁事件可追溯，封禁/解封/策略变更有管理员审计；读接口不返回token、API key或原始IP；代理IP只信配置的受信边界，匿名Cookie不能调用管理API。",
+      "phase": "backend",
+      "status": "active",
+      "required": true,
+      "requirement_ids": [
+        "REQ-ABUSE-001",
         "REQ-AUTH-001"
       ],
       "spec_refs": [
@@ -788,5 +834,5 @@
       ]
     }
   ],
-  "note": "ITERATE r3：23 项需求与 34 项 AC 双向关联。保留稳定 ID，三字段偏好、首次引导和每日站内发布替代 r2 扩展参数与邮件设置。active/required 是有效验收定义，不表示执行通过；正式 backend/frontend/integration 验收不继承模拟结果，当前未冻结。"
+  "note": "ITERATE r5：24项需求与36项AC双向关联。自动匿名身份、公开生成进度、新闻详情弹窗与匿名防滥用监测；保留稳定ID，用户注册、已读状态和整理记录被本轮反馈替代。active/required不代表执行通过；当前未冻结，生产验收不能继承模拟结果。"
 }

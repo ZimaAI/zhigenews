@@ -11,7 +11,7 @@ const articles = [
   { id: 'n-05', topic: '开源生态', title: 'RSS 仍然有用：为自动化阅读保留一份稳定的输入', summary: '条件请求、不可变快照和按源轮询，让订阅内容能够被重复分析。这份示例说明如何以轻量文件组织支持 Agent 的逐行阅读与检索。', reason: '与你关注的开源生态、数据工具相关', source: 'RSS 规范', sourceType: 'rss', url: 'https://www.rssboard.org/rss-specification' },
   { id: 'n-06', topic: 'AI 安全', title: '工具有权限边界，模型才能在边界内自主行动', summary: '示例讨论只读新闻目录、独立工作区和文件版本校验。它们需要由工具执行层强制落实，而不能只写在系统提示词中。', reason: '补充你关注的 Agent 工程实践', source: 'Docker 文档', sourceType: 'newsnow', url: 'https://docs.docker.com/engine/security/' },
 ];
-const news: NewsItem[] = articles.map((a, i) => ({ ...a, publishedAt: `2026-09-18T0${7 - i}:20:00+08:00`, read: i === 2, citations: [{ id: `ref-${i + 1}`, name: a.source, title: `${a.title} · 参考资料（非新闻原稿）`, url: a.url, publishedAt: null }] }));
+const news: NewsItem[] = articles.map((a, i) => ({ ...a, publishedAt: `2026-09-18T0${7 - i}:20:00+08:00`, citations: [{ id: `ref-${i + 1}`, name: a.source, title: `${a.title} · 参考资料（非新闻原稿）`, url: a.url, publishedAt: null }] }));
 export const EXAMPLE_EVENTS: RunEvent[] = [
   { id: 1, time: '08:00:00', title: '载入本次订阅与来源快照', detail: '订阅 v3 · 最近 24 小时 · 3 个关注主题', status: 'completed', duration: '120ms' },
   { id: 2, time: '08:00:01', title: '读取 RSS 索引', detail: '读取授权快照的前 120 行，返回文件版本哈希。', status: 'completed', duration: '84ms', tool: 'read_file', params: '{"path":"/rss/tech/entries.jsonl","start_line":1,"end_line":120}', output: '{"lines":120,"truncated":false,"sha256":"demo-6c98…a821"}' },
@@ -26,7 +26,7 @@ export const EXAMPLE_EVENTS: RunEvent[] = [
 
 export function createSeed(): DemoState {
   return structuredClone({
-    scenario: 'normal', loaded: true, authenticated: true, onboardingCompleted: false,
+    scenario: 'normal', loaded: true, authenticated: true, onboardingCompleted: false, session: null, generation: null, generationPreferences: null,
     preferences: { version: 0, role: '', topics: [], keywords: [] },
     delivery: { time: '08:00' },
     briefs: [0, 1, 2, 3].map((offset) => ({ id: `brief-${18 - offset}`, title: ['在变化中，找到值得关注的进展', '让 Agent 从演示走向日常工作', '开源工具与模型应用的一天', '从模型能力到产品体验'][offset], date: `2026-09-${18 - offset}`, version: 1, summary: '从可靠的工具调用到上下文管理，关注 Agent 工程与开源工具的最新进展。', items: news.slice(0, 6 - offset).map(item => ({ ...item, id: `${item.id}-${18 - offset}`, publishedAt: item.publishedAt?.replace('2026-09-18', `2026-09-${18 - offset}`) || null, citations: item.citations.map(c => ({ ...c })) })), generationStatus: offset === 2 ? 'partial' : 'completed', deliveryStatus: offset === 0 ? 'failed' : 'submitted', generatedAt: `2026-09-${18 - offset}T08:00:12+08:00`, runId: offset === 0 ? 'run-001' : `run-history-${18-offset}`, preferenceSnapshot: preferences })),

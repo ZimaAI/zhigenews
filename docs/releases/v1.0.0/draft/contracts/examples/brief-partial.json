@@ -1,6 +1,6 @@
 {
   "synthetic": true,
-  "schema": "Brief",
+  "schema": "AdminBrief",
   "data": {
     "id": "synthetic-brief-01",
     "title": "【模拟】今日 AI 简报",
@@ -18,7 +18,6 @@
         "sourceType": "rss",
         "publishedAt": null,
         "url": "https://news.example.com/synthetic/agent-news",
-        "read": false,
         "citations": [
           {
             "id": "synthetic-citation-01",

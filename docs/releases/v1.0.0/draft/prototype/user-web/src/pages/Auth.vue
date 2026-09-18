@@ -1,46 +1,63 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { BookOpen, Eye, EyeOff } from 'lucide-vue-next';
-import { api } from '@shared/mock';
-const route = useRoute(), router = useRouter();
-const registering = computed(() => route.path === '/register');
-const form = reactive({ name: '', email: 'reader@example.com', password: 'demo12345' });
-const busy = ref(false), error = ref(''), reveal = ref(false);
-async function submit() { if (busy.value) return; busy.value = true; error.value = ''; try { if (registering.value) await api.register(form.email, form.password, form.name); else await api.login(form.email, form.password); await router.push(registering.value ? '/onboarding' : '/today'); } catch (e) { error.value = (e as Error).message; } finally { busy.value = false; } }
+import { ArrowRight, Feather, LoaderCircle, RefreshCw } from 'lucide-vue-next';
+import { api, anonymousEntry } from '@shared/mock';
+const router = useRouter(), route = useRoute();
+const now = ref(Date.now());
+const remaining = computed(() => Math.max(0, Math.ceil((anonymousEntry.retryAt - now.value) / 1000)));
+let timer: ReturnType<typeof setInterval>;
+async function enter() {
+  if (anonymousEntry.busy || remaining.value) return;
+  try {
+    await api.ensureAnonymousSession();
+    const next = typeof route.query.next === 'string' ? route.query.next : '/today';
+    await router.replace(next.startsWith('/') && !next.startsWith('//') && !/^\/(login|register)(\?|$)/.test(next) ? next : '/today');
+  } catch { /* The welcome card displays the session error and a manual retry. */ }
+}
+onMounted(() => { timer = setInterval(() => now.value = Date.now(), 1000); if (!anonymousEntry.error) void enter(); });
+onUnmounted(() => clearInterval(timer));
 </script>
 <template>
   <main class="auth-page">
-    <a class="skip-auth" href="#auth-form">跳转到表单</a>
-    <div class="auth-brand"><BookOpen :size="26" aria-hidden="true" /><span>知更</span></div>
-    <section class="auth-card">
-      <h1>{{ registering ? '创建账户' : '欢迎回来' }}</h1>
-      <p v-if="error" class="alert alert--danger" role="alert">{{ error }}</p>
-      <form id="auth-form" @submit.prevent="submit">
-        <div v-if="registering" class="field"><label for="display-name">称呼</label><input id="display-name" v-model="form.name" class="field-control" autocomplete="nickname" maxlength="40" required /></div>
-        <div class="field"><label for="email">邮箱</label><input id="email" v-model="form.email" class="field-control" type="email" autocomplete="username" required /></div>
-        <div class="field"><label for="password">密码</label><div class="password-field"><input id="password" v-model="form.password" class="field-control" :type="reveal ? 'text' : 'password'" :autocomplete="registering ? 'new-password' : 'current-password'" required minlength="8" placeholder="至少 8 个字符" /><button type="button" :aria-label="reveal ? '隐藏密码' : '显示密码'" @click="reveal = !reveal"><EyeOff v-if="reveal" :size="18" /><Eye v-else :size="18" /></button></div></div>
-        <button class="button button--primary auth-submit" :disabled="busy" type="submit">{{ busy ? '正在进入…' : registering ? '创建账户' : '登录' }}</button>
-      </form>
-      <p class="auth-switch">{{ registering ? '已有账户？' : '还没有账户？' }}<RouterLink :to="registering ? '/login' : '/register'" @click="error = ''">{{ registering ? '登录' : '注册' }}</RouterLink></p>
-    </section>
-    <p class="auth-note">演示原型 · 使用预填的演示账户</p>
+    <a class="skip-auth" href="#entry-card">跳转到进入状态</a>
+    <div class="auth-brand"><Feather :size="28" aria-hidden="true" /><span>知更<span class="brand-en">QUIET BRIEF</span></span></div>
+    <div class="auth-layout">
+      <section class="auth-intro"><p class="eyebrow">LESS NOISE. MORE SIGNAL.</p><h1>每天，读一点<br />真正关心的事。</h1><p>你的兴趣，你的阅读节奏。</p><div class="auth-preview"><span>有来源的 AI 新闻简报</span><p>为你保留值得关注的进展。</p></div></section>
+      <section id="entry-card" class="auth-card" :aria-busy="anonymousEntry.busy">
+        <div class="entry-icon"><Feather :size="24" aria-hidden="true" /></div>
+        <h2>你的阅读空间</h2><p class="muted">无需注册，即刻开始。</p>
+        <template v-if="anonymousEntry.error"><p class="alert alert--danger" role="alert">{{ anonymousEntry.error }}</p><button class="button button--primary auth-submit" :disabled="anonymousEntry.busy || remaining > 0" @click="enter"><RefreshCw :size="16" aria-hidden="true" />{{ anonymousEntry.busy ? '正在进入…' : remaining > 0 ? remaining + ' 秒后可重试' : '重新进入' }}</button></template>
+        <div v-else class="entry-status" role="status"><LoaderCircle :size="18" class="entry-loading" aria-hidden="true" /><span>正在为你打开…</span><ArrowRight :size="16" aria-hidden="true" /></div>
+        <p class="auth-note">匿名访问 · 偏好保留在当前浏览器</p>
+      </section>
+    </div>
+    <footer class="auth-footer">知更 · 交互原型</footer>
   </main>
 </template>
 <style scoped>
-.auth-page { width: min(100%, 448px); margin: auto; padding: 64px 24px; min-height: 100vh; }
+.auth-page { max-width: 1200px; margin: auto; padding: 40px; min-height: 100vh; }
 .skip-auth { position: absolute; left: -10000px; }
 .skip-auth:focus { left: 20px; top: 8px; }
-.auth-brand { display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--color-primary); font-size: 24px; font-weight: 600; margin-bottom: 36px; }
+.auth-brand { display: inline-flex; align-items: center; gap: 12px; color: var(--color-primary); font-size: 24px; font-weight: 600; }
+.auth-brand > span { display: flex; align-items: center; gap: 16px; }
+.brand-en { color: var(--color-text-muted); font-size: 11px; font-weight: 500; letter-spacing: 2px; }
+.auth-layout { display: grid; grid-template-columns: minmax(0,1fr) 420px; align-items: center; gap: 80px; margin-block: 88px 80px; }
+.auth-intro h1 { font-size: 40px; line-height: 56px; margin: 20px 0; font-weight: 600; }
+.auth-intro > p:not(.eyebrow) { font-size: 16px; line-height: 28px; max-width: 380px; color: var(--color-text-secondary); }
+.auth-preview { margin-top: 40px; padding-left: 20px; border-left: 2px solid var(--color-primary-border); }
+.auth-preview p { margin: 8px 0; font-size: 14px; color: var(--color-text-muted); }
 .auth-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-card); padding: 32px; }
-.auth-card h1 { margin: 0 0 28px; font-size: 24px; }
-.auth-card .field { margin-bottom: 24px; }
-.password-field { display: flex; position: relative; }
-.password-field input { padding-right: 44px; }
-.password-field button { border: 0; background: none; position: absolute; right: 0; top: 0; display: flex; align-items: center; justify-content: center; height: 44px; width: 44px; color: var(--color-text-muted); cursor: pointer; }
-.auth-submit { width: 100%; margin-top: 4px; }
-.auth-switch { font-size: 14px; text-align: center; margin: 24px 0 0; }
-.auth-switch a { display: inline-flex; align-items: center; margin-left: 8px; min-height: 44px; }
-.auth-note { margin-top: 24px; text-align: center; color: var(--color-text-muted); font-size: 12px; }
-@media (max-width: 480px) { .auth-page { padding: 40px 16px; } .auth-card { padding: 24px 20px; } }
+.entry-icon { display: grid; place-items: center; width: 48px; height: 48px; background: var(--color-primary-soft); color: var(--color-primary); border-radius: var(--radius-card); margin-bottom: 24px; }
+.auth-card h2 { margin: 0 0 8px; font-size: 24px; }
+.auth-card > .muted { margin: 0 0 32px; font-size: 14px; }
+.entry-status { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; background: var(--color-primary-soft); border-radius: var(--radius-control); color: var(--color-primary); font-size: 14px; }
+.entry-loading { animation: rotate 1.5s linear infinite; }
+.auth-submit { width: 100%; }
+.auth-note { border-top: 1px solid var(--color-border); margin: 28px 0 0; padding-top: 20px; font-size: 12px; text-align: center; color: var(--color-text-muted); }
+.auth-footer { font-size: 12px; color: var(--color-text-muted); text-align: center; }
+@keyframes rotate { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .entry-loading { animation: none; } }
+@media (max-width: 900px) { .auth-layout { grid-template-columns: minmax(0,1fr); gap: 32px; margin-block: 40px; max-width: 480px; margin-inline: auto; } .auth-intro { display: none; } }
+@media (max-width: 480px) { .auth-page { padding: 24px 16px; } .auth-card { padding: 24px 20px; } .auth-brand > span { gap: 12px; } }
 </style>

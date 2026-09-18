@@ -1,4 +1,4 @@
-# 系统架构（DISCOVER 草稿）
+# 系统架构（ITERATE r5 草稿）
 
 本文件是贴合需求的设计建议，尚未冻结；代码和接口兼容性均待实施验证。外部事实与具体源码出处见文末及三份研究报告。
 
@@ -29,7 +29,7 @@ flowchart TB
   D --> G
 ```
 
-一个后端代码库，按进程职责运行 API、调度器、采集/Agent/投递 worker；不是多个独立微服务。Gateway 不实现模型循环，Harness 不依赖 FastAPI 的 Request/路由对象。任务创建 HTTP 返回 202 和 run ID，耗时工作进队列；SSE 从持久事件记录追赶，Redis 可辅助唤醒但不是事件权威源。
+一个后端代码库，按进程职责运行 API、调度器、采集/Agent/投递 worker；不是多个独立微服务。Gateway 不实现模型循环，Harness 不依赖 FastAPI 的 Request/路由对象。用户创建生成 HTTP 返回 202 和公开 GenerationProgress，耗时工作进队列；用户轮询公开进度，管理员 SSE 从持久事件记录追赶，Redis 可辅助唤醒但不是事件权威源。
 
 建议源码布局：
 
@@ -61,7 +61,7 @@ SQLAlchemy 2 + Alembic，目标 MySQL 8.4 LTS/InnoDB/utf8mb4；UTC 存储时间�
 
 | 组 | 主要对象 | 关键不变量 |
 | --- | --- | --- |
-| 账户 | users、sessions、user_preferences、delivery_settings | user/admin 权限；偏好有 version；首次完成标记持久化；推送设置仅每日时间 |
+| 账户 | users、sessions、admin_sessions、anonymous_policy、abuse_events、user_preferences、delivery_settings | 匿名用户/admin 权限隔离；偏好有 version；首次完成标记持久化；推送设置仅每日时间 |
 | 采集 | sources、source_fetches、source_snapshots、news_items | 源 ID 固定；快照不可变；新闻原链接/来源时间/抓取时间分别记录 |
 | Agent 配置 | model_endpoints、secret_refs、agent_config_versions | 数据库存加密凭据；主加密密钥来自环境；运行绑定配置版本 |
 | 运行 | agent_runs、run_events、message_journal、subtasks | 每条 run 归属用户；事件和原始消息序号单调递增；子任务归属父 run |
@@ -76,6 +76,19 @@ MySQL durable checkpointer 优先评估社区 `langgraph-checkpoint-mysql`，外
 短事务用行锁/唯一约束协调，模型/网络请求不持有数据库锁。Worker 心跳与租约用于识别意外退出；恢复依据检查点和已记录副作用。站内发布以用户与精确简报版本唯一键去重，不重复创建收件记录。
 
 每日计划：首次有效偏好保存后启用，默认 08:00，按系统时区 Asia/Shanghai 计算 UTC `next_run_at`。用户仅修改 HH:mm；未完成引导或被禁用账户不调度，修改时间不补发历史。浏览器原型只演示设置，真实定时任务仍待后端实现。
+
+## 自动匿名身份与滥用控制
+
+以下是结合官方建议形成的本系统候选方案。正式Gateway尚未实现；本轮仅以本地Vite开发中间件演示Cookie、计数和封禁。
+
+1. 网站启动先POST /auth/anonymous。服务端验证现有Cookie；有效时返回同一Session，无有效会话且通过IP门槛时创建随机匿名ID和高熵不透明token，原子落库并Set-Cookie。生产使用HttpOnly、Secure、SameSite=Lax、Path=/且不设Domain；Cookie不含身份资料，服务器保存token哈希并执行有效期和撤销。Cookie丢失或过期形成新身份，无法凭前端缓存找回旧账户；封禁会话返回403而不换号。该匿名恢复体验是本产品选择；会话保护依据见 [OWASP Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)。
+2. 用户只有本人资源权限，管理员独立认证和Cookie。所有写操作精确校验允许的Origin，并采用JSON/专用请求头或服务端CSRF token，拒绝跨源简单表单；只允许配置的源携带凭据，不能用通配CORS。SameSite作为补充，不能单独替代CSRF保护。依据 [OWASP CSRF Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)。
+3. Gateway在账号和IP两个维度原子限流；默认账号每分钟60请求、每日20次生成、最多1个并发生成，同IP每小时最多10个新账号。管理员可在契约范围内调整。创建账号、手动生成、轮询分别纳入适当计数；调度也遵守封禁和生成预算。入队前先检查配额/并发并登记幂等键，重复意图返回原操作，不重复扣生成额度。代理IP只信受信网关头；清Cookie不会重置IP桶。限制策略需结合实际流量调优，IP不等同真实身份。参考 [OWASP DoS Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Denial_of_Service_Cheat_Sheet.html)。
+4. 超过限制返回429和Retry-After秒数，前端停止自动重试并给出可恢复提示；封禁返回403，不自动清Cookie。依据 [RFC 6585 §4](https://www.rfc-editor.org/rfc/rfc6585#section-4)。封禁停止新运行/调度，解除仍受配额约束。管理监测展示创建/最近活动、请求率、生成量、并发、限流数、风险、脱敏IP和封禁原因；封禁、解封和策略修改写入管理员审计记录。日志不记录原始token/API key，风险阈值和保留期在后端实施前明确。
+
+公开GenerationProgress与内部AgentRun由独立序列化路径产生，用户HTTP响应不含工具/消息/子任务/配置和工作区字段。估计由服务端根据已完成工作及历史耗时提供；样本不足为null，页面使用不定进度与“正在估算”。剩余时间是估计，可上调；真实产物发布前不能报100%或completed。Agent循环与管理观测不因此改成固定线性流程。
+
+本轮原型的 /__demo 为开发专用命名空间：用户5173签发HttpOnly Cookie，管理员5174代理监测请求到同一开发服务并使用独立管理员演示Cookie。仅ignored .demo中的本地JSON与哈希token用于演示，不是MySQL/Redis的生产安全实现；新闻、Agent、定时发布仍为模拟。正式部署需使用FastAPI、持久会话、原子配额和受信代理配置重新验收。
 
 ## 本地资料与运行文件
 
@@ -148,7 +161,7 @@ bash 每次运行在最小 Linux 容器环境：无模型/数据库凭据、无�
 
 长期记忆按 user namespace 保存显式关注背景、反馈和简报去重指纹；新任务将当前偏好放在更高优先级。RSS/搜索文本标识为不可信资料，不能写入系统指令或提升为用户偏好。记忆有来源/更新时间与删除能力，不在本轮用户设置中展示记忆管理。
 
-观测记录实际模型/工具事件、耗时、tokens、状态、错误、摘要覆盖范围和子 run 关联。用户只见本人的简化事件，管理员看脱敏细节；不采集/展示模型私有思维链。SSE 的 Last-Event-ID/游标可补拉已持久化事件，断线不改变 run 状态。
+观测记录实际模型/工具事件、耗时、tokens、状态、错误、摘要覆盖范围和子 run 关联。用户只见本人的公开百分比与预计剩余时间，管理员看脱敏事件；不采集/展示模型私有思维链。SSE 的 Last-Event-ID/游标可补拉已持久化事件，断线不改变 run 状态。
 
 评估先做确定性检查（引用存在/来源可追溯/相关性/重复/时效/预算），再做人工或明确标注的模型评分（相关性、摘要忠实度）。固定样例包含来源快照与时间，评估过程不向用户发布真实简报。实验比较绑定模型与配置、提示词、dataset 版本和评分器版本；评分器故障不能记成 0 分或通过。
 

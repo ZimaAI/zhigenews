@@ -1,0 +1,9 @@
+{
+  "synthetic": true,
+  "schema": "Error",
+  "data": {
+    "code": "ACCOUNT_BLOCKED",
+    "message": "当前账号暂不可用。",
+    "requestId": "request-example"
+  }
+}

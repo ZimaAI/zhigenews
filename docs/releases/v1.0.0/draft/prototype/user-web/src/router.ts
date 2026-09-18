@@ -6,7 +6,6 @@ import Preferences from './pages/Preferences.vue';
 import Delivery from './pages/Delivery.vue';
 import Onboarding from './pages/Onboarding.vue';
 import Auth from './pages/Auth.vue';
-import Run from './pages/Run.vue';
 import Settings from './pages/Settings.vue';
 import { state } from '@shared/mock';
 const router = createRouter({
@@ -19,14 +18,14 @@ const router = createRouter({
     { path: '/preferences', redirect: '/settings/preferences' },
     { path: '/delivery', redirect: '/settings/schedule' },
     { path: '/onboarding', component: Onboarding, meta: { title: '订阅偏好' } },
-    { path: '/runs/:id', component: Run, meta: { title: '整理过程' } },
+    { path: '/runs/:id', redirect: '/today' },
     { path: '/settings', component: Settings, meta: { title: '个人设置' }, children: [
       { path: '', redirect: '/settings/preferences' },
       { path: 'preferences', component: Preferences, meta: { title: '订阅偏好' } },
       { path: 'schedule', component: Delivery, meta: { title: '推送时间' } },
     ] },
-    { path: '/login', component: Auth, meta: { title: '登录', standalone: true } },
-    { path: '/register', component: Auth, meta: { title: '创建账户', standalone: true } },
+    { path: '/login', component: Auth, meta: { title: '欢迎', standalone: true } },
+    { path: '/register', redirect: '/login' },
     { path: '/:pathMatch(.*)*', redirect: '/today' },
   ],
   scrollBehavior(to, from, saved) {
@@ -37,7 +36,7 @@ const router = createRouter({
 });
 router.beforeEach((to) => {
   if (to.meta.standalone) return;
-  if (!state.authenticated) return '/login';
+  if (!state.authenticated) return { path: '/login', query: { next: to.fullPath } };
   if (!state.onboardingCompleted && to.path !== '/onboarding') return '/onboarding';
   if (state.onboardingCompleted && to.path === '/onboarding') return '/today';
 });

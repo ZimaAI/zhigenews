@@ -1,29 +1,31 @@
 # 领域模型与数据边界（ITERATE 草稿）
 
-本稿对应 v1.0.0 r3 原型，尚未冻结。权威交换格式见 `../contracts/openapi.json`；页面上的模拟运行、评分与投递不代表下列后端不变量已实现。
+本稿对应 v1.0.0 r5 原型，尚未冻结。权威交换格式见 `../contracts/openapi.json`；页面上的模拟运行、评分与投递不代表下列后端不变量已实现。
 
 ## 四类模型
 
 | 层次 | 对象与职责 | 不应混入的内容 |
 | --- | --- | --- |
 | 领域 | 用户、偏好版本、来源/快照、运行/子任务、简报版本、投递尝试、配置版本、记忆、评估实验 | 组件是否展开、表单脏状态、toast |
-| 交换 | 同名 Preferences/NewsItem/Brief/AgentRun 等 DTO，写请求、分页、错误、SSE | ORM 对象、密钥原文、宿主物理路径、模型私有思维链 |
-| 页面 | DemoState、Scenario、筛选/页码、编辑草稿、loading/error、read 展示与对比选项 | 不承担权限、调度、投递保证 |
+| 交换 | Preferences/NewsItem/公开 Brief/GenerationProgress，以及仅管理员 AgentRun/AnonymousAccount 等 DTO，写请求、分页、错误、SSE | ORM 对象、密钥原文、宿主物理路径、模型私有思维链 |
+| 页面 | DemoState、Scenario、筛选/页码、编辑草稿、loading/error、新闻弹窗与对比选项 | 不承担权限、调度、投递保证 |
 | 持久化 | MySQL 主外键/唯一约束/版本、不可变文件快照、checkpoint、outbox 与事件日志 | 不解析格式化的页面时间作为调度依据 |
 
 ## 实体、关系与不变量
 
 | 领域实体 | 身份与关系 | 主要不变量/交换映射 |
 | --- | --- | --- |
-| User / Session | User 有稳定 ID；Session 归属一个 User | 角色 user/admin；禁用与注销能撤销有效会话；`Preferences.role` 是背景而非授权角色；Session 返回持久化 onboardingCompleted |
+| User / Session | User 有稳定 ID；Session 归属一个 User | 匿名用户与管理员会话分离；服务器创建不透明会话并通过 Cookie 持有；过期/撤销由服务器控制；`Preferences.role` 是背景而非授权角色；Session 返回持久化 onboardingCompleted |
+| AnonymousAccount / AbuseEvent / AnonymousPolicy | 匿名用户稳定ID；事件关联账户，规则由管理员管理 | 同 Cookie 恢复身份；请求/每日生成/并发/同IP新建账号在服务端原子计数；封禁与解封审计；统计不含token或原始IP |
+| GenerationProgress | 归属匿名用户的公开生成投影 | percent 与 remainingSeconds 可空；未知不报0或100；用户无 AgentRun/事件访问权；详情、状态与结果归属均服务端检查 |
 | PreferenceRevision | `(userId, version)` 唯一 | 读取未配置偏好允许 version=0 和空数组；保存至少一个话题或关键词，成功递增并原子标记首次配置完成；仅话题/背景/关键词；旧运行保留原快照 |
 | DeliveryPlan | 每用户一个计划 | 只有每日 HH:mm 可由用户修改；固定系统时区 Asia/Shanghai，首次偏好完成后默认启用；仅站内；对应 DeliverySettings |
 | Source / SourceSnapshot | Source 稳定 ID；一个源有多次 Fetch 和不可变 Snapshot | NewsNow 与 RSS 分开；周期单位秒；成功发布新快照才能更新 lastSuccess；坏响应不覆盖有效快照；对应 Source |
-| NewsEvidence / BriefItem | 条目带原 URL、来源及引用；BriefItem 归属某一期版本 | 来源发布时间可空，不能拿抓取/榜单时间替代；原文证据与 Agent 推荐理由分开；read 是用户条目阅读状态；对应 NewsItem/Citation |
+| NewsEvidence / BriefItem | 条目带原 URL、来源及引用；BriefItem 归属某一期版本 | 来源发布时间可空，不能拿抓取/榜单时间替代；原文证据与 Agent 推荐理由分开；不存储已读/未读状态；对应 NewsItem/Citation |
 | AgentConfigRevision / ModelEndpoint | 配置草稿发布成不可变版本并引用模型 | 模型 ID、端点、能力、密钥引用分离；API key 只写/加密保存；新运行绑定快照；对应 AgentConfig/ModelConfig |
 | AgentRun / Subtask | run 归属用户与 thread；子 run 归属父 run | 绑定偏好/配置/来源快照；预算包括子任务；运行取消独立于未来计划；对应 AgentRun/Subtask |
 | MessageJournal / Summary | `(threadId,messageSeq)` 单调唯一；调用实例关联 toolCallId | 原始日志保留，修复重建模型视图不重新编号；摘要另存覆盖范围与版本；最新用户原文不压缩 |
-| BriefRevision | 简报归属用户与 run；日期内可有多个 version | 内容一经发布不可覆盖，引用及偏好快照可追溯；部分完成仍说明缺失来源；对应 Brief |
+| BriefRevision | 简报归属用户与 run；日期内可有多个 version | 内容一经发布不可覆盖，引用及偏好快照可追溯；部分完成仍说明缺失来源；内部对应 AdminBrief；公开 Brief 不含 runId/偏好技术快照 |
 | DeliveryAttempt | 归属精确 briefId/版本与渠道 | 生成完成不意味着站内发布成功；channel 固定 in_app；管理端重试复用同一简报并增加尝试；对应 Delivery |
 | UserMemory | 归属用户 namespace，带来源/更新时间 | 显式偏好高于推断；网上内容不可当用户事实；删除仅影响后续读取；对应 Memory |
 | EvaluationDataset / EvaluationRun | 固定 case/来源快照与时钟；实验绑定配置与评分器版本 | 无评分为 null，非 0；规则/人工/LLM 分开；没有样本不显示准确率；对应 EvalCase/Evaluation |
@@ -50,11 +52,19 @@ Source 使用 `unverified/healthy/syncing/failed/disabled`；发起采集只代�
 
 ## 权限与时间
 
-用户只读写本人的偏好、计划、记忆、简报、阅读标记和运行；管理员读管理视图与脱敏运行详情、管理来源/模型/配置/用户状态。服务端解析当前身份，不接收客户端声称的 userId 作为归属依据；用户作用域跨账号 ID 返回不可见。
+匿名用户可使用全部用户端功能，只读写本人的偏好、计划和简报，读取公开生成进度；管理员读管理视图与脱敏运行详情、管理来源/模型/配置和匿名账户。用户端不开放已读标记、整理记录、AgentRun或事件。服务端解析当前身份，不接收客户端声称的 userId 作为归属依据；用户作用域跨账号 ID 返回不可见。
 
 数据库时间为 UTC；ISO 时间表示实际事件时刻，日期与每日 HH:mm 按系统时区 Asia/Shanghai 解释。用户不设置时区，后端保存完整下一次 UTC 计划时刻。原型固定时钟 `2026-09-18T08:12:00+08:00`，事件短时间是页面投影，不可直接持久化为调度事实。
 
 新闻发布时间、采集成功时间、快照发布时间、简报生成时间、计划槽位和渠道提交时间分别记录；未知来源发布时间保留 null。严格新鲜度条件不能通过本地抓取时间补成“新新闻”。来源/运行工作区 ID 由服务端生成，不用外部标题或 URL 拼接目录。
+
+## 匿名会话与公开生成投影
+
+Session 只返回 kind=anonymous、userId、name、onboardingCompleted；token 只在 Set-Cookie 中返回，服务器只保存其哈希。匿名账户没有管理员权限，不允许用户提交userId声明所有权。同一Cookie刷新/重试不会新建账户，合法新会话的onboardingCompleted=false；已封禁会话返回403，不能通过自动重试创建替代账户。管理员采用独立Cookie和AdminSession。
+
+GenerationProgress 的状态沿用运行终态语义，但不包含runId、模型、工具、事件、子任务、路径或配置。percent 为0..100或null；remainingSeconds为非负整数或null，updatedAt为完整时间。未知时显示不定进度和正在估算；预计用时不是完成保证，不能客户端倒数到零就设completed。只有服务端确认简报发布后返回completed/partial和briefId。刷新通过当前账户恢复活动生成，失败/封禁/429有明确状态，不泄露技术过程。
+
+封禁/配额不删除既有简报或偏好。清Cookie创建的是新身份，同IP创建速率与资源门槛仍生效；这不是保证识别真实自然人。IP在受信反向代理边界提取，统计页面只展示脱敏标签。
 
 ## 持久化与文件访问边界
 

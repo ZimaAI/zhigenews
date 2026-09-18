@@ -1,34 +1,37 @@
-# 原型共享模块接口
+# 原型共享开发接口（ITERATE r5）
 
-这是 ITERATE r3 的原型开发接口说明。唯一交换主源为 [OpenAPI](../../contracts/openapi.json)，内存 adapter 到未来 HTTP 的映射见 [契约说明](../../contracts/README.md)。当前没有 HTTP 后端；UI 只读 `state`，修改经 `api`，不得分散 mock 结果。
+唯一正式交换主源为 [OpenAPI](../../contracts/openapi.json)，映射见[契约说明](../../contracts/README.md)。当前Vue界面经集中 `mock.ts` 操作状态；`anonymous.ts` 调用开发专用 `/__demo` 服务。两者都不是正式FastAPI实现。静态dist/preview不含开发Cookie服务，匿名交互需运行用户Vite5173；管理监测还需管理员Vite5174代理。
 
-`@shared/mock` 导出 Vue reactive `state: DemoState`、`api`、`setScenario(Scenario)`、`resetDemo()`、`resetRevision: Ref<number>`、`FIXED_NOW`、`TOPICS: string[]`、`notify(message)`、`toast: Ref<string>`、`formatDate(value)`、`statusLabel(value)`。
+## 用户状态与方法
 
-`FIXED_NOW = '2026-09-18T08:12:00+08:00'`。`resetDemo()` 清除模拟任务定时器、恢复 seed 并递增 resetRevision；Shell/表单借此重新挂载或同步，不能只监听 scenario（正常场景内也能重置）。`setScenario` 清除当前模拟任务并恢复其他示例数据，再设置场景；保留已保存偏好与 onboardingCompleted，不重新触发已完成的首次引导。`resetDemo` 则连同上述设置一起恢复 seed，并清空完成标记。localStorage 为每个 origin 的独立演示状态，两端不实时同步；不要把这个存储当作后端或用户权限系统。
+`@shared/mock` 导出reactive `state: DemoState`、`api`、`anonymousEntry`、`setScenario`、`resetDemo`、`resetRevision`、`FIXED_NOW`、`TOPICS`、`notify`、`toast`、`formatDate`及`statusLabel`。
 
-除 `logout` 外 api 方法均异步，错误通过 throw Error；页面须 try/catch 保留输入。普通操作延迟约 350ms，采集/生成/评估通过额外定时器推进，error 场景写操作失败；重置使旧操作失效。
+- `api.ensureAnonymousSession()` 自动创建/恢复服务器匿名Cookie会话；返回身份投影和当前公开生成，更新 `state.session`、`generation`、首次完成标记。请求合并，重试不盲目创建多个身份。`anonymousEntry` 提供busy/error/retryAt。
+- `load()` 保留全局加载/失败场景。`savePreferences(Preferences)` 只接受version/role/topics/keywords，至少话题或关键词非空，背景最多500字、关键词20个且单项40字；保存后完成首次引导。`saveDelivery(DeliverySettings)` 只接受HH:mm时间，Asia/Shanghai每日站内发布。
+- `generateBrief()` 创建公开生成并返回其ID，轮询更新 `state.generation: GenerationProgress | null`；完成后按保存的偏好快照生成模拟简报。`cancelGeneration()` 是服务能力；用户无运行详情页。
+- `login(email,password)`、`logout()` 仅供管理员演示登录；用户页面不调用，原用户register和markRead已删除。
+- `deleteMemory(id)` 为原型内部保留能力，不在用户设置展示。
 
-- `load(): Promise<void>`、`login(email, password): Promise<void>`、`register(email, password, name?): Promise<void>`、`logout(): void`。登录/注册仅修改演示身份；注册将 onboardingCompleted 重置为 false 并进入首次订阅，密码校验至少 8 位。
-- `savePreferences(Preferences): Promise<void>`、`saveDelivery(DeliverySettings): Promise<void>`。Preferences 仅 version/role/topics/keywords，背景最长 500 字，关键词最多 20 个、每个最长 40 字；话题或关键词至少一类非空，保存增加版本并持久化 onboardingCompleted=true；DeliverySettings 仅 time，HH:mm 按 Asia/Shanghai 的每日站内计划解释，保存不立即生成。
-- `deleteMemory(id): Promise<void>` 是共享服务能力，用户设置页不再提供记忆管理。邮箱验证与测试发送方法已移除。
-- `generateBrief(): Promise<string>` 返回 run ID，后续示例事件自动推进；模拟筛选最近 24 小时、最多 10 条，命中任一所选话题或任一关键词即可入选，无匹配不凑数；背景只保存供正式 Agent 语义使用；`cancelRun(id): Promise<void>`
-- `retryDelivery(id): Promise<void>`（id 可为 brief ID 或 delivery ID，保持原简报并增加尝试；仅 in_app 站内发布，submitted 表示已发布）、`markRead(newsId): Promise<void>`（toggle 阅读状态，同 ID 一致赋值）。
-- `saveSource(Source): Promise<void>`、`toggleSource(id): Promise<void>`、`fetchSource(id): Promise<void>`
-- `saveModel(ModelConfig, key?: string): Promise<void>`（仅保存遮罩，不持久化 key）、`testModel(id): Promise<void>`、`toggleModel(id): Promise<void>`
-- `saveConfig(AgentConfig): Promise<void>`、`publishConfig(id): Promise<void>`
-- `runEvaluation(configVersion): Promise<string>`、`saveEvalCase(EvalCase): Promise<void>`
-- `toggleUser(id): Promise<void>`
+`GenerationProgress`只有id/status/percent/remainingSeconds/updatedAt/briefId/error；模型、工具和事件不进入用户投影。新闻已删除read；共享内部Brief仍有runId/preferenceSnapshot，按管理AdminBrief校验，公开HTTP必须剔除这两项。用户组件不能读取内部运行字段。
 
-共享组件：
+原型偏好、示例简报和设置仍由浏览器按匿名账户隔离保存；身份、完成标记、生成状态、匿名统计及策略由本地开发服务维护。开发Cookie为HttpOnly/SameSite=Lax，HTTPS才加Secure；不使用document.cookie手写凭证。Cookie丢失产生新身份，403保留原身份提示不可用。生产还需完整数据库与资源归属校验。
 
-- `@shared/AppShell.vue`：保留原侧栏控制台壳，当前由管理员项目使用；prop `app="user"|"admin"`，default slot 放 router-view。r2 用户端改用 `user-web/src/components/ReaderShell.vue` 和独立 `user-tokens.css`，两壳保留导航、原型场景/重置、toast。
-- `@shared/Badge.vue`：prop `status: string`，自动状态中文文本/色。
-- `@shared/EmptyState.vue`：props `title`, `description?`, `error?`；default slot 放操作。
-- `@shared/RunTimeline.vue`：props `run: AgentRun`, `technical?: boolean`，含事件/子任务。
-- `@shared/Modal.vue`：props `open`, `title`，emit `close`；default slot 内容，footer slot 操作。
+## 开发HTTP边界
 
-共享 CSS 在 main.ts `import '@shared/styles.css'`。可用 `.page-header`（h1+描述，右侧 actions）、`.eyebrow`、`.muted`、`.meta`、`.card`、`.stack`、`.row`、`.actions`、`.button`/`button--primary`/`button--ghost`、`.field-control`、`.field`、`.form-grid`、`.chip`/`.chip--active`、`.alert`/`alert--danger`/`alert--success`、`.table-wrap`、`.data-table`、`.tabs`、`.section-heading`、`.metric-grid`、`.metric`、`.mono`、`.empty-state`。页面可写 scoped CSS 布局，不重复定义色板。
+`anonymousApi` 包括session、touch、onboard、generate、progress、cancel；请求统一带凭据与JSON，`DemoHttpError`保存status和Retry-After。session返回 `{session,generation}` 仅是bootstrap封套，不是正式Session DTO。
 
-Shell 管理全局 loading/error/unauthorized 页面；空场景由各页空数组/无主题处理，partial 场景通过相应数据状态呈现。应用默认演示已登录；登录页须可访问且标明模拟。所有数据为 synthetic，不使用真实凭据。
+`anonymousAdminApi` 包括login、session、logout、list、setStatus、savePolicy、simulateAbuse。list聚合users/events/policy供原型管理页；正式列表采用契约中的分页响应。`simulateAbuse`仅管理员演示按钮，不能部署为公开生产端点。
 
-首次演示 seed 的偏好为 version 0、背景空、话题和关键词空，onboardingCompleted=false；历史简报保留独立的示例快照。路由以身份与完成标记决定首次引导，不把现有历史简报或数组数量作为完成证据。有效保存后刷新和后续登录保留完成状态。
+用户Vite5173挂载 `demo-server.ts`，管理员5174代理管理请求到同一服务，用独立管理员演示Cookie；监测可以观察到本地实际演示请求。匿名token只保存哈希，开发数据位于被Git忽略的 `.demo`。服务器重启/浏览器关闭与内存原型的语义不同，不能用浏览器定时器冒充真实后台Agent。
+
+## 保留的管理模拟方法
+
+`saveSource/toggleSource/fetchSource`、`saveModel/testModel/toggleModel`、`saveConfig/publishConfig`、`saveEvalCase/runEvaluation`、`cancelRun`、`retryDelivery`继续由集中adapter处理。模型只保留key遮罩；发布配置对后续运行生效；站内重试沿用原briefId，submitted仅表示已发布。
+
+这些来源、模型、运行、实验和发布数据仍为synthetic。固定参考时钟 `2026-09-18T08:12:00+08:00`用于新闻seed；匿名HTTP活动使用实际服务器时间。场景/重置用于UI演示，不充当清除Cookie或绕过服务端配额的控制。
+
+## 组件
+
+管理员使用 `AppShell.vue` 与共享默认样式；用户独立使用 `ReaderShell.vue`、user-tokens.css和user.css。`Badge`、`EmptyState`、`Modal`等语义原语共用。`RunTimeline`只在管理端使用。
+
+用户 `NewsArticle` 触发单条新闻详情，`NewsDetailDialog`管理对应内容和可访问弹窗；`GenerationProgress`组件只展示公开进度及估算，不渲染Agent事件。按钮、标签、状态色沿用双端design规范，任何跨端基础组件修改需验证两种主题。

@@ -1,0 +1,18 @@
+{
+  "synthetic": true,
+  "schema": "AnonymousAccount",
+  "data": {
+    "id": "anon-example",
+    "name": "匿名读者",
+    "createdAt": "2026-09-18T07:00:00+08:00",
+    "lastSeenAt": "2026-09-18T08:12:00+08:00",
+    "status": "active",
+    "risk": "watch",
+    "requestsLastMinute": 45,
+    "generationsToday": 3,
+    "rateLimitHits": 2,
+    "activeGenerations": 1,
+    "ipLabel": "192.0.2.*",
+    "blockReason": ""
+  }
+}

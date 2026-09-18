@@ -8,7 +8,8 @@ import Evaluations from './pages/Evaluations.vue';
 import Users from './pages/Users.vue';
 import Deliveries from './pages/Deliveries.vue';
 import Login from './pages/Login.vue';
-export default createRouter({ history: createWebHistory(), routes: [
+import { anonymousAdminApi } from '@shared/anonymous';
+const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/', redirect: '/overview' },
   { path: '/overview', component: Overview },
   { path: '/sources/:id?', component: Sources },
@@ -21,3 +22,6 @@ export default createRouter({ history: createWebHistory(), routes: [
   { path: '/login', component: Login },
   { path: '/:pathMatch(.*)*', redirect: '/overview' },
 ], scrollBehavior(to, from, saved) { return saved || (to.path === from.path ? {} : { top: 0 }); } });
+
+router.beforeEach(async to => { if (to.path === '/login') return; try { await anonymousAdminApi.session(); } catch { return '/login'; } });
+export default router;

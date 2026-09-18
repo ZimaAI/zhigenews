@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { ArrowUpRight, BookOpen, ChevronDown, FlaskConical, RotateCcw } from 'lucide-vue-next';
+import { ArrowUpRight, BookOpen, ChevronDown, FlaskConical, History, Newspaper, RotateCcw } from 'lucide-vue-next';
 import { api, resetDemo, resetRevision, setScenario, state, toast } from '@shared/mock';
 import type { Scenario } from '@shared/types';
 import EmptyState from '@shared/EmptyState.vue';
 
 const route = useRoute();
-const name = computed(() => state.users[0]?.name || '新读者');
+const name = computed(() => state.session?.name || state.users[0]?.name || '匿名读者');
 const navigation = [
-  { path: '/today', label: '今日简报' },
-  { path: '/briefs', label: '历史简报' },
+  { path: '/today', label: '今日简报', icon: Newspaper },
+  { path: '/briefs', label: '历史简报', icon: History },
 ];
 const active = (path: string) => route.path === path || route.path.startsWith(`${path}/`);
 const scenarios: { value: Scenario; label: string }[] = [
@@ -50,7 +50,7 @@ async function retry() { state.scenario = 'normal'; await api.load(); }
     <div class="reader-canvas">
       <nav v-if="state.onboardingCompleted" class="reader-nav" aria-label="主要导航">
         <RouterLink v-for="item in navigation" :key="item.path" :to="item.path" :class="{ selected: active(item.path) }" :aria-current="active(item.path) ? 'page' : undefined">
-          {{ item.label }}
+          <component :is="item.icon" :size="18" :stroke-width="1.8" aria-hidden="true" />{{ item.label }}
         </RouterLink>
       </nav>
       <main id="reader-main" class="reader-main" tabindex="-1">
@@ -77,7 +77,7 @@ async function retry() { state.scenario = 'normal'; await api.load(); }
 .prototype-menu > summary { background: transparent; border-color: transparent; min-height: 40px; font-size: 12px; }
 .reader-canvas { background: var(--color-surface); border-radius: 8px; box-shadow: var(--shadow-canvas); min-height: calc(100vh - 112px); }
 .reader-nav { display: flex; gap: 36px; margin-inline: 48px; border-bottom: 1px solid var(--color-border); padding-top: 12px; min-width: 0; overflow-x: auto; }
-.reader-nav a { display: inline-flex; align-items: center; flex-shrink: 0; min-height: 56px; padding: 8px 0 5px; border-bottom: 2px solid transparent; color: var(--color-text-muted); text-decoration: none; font-size: 14px; }
+.reader-nav a { display: inline-flex; align-items: center; flex-shrink: 0; gap: 8px; min-height: 56px; padding: 8px 0 5px; border-bottom: 2px solid transparent; color: var(--color-text-muted); text-decoration: none; font-size: 14px; }
 .reader-nav a:hover { color: var(--color-primary); }
 .reader-nav a.selected { color: var(--color-primary); border-bottom-color: var(--color-accent); font-weight: 600; }
 .reader-main { padding: 40px 48px 48px; min-width: 0; outline: none; }

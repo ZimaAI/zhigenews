@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "ZhigeNews v1.0.0 draft exchange contract",
-    "version": "1.0.0-prototype.1",
-    "description": "v1.0.0 ITERATE r3 候选契约，尚未冻结或实现 HTTP。用户偏好仅话题/背景/关键词，推送仅每日时间且只站内；首次设置完成状态持久化。"
+    "version": "1.0.0-prototype.5",
+    "description": "v1.0.0 ITERATE r5 候选契约，尚未冻结。自动匿名 Cookie 会话、新闻详情弹窗、公开生成进度和匿名防滥用监测；Agent 事件仅供管理员。/__demo 原型接口不冒充此正式 Gateway。"
   },
   "servers": [
     {
@@ -30,155 +30,11 @@
   ],
   "paths": {
     "/auth/session": {
-      "post": {
-        "operationId": "login",
-        "tags": [
-          "Auth"
-        ],
-        "summary": "登录并设置 HttpOnly 会话 Cookie",
-        "x-required-role": "public",
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Session"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthenticated"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      },
       "get": {
         "operationId": "getSession",
-        "tags": [
-          "User"
-        ],
-        "summary": "读取当前身份",
-        "x-required-role": "authenticated",
+        "description": "恢复当前匿名会话；缺失/过期401，封禁403；不创建新账号。",
         "responses": {
           "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Session"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthenticated"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      },
-      "delete": {
-        "operationId": "logout",
-        "tags": [
-          "User"
-        ],
-        "summary": "退出并撤销会话",
-        "x-required-role": "authenticated",
-        "responses": {
-          "204": {
-            "description": "成功"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthenticated"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/auth/register": {
-      "post": {
-        "operationId": "register",
-        "tags": [
-          "Auth"
-        ],
-        "summary": "注册普通用户",
-        "x-required-role": "public",
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
             "description": "成功",
             "content": {
               "application/json": {
@@ -600,8 +456,8 @@
         "tags": [
           "User"
         ],
-        "summary": "基于当前偏好创建新简报运行",
-        "description": "每次不同幂等键创建新内容版本；不会覆盖已发布简报。生成与投递分别记录状态。",
+        "summary": "基于当前偏好创建简报生成意图",
+        "description": "按当前偏好创建简报生成意图，返回公开进度。相同幂等键返回原意图；并发/配额校验在队列入队前由服务器原子执行。 preferenceVersion必须匹配当前已保存偏好，否则409。",
         "x-required-role": "authenticated",
         "parameters": [
           {
@@ -632,7 +488,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AcceptedRun"
+                  "$ref": "#/components/schemas/GenerationProgress"
                 }
               }
             }
@@ -688,237 +544,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Brief"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthenticated"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/me/news/{id}/read": {
-      "put": {
-        "operationId": "markNewsRead",
-        "tags": [
-          "User"
-        ],
-        "summary": "标记本人简报条目阅读状态",
-        "x-required-role": "authenticated",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 120
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReadWrite"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "成功"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthenticated"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/me/runs": {
-      "get": {
-        "operationId": "listOwnRuns",
-        "tags": [
-          "User"
-        ],
-        "summary": "列出本人运行",
-        "x-required-role": "authenticated",
-        "parameters": [
-          {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AgentRunPage"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthenticated"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/me/runs/{id}": {
-      "get": {
-        "operationId": "getOwnRun",
-        "tags": [
-          "User"
-        ],
-        "summary": "读取本人运行的简化事件",
-        "x-required-role": "authenticated",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 120
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AgentRun"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthenticated"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/me/runs/{id}/cancel": {
-      "post": {
-        "operationId": "cancelOwnRun",
-        "tags": [
-          "User"
-        ],
-        "summary": "请求取消本人活动运行",
-        "description": "queued/running 进入 cancelling，worker 确认后才 cancelled；终态幂等返回原状态。",
-        "x-required-role": "authenticated",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 120
-            }
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AgentRun"
                 }
               }
             }
@@ -1116,7 +741,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/sources": {
@@ -1178,7 +808,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       },
       "post": {
         "operationId": "createSource",
@@ -1229,7 +864,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/sources/{id}": {
@@ -1294,7 +934,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       },
       "get": {
         "operationId": "getSource",
@@ -1347,7 +992,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/models": {
@@ -1409,7 +1059,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       },
       "post": {
         "operationId": "createModel",
@@ -1460,7 +1115,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/models/{id}": {
@@ -1525,7 +1185,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/agent-configs": {
@@ -1587,7 +1252,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       },
       "post": {
         "operationId": "createConfig",
@@ -1638,7 +1308,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/agent-configs/{id}": {
@@ -1704,7 +1379,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/eval-cases": {
@@ -1766,7 +1446,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       },
       "post": {
         "operationId": "createEvalCase",
@@ -1817,7 +1502,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/eval-cases/{id}": {
@@ -1882,7 +1572,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/sources/{id}/enabled": {
@@ -1947,7 +1642,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/sources/{id}/fetch": {
@@ -2014,7 +1714,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/models/{id}/enabled": {
@@ -2079,7 +1784,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/models/{id}/test": {
@@ -2134,7 +1844,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/models/{id}/secret": {
@@ -2182,7 +1897,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/agent-configs/{id}/publish": {
@@ -2238,7 +1958,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/runs": {
@@ -2330,7 +2055,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/runs/{id}": {
@@ -2385,7 +2115,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/runs/{id}/cancel": {
@@ -2440,7 +2175,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/evaluations": {
@@ -2502,7 +2242,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       },
       "post": {
         "operationId": "runEvaluation",
@@ -2566,7 +2311,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/evaluations/{id}": {
@@ -2621,134 +2371,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
-      }
-    },
-    "/admin/users": {
-      "get": {
-        "operationId": "listUsers",
-        "tags": [
-          "Admin"
-        ],
-        "summary": "查看用户状态和订阅摘要",
-        "x-required-role": "admin",
-        "parameters": [
-          {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DemoUserPage"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthenticated"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/admin/users/{id}/status": {
-      "put": {
-        "operationId": "setUserStatus",
-        "tags": [
-          "Admin"
-        ],
-        "summary": "显式启用或禁用用户",
-        "x-required-role": "admin",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 120
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UserStatusWrite"
-              }
-            }
-          }
         },
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DemoUser"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthenticated"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
+        "security": [
+          {
+            "adminSessionCookie": []
           }
-        }
+        ]
       }
     },
     "/admin/deliveries": {
@@ -2810,7 +2438,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     },
     "/admin/deliveries/{id}/retry": {
@@ -2876,74 +2509,12 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
-      }
-    },
-    "/me/runs/{id}/events": {
-      "get": {
-        "operationId": "meRunEvents",
-        "tags": [
-          "User"
-        ],
-        "summary": "订阅可回放的持久运行事件",
-        "x-required-role": "authenticated",
-        "parameters": [
+        },
+        "security": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 120
-            }
-          },
-          {
-            "name": "Last-Event-ID",
-            "in": "header",
-            "schema": {
-              "type": "string",
-              "pattern": "^[0-9]+$"
-            },
-            "description": "仅此 run 内单调递增的事件 ID；先补发其后的持久事件再监听。"
+            "adminSessionCookie": []
           }
-        ],
-        "responses": {
-          "200": {
-            "description": "SSE：id 为 RunEvent.id，event 为 run.event，data 为 RunEvent JSON。断线不改变 run 状态。",
-            "content": {
-              "text/event-stream": {
-                "schema": {
-                  "type": "string"
-                },
-                "x-event-schema": {
-                  "$ref": "#/components/schemas/RunEvent"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthenticated"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
+        ]
       }
     },
     "/admin/runs/{id}/events": {
@@ -3010,7 +2581,579 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/auth/anonymous": {
+      "post": {
+        "operationId": "ensureAnonymousSession",
+        "description": "无有效Cookie且通过IP门槛后创建匿名账号并Set-Cookie；已有有效会话幂等恢复，不重置偏好或重复计数。被封禁会话返回403，不能自动换号。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "仅首次/更新会话返回不透明token，HttpOnly; Secure(生产HTTPS); SameSite=Lax; Path=/。服务端控制过期和撤销。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": []
+      }
+    },
+    "/admin/auth/login": {
+      "post": {
+        "operationId": "adminLogin",
+        "description": "仅管理员认证入口，签发独立管理员Cookie；匿名账号不能提升权限。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminLoginRequest"
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/admin/auth/session": {
+      "get": {
+        "operationId": "getAdminSession",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "adminLogout",
+        "description": "",
+        "responses": {
+          "204": {
+            "description": "成功"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/me/generations/{id}": {
+      "get": {
+        "operationId": "getGenerationProgress",
+        "description": "仅本人公开生成进度；跨账号404，不返回AgentRun或事件。客户端短轮询，不在本地推算完成。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationProgress"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ]
+      }
+    },
+    "/me/generations/{id}/cancel": {
+      "post": {
+        "operationId": "cancelGeneration",
+        "description": "服务能力：请求取消，先返回cancelling；由worker确认cancelled，不影响每日计划。",
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationProgress"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ]
+      }
+    },
+    "/admin/anonymous-accounts": {
+      "get": {
+        "operationId": "listAnonymousAccounts",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnonymousAccountPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/anonymous-accounts/{id}/status": {
+      "put": {
+        "operationId": "setAnonymousAccountStatus",
+        "description": "封禁/解除封禁需审计；封禁停止新生成与后续调度，保留已有内容。解除后仍受IP/账户限额约束。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnonymousAccount"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnonymousAccountStatusWrite"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/abuse-events": {
+      "get": {
+        "operationId": "listAbuseEvents",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AbuseEventPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/anonymous-policy": {
+      "get": {
+        "operationId": "getAnonymousPolicy",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnonymousPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      },
+      "put": {
+        "operationId": "saveAnonymousPolicy",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnonymousPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnonymousPolicy"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
       }
     }
   },
@@ -3020,7 +3163,13 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "zg_session",
-        "description": "生产方案：Secure、HttpOnly、SameSite Cookie，服务端会话及角色校验；变更请求校验同源/CSRF。原型登录不执行真实鉴权。"
+        "description": "用户匿名不透明会话 token；服务端签发，生产 HttpOnly; Secure; SameSite=Lax; Path=/，不含个人资料，存储哈希并检查有效期/撤销。写请求另校验 Origin/CSRF。"
+      },
+      "adminSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "zg_admin_session",
+        "description": "独立管理员会话；不接受匿名 Cookie。生产 HttpOnly/Secure/SameSite=Lax，服务端管理员认证和角色校验。"
       }
     },
     "schemas": {
@@ -3154,7 +3303,6 @@
           "sourceType",
           "publishedAt",
           "url",
-          "read",
           "citations"
         ],
         "properties": {
@@ -3197,9 +3345,6 @@
             "type": "string",
             "format": "uri"
           },
-          "read": {
-            "type": "boolean"
-          },
           "citations": {
             "type": "array",
             "items": {
@@ -3220,9 +3365,7 @@
           "items",
           "generationStatus",
           "deliveryStatus",
-          "generatedAt",
-          "runId",
-          "preferenceSnapshot"
+          "generatedAt"
         ],
         "properties": {
           "id": {
@@ -3259,16 +3402,9 @@
           "generatedAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "runId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120
-          },
-          "preferenceSnapshot": {
-            "$ref": "#/components/schemas/Preferences"
           }
-        }
+        },
+        "description": "用户阅读投影；不含内部运行关联、模型配置或偏好技术快照。"
       },
       "RunEvent": {
         "type": "object",
@@ -3807,51 +3943,6 @@
           }
         }
       },
-      "DemoUser": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "id",
-          "name",
-          "email",
-          "role",
-          "status",
-          "topics"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120
-          },
-          "name": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string",
-            "enum": [
-              "user",
-              "admin"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "active",
-              "disabled"
-            ]
-          },
-          "topics": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
       "Delivery": {
         "type": "object",
         "additionalProperties": false,
@@ -3937,66 +4028,26 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "user",
-          "expiresAt",
+          "kind",
+          "userId",
+          "name",
           "onboardingCompleted"
         ],
         "properties": {
-          "user": {
-            "$ref": "#/components/schemas/DemoUser"
-          },
-          "expiresAt": {
+          "kind": {
             "type": "string",
-            "format": "date-time"
+            "const": "anonymous"
           },
-          "onboardingCompleted": {
-            "type": "boolean",
-            "description": "首次有效偏好保存后持久化为 true；注册为 false，刷新或重新登录不重置。"
-          }
-        }
-      },
-      "LoginRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "email",
-          "password"
-        ],
-        "properties": {
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "password": {
-            "type": "string",
-            "minLength": 8,
-            "maxLength": 256,
-            "writeOnly": true
-          }
-        }
-      },
-      "RegisterRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "email",
-          "password"
-        ],
-        "properties": {
-          "name": {
+          "userId": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 80
+            "maxLength": 120
           },
-          "email": {
-            "type": "string",
-            "format": "email"
+          "name": {
+            "type": "string"
           },
-          "password": {
-            "type": "string",
-            "minLength": 8,
-            "maxLength": 256,
-            "writeOnly": true
+          "onboardingCompleted": {
+            "type": "boolean"
           }
         }
       },
@@ -4020,10 +4071,11 @@
               "INVALID_STATE",
               "SECRET_REQUIRED",
               "SOURCE_INTERVAL_TOO_SHORT",
-              "EMAIL_UNVERIFIED",
               "RATE_LIMITED",
               "DEPENDENCY_UNAVAILABLE",
-              "INTERNAL_ERROR"
+              "INTERNAL_ERROR",
+              "ACCOUNT_BLOCKED",
+              "CSRF_REJECTED"
             ]
           },
           "message": {
@@ -4037,20 +4089,6 @@
             "additionalProperties": {
               "type": "string"
             }
-          }
-        }
-      },
-      "AcceptedRun": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "runId"
-        ],
-        "properties": {
-          "runId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120
           }
         }
       },
@@ -4295,35 +4333,6 @@
         "properties": {
           "enabled": {
             "type": "boolean"
-          }
-        }
-      },
-      "UserStatusWrite": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "status"
-        ],
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "active",
-              "disabled"
-            ]
-          }
-        }
-      },
-      "ReadWrite": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "read"
-        ],
-        "properties": {
-          "read": {
-            "type": "boolean",
-            "default": true
           }
         }
       },
@@ -4599,28 +4608,6 @@
           }
         }
       },
-      "DemoUserPage": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "items",
-          "nextCursor"
-        ],
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DemoUser"
-            }
-          },
-          "nextCursor": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      },
       "DeliveryPage": {
         "type": "object",
         "additionalProperties": false,
@@ -4701,11 +4688,389 @@
             }
           }
         ]
+      },
+      "AdminSession": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "userId",
+          "name"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "admin"
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "AdminLoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 256,
+            "writeOnly": true
+          }
+        }
+      },
+      "GenerationProgress": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "status",
+          "percent",
+          "remainingSeconds",
+          "updatedAt",
+          "briefId",
+          "error"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "percent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100,
+            "description": "可估计时为0..100；null时展示不定进度。成功发布前不能显示100。"
+          },
+          "remainingSeconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "服务端估计的剩余秒数，可随负载更新；null表示暂不能估计。不是完成承诺。"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "briefId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "description": "仅向拥有者公开此投影，不包含模型、工具、文件、事件、子任务或推理过程。partial/completed时可给出briefId；失败不能把百分比冒充完成。"
+      },
+      "AnonymousAccount": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "createdAt",
+          "lastSeenAt",
+          "status",
+          "risk",
+          "requestsLastMinute",
+          "generationsToday",
+          "rateLimitHits",
+          "activeGenerations",
+          "ipLabel",
+          "blockReason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "blocked"
+            ]
+          },
+          "risk": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "watch",
+              "high"
+            ]
+          },
+          "requestsLastMinute": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "generationsToday": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rateLimitHits": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "activeGenerations": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "ipLabel": {
+            "type": "string",
+            "description": "脱敏来源标签，不返回原始IP或会话token。"
+          },
+          "blockReason": {
+            "type": "string"
+          }
+        }
+      },
+      "AbuseEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "accountId",
+          "time",
+          "kind",
+          "detail"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "rate_limited",
+              "account_blocked",
+              "account_unblocked",
+              "generation_rejected"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "AnonymousPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestsPerMinute",
+          "generationsPerDay",
+          "maxConcurrentGenerations",
+          "accountsPerIpHour"
+        ],
+        "properties": {
+          "requestsPerMinute": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600,
+            "default": 60
+          },
+          "generationsPerDay": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          },
+          "maxConcurrentGenerations": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 1
+          },
+          "accountsPerIpHour": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 10
+          }
+        }
+      },
+      "AnonymousAccountStatusWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "reason"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "blocked"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": ".*\\S.*"
+          }
+        }
+      },
+      "AnonymousAccountPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnonymousAccount"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AbuseEventPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AbuseEvent"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AdminBrief": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "date",
+          "version",
+          "summary",
+          "items",
+          "generationStatus",
+          "deliveryStatus",
+          "generatedAt",
+          "runId",
+          "preferenceSnapshot"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "title": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "summary": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewsItem"
+            }
+          },
+          "generationStatus": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "deliveryStatus": {
+            "$ref": "#/components/schemas/DeliveryStatus"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "preferenceSnapshot": {
+            "$ref": "#/components/schemas/Preferences"
+          }
+        },
+        "description": "管理员和内部持久化投影，包含runId与偏好快照；不能返回普通用户。"
       }
     },
     "responses": {
       "BadRequest": {
-        "description": "输入校验失败（包括不支持的时区）",
+        "description": "输入校验失败",
         "content": {
           "application/json": {
             "schema": {
@@ -4725,7 +5090,7 @@
         }
       },
       "Forbidden": {
-        "description": "角色不允许该操作",
+        "description": "角色不允许、账号被封禁或CSRF校验失败；封禁不会自动创建替代身份。",
         "content": {
           "application/json": {
             "schema": {
@@ -4755,11 +5120,21 @@
         }
       },
       "RateLimited": {
-        "description": "请求或运行额度达到上限",
+        "description": "请求频率、生成配额、并发或同IP新账号门槛达到上限",
         "content": {
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "headers": {
+          "Retry-After": {
+            "required": true,
+            "description": "等待秒数；客户端显示并停止自动重试，不能清Cookie绕过。",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
             }
           }
         }

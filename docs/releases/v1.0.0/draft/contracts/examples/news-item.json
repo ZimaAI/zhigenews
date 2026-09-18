@@ -11,7 +11,6 @@
     "sourceType": "rss",
     "publishedAt": null,
     "url": "https://news.example.com/synthetic/agent-news",
-    "read": false,
     "citations": [
       {
         "id": "synthetic-citation-01",

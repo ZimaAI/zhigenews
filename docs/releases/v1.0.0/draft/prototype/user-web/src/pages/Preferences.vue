@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
+import { Check, Save } from 'lucide-vue-next';
 import { api, state } from '@shared/mock';
 import type { Preferences } from '@shared/types';
 import PreferenceEditor from '../components/PreferenceEditor.vue';
@@ -40,7 +41,7 @@ async function save() {
   <form class="preferences-form" aria-label="兴趣订阅" @submit.prevent="save">
     <p v-if="error" class="alert alert--danger" role="alert">{{ error }}</p>
     <PreferenceEditor ref="editor" v-model="form" :error="invalid" :disabled="busy" />
-    <div class="form-actions"><span class="save-status meta" role="status">{{ dirty ? '未保存' : success }}</span><button class="button button--primary" type="submit" :disabled="busy || !dirty">{{ busy ? '正在保存…' : '保存' }}</button></div>
+    <div class="form-actions"><span class="save-status meta" :class="{ 'save-status--success': !!success && !dirty }" role="status"><Check v-if="success && !dirty" :size="14" aria-hidden="true" />{{ dirty ? '未保存' : success }}</span><button class="button button--primary" type="submit" :disabled="busy || !dirty"><Save :size="16" :stroke-width="1.8" aria-hidden="true" />{{ busy ? '正在保存…' : '保存' }}</button></div>
     <UnsavedDialog :dirty="dirty" />
   </form>
 </template>

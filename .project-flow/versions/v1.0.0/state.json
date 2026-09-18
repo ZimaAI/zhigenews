@@ -26,6 +26,21 @@
       "id": "c0004",
       "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0004/manifest.json",
       "sha256": "f08c759eca46fdd93c09127f689eff6d7a30f9e23ff4eb05814189573637ab3f"
+    },
+    {
+      "id": "c0005",
+      "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0005/manifest.json",
+      "sha256": "49f2bc27cede0e4ae48ac1b66c90b26135451aad500fa656dbe02f103e974a11"
+    },
+    {
+      "id": "c0006",
+      "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0006/manifest.json",
+      "sha256": "02ed69906d03cabf3f7e27682018b98274b2ce66c0795925f2b279e18796923b"
+    },
+    {
+      "id": "c0007",
+      "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0007/manifest.json",
+      "sha256": "6db231925a13a3ba57fea9d43cf017facc182e42ab4eab145cc2d90c2b16d73c"
     }
   ],
   "code_start_ref": null,
@@ -105,14 +120,14 @@
     }
   ],
   "last_checkpoint": {
-    "id": "c0004",
-    "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0004/manifest.json",
-    "sha256": "f08c759eca46fdd93c09127f689eff6d7a30f9e23ff4eb05814189573637ab3f"
+    "id": "c0007",
+    "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0007/manifest.json",
+    "sha256": "6db231925a13a3ba57fea9d43cf017facc182e42ab4eab145cc2d90c2b16d73c"
   },
-  "next_action": "继续 ITERATE r3，按用户反馈调整极简用户端原型和方案。",
+  "next_action": "继续 ITERATE r5，按用户反馈调整匿名阅读、生成进度与管理方案。",
   "open_questions": [],
   "pending_stage_review": null,
-  "prototype_revision": 3,
+  "prototype_revision": 5,
   "resume_stage": null,
   "schema_version": 4,
   "stage": "ITERATE",

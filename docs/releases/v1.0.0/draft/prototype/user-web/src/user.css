@@ -4,6 +4,9 @@
 .reader-main .page-header p { line-height: 1.6; }
 .reader-main .card { box-shadow: none; }
 .reader-main .button { font-weight: 500; }
+.reader-main .button > svg { stroke-width: 1.8; }
+.reader-main .save-status { display: inline-flex; align-items: center; gap: 5px; }
+.reader-main .save-status--success { color: var(--color-primary); background: var(--color-primary-soft); border-radius: var(--radius-pill); padding: 3px 9px; font-size: 12px; }
 .reader-main .field-control:focus { border-color: var(--color-primary); }
 .reader-main .empty-state { border-style: dashed; }
 .toast { border-radius: var(--radius-card); }

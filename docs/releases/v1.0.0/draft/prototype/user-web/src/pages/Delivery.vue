@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { Check, Clock3, Save } from 'lucide-vue-next';
 import { api, state } from '@shared/mock';
 import type { DeliverySettings } from '@shared/types';
 import UnsavedDialog from '../components/UnsavedDialog.vue';
@@ -25,8 +26,8 @@ async function save() {
 <template>
   <form class="delivery-form" aria-label="推送时间" @submit.prevent="save">
     <p v-if="error" class="alert alert--danger" role="alert">{{ error }}</p>
-    <div class="field schedule-field"><label for="delivery-time">每天自动推送时间</label><input id="delivery-time" v-model="form.time" class="field-control" type="time" required :disabled="busy" /></div>
-    <div class="form-actions"><span class="save-status meta" role="status">{{ success || (dirty ? '未保存' : '') }}</span><button class="button button--primary" type="submit" :disabled="busy || !dirty">{{ busy ? '正在保存…' : '保存' }}</button></div>
+    <div class="field schedule-field"><label for="delivery-time"><Clock3 :size="16" :stroke-width="1.8" aria-hidden="true" />每天自动推送时间</label><input id="delivery-time" v-model="form.time" class="field-control" type="time" required :disabled="busy" /></div>
+    <div class="form-actions"><span class="save-status meta" :class="{ 'save-status--success': !!success }" role="status"><Check v-if="success" :size="14" aria-hidden="true" />{{ success || (dirty ? '未保存' : '') }}</span><button class="button button--primary" type="submit" :disabled="busy || !dirty"><Save :size="16" :stroke-width="1.8" aria-hidden="true" />{{ busy ? '正在保存…' : '保存' }}</button></div>
     <UnsavedDialog :dirty="dirty" />
   </form>
 </template>
@@ -34,6 +35,8 @@ async function save() {
 <style scoped>
 .delivery-form { min-width: 0; }
 .schedule-field { max-width: 240px; }
+.schedule-field label { display: inline-flex; align-items: center; gap: 8px; }
+.schedule-field label svg { color: var(--color-primary); }
 .delivery-form .form-actions { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--color-border); }
 .save-status { min-height: 20px; }
 </style>

@@ -1,0 +1,13 @@
+{
+  "synthetic": true,
+  "schema": "GenerationProgress",
+  "data": {
+    "id": "gen-example",
+    "status": "running",
+    "percent": 42,
+    "remainingSeconds": 35,
+    "updatedAt": "2026-09-18T08:12:00+08:00",
+    "briefId": null,
+    "error": ""
+  }
+}

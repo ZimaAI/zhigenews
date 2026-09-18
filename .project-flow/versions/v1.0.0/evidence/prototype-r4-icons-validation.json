@@ -1,0 +1,41 @@
+{
+  "schema_version": 4,
+  "version": "v1.0.0",
+  "stage": "ITERATE",
+  "prototype_revision": 4,
+  "date": "2026-09-18",
+  "scope": "移除来源字母方块，更新简报恢复 WandSparkles 图标",
+  "history_reference": {
+    "r2": "72b512a: WandSparkles 16px",
+    "r3": "e7251f3: RefreshCw 16px"
+  },
+  "commands": [
+    {
+      "command": "npm run check",
+      "cwd": "docs/releases/v1.0.0/draft/prototype",
+      "exit_code": 0
+    }
+  ],
+  "browser": {
+    "today": {
+      "source_blocks": 0,
+      "source": "LangChain 文档",
+      "button": "更新简报",
+      "icon": "lucide lucide-wand-sparkles-icon",
+      "viewport_width": 670,
+      "document_width": 655
+    },
+    "detail": {
+      "source_blocks": 0,
+      "articles": 6,
+      "source": "LangChain 文档"
+    },
+    "console_errors": [],
+    "visual_review": "今日页截图确认，留在 /today；没有改变视口覆盖"
+  },
+  "contract_change": false,
+  "known_limits": [
+    "本轮为两处外观微调，没有重复完整布局与业务流程检查；上轮结果单独保留"
+  ],
+  "next_action": "继续 ITERATE r4，按用户反馈调整用户端原型和方案。"
+}

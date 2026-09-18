@@ -1,0 +1,84 @@
+{
+  "schema_version": 4,
+  "version": "v1.0.0",
+  "stage": "ITERATE",
+  "prototype_revision": 5,
+  "date": "2026-09-18",
+  "pre_change_commit": "e7251f3",
+  "commands": [
+    {
+      "command": "npm run build",
+      "cwd": "docs/releases/v1.0.0/draft/prototype",
+      "exit_code": 0,
+      "result": "vue-tsc通过；用户1634模块、管理1611模块"
+    },
+    {
+      "command": "npm run check:contract",
+      "exit_code": 0,
+      "result": {
+        "examples": 22,
+        "schemas": 50,
+        "operations": 52,
+        "instancesChecked": 57,
+        "rejectedCases": 13,
+        "failures": []
+      }
+    },
+    {
+      "command": "node scripts/check-anonymous.mjs",
+      "exit_code": 0,
+      "result": {
+        "passed": 7,
+        "failures": [],
+        "isolation": "临时服务器和数据库，不修改日常演示配额"
+      }
+    },
+    {
+      "command": "git -c core.safecrlf=false diff --check",
+      "exit_code": 0
+    }
+  ],
+  "browser": {
+    "passed": [
+      "自动匿名进入和首次偏好保存；同Cookie刷新恢复身份",
+      "新闻弹窗开关/来源/焦点循环/恢复",
+      "生成进度和剩余时间，刷新续接、完成与取消保留旧简报",
+      "移除已读控件和用户运行链接",
+      "欢迎页无凭据表单，封禁拒绝后解除并恢复同身份",
+      "管理员独立Cookie登录、详情/封禁/解除/审计/模拟限流/筛选/策略校验/错误焦点/草稿保留"
+    ],
+    "responsive": {
+      "widths": [
+        320,
+        375,
+        768,
+        1024,
+        1440,
+        1920
+      ],
+      "surfaces": [
+        "新闻详情弹窗",
+        "活跃生成页面",
+        "欢迎页拒绝状态",
+        "管理员匿名监测"
+      ],
+      "observations": 24,
+      "result": "无整页横向溢出，额外检查320策略弹窗"
+    },
+    "corrected_observations": [
+      "原生dialog的ShiftTab会离开，shared/Modal增加显式首尾循环后两端inside=true",
+      "没有Retry-After时不再显示1秒等待"
+    ],
+    "console_errors": [],
+    "cleanup": "两端viewport均reset，测试1373账户已解封，全局配额未修改，14ac仅保留模拟异常审计"
+  },
+  "contract_change": true,
+  "known_limits": [
+    "仍是ITERATE原型，新闻和12秒生成进度是模拟",
+    "Cookie与限流为本地Vite开发服务，未完成生产FastAPI/MySQL/分布式防护",
+    "用户偏好和新闻按匿名ID保存在浏览器，Cookie丢失创建新身份",
+    "生产策略变更审计在规范中，本轮演示审计为封禁/解封与异常事件"
+  ],
+  "unresolved_observed_blockers": [],
+  "next_action": "按反馈继续ITERATE r5"
+}

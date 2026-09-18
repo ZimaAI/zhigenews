@@ -1,58 +1,51 @@
-# v1.0.0 交换契约（ITERATE 草稿）
+# v1.0.0 交换契约（ITERATE r5 草稿）
 
-唯一交换主源为 [openapi.json](openapi.json)，OpenAPI 3.1 / JSON Schema 2020-12。当前未冻结，也未实现 HTTP Gateway；原型使用 `../prototype/shared/mock.ts` 的内存 adapter。HTTP 路由表达拟采用的服务边界，不能把原型操作成功当作接口已实现。
+唯一交换主源为 [openapi.json](openapi.json)，OpenAPI 3.1 / JSON Schema 2020-12；当前50 schemas、52操作、22个synthetic固定样例。尚未冻结，正式HTTP Gateway未实现。原型 `/__demo` 是独立的开发服务命名空间，不能当作正式API。
 
-## 类型与固定样例
+## 交换与内部模型
 
-核心响应 schema 与 `../prototype/shared/types.ts` 的同名接口字段对齐，采用 camelCase；`DemoState`、`Scenario`、toast、局部表单和筛选属于页面状态，不是后端响应。`DemoUser` 是原型沿用名称，正式命名调整应同时更新契约、生成类型和 adapter。
+用户响应为 `Session`、`Preferences`、`DeliverySettings`、`NewsItem`、`Brief`、`GenerationProgress`。Session只含kind=anonymous、userId、name、onboardingCompleted，不返回token；Cookie由服务器签发。`NewsItem.read`已删除。公开Brief不含runId和preferenceSnapshot，技术关联保留在内部/管理 `AdminBrief`。`AgentRun`、RunEvent、Subtask只供管理员，不能直接序列化为用户响应。
 
-原型已有的枚举保持一致：来源为 `rss/newsnow/search`，其中 `search` 使用 Tavily 的 `web_search` 工具；用户偏好仅话题/背景/关键词；模型角色为 `主模型/摘要模型/评估模型/子模型`。Source 的 `interval/upstreamInterval` 单位为**秒**，界面可换算为分钟。评估相关性/忠实度为 0–5，引用检查为 0–100%，费用为估算美元，延迟为秒。
+原型shared/types.ts中的Brief目前是内部聚合模型，映射AdminBrief；正式用户客户端必须从公开Brief生成。DemoState、Scenario、选中新闻、toast、筛选和表单草稿属于页面状态。响应/写请求分开，禁止把完整页面state写回Gateway。
 
-`examples/*.json` 均采用 `{ "synthetic": true, "schema": "SchemaName", "data": ... }` 封套；只将 `data` 按 `components.schemas[schema]` 校验。新闻内容是模拟材料，`.example.com` URL 仅示意，不作为真实可访问新闻。原型页面 seed 中的文档链接也只是参考资料，不能据此声称当天发布了某条新闻。
+`GenerationProgress`只有id、status、percent、remainingSeconds、updatedAt、briefId、error。percent为0–100或null，remainingSeconds为非负整数或null；未知估计不表示0秒。发布前不能报100%/completed，时间可随负载调整。不得混入模型、事件、工具、子任务、配置或工作区。
 
-当前固定样例覆盖 Preferences、NewsItem、Brief、AgentRun、DeliverySettings、Delivery、Source、ModelConfig、AgentConfig、Evaluation、Memory 和 Error，包括未知发布时间、来源失败、部分完成、投递失败与待评分空值。`prototype/shared/fixtures.ts` 为交互 seed；不得把它变成第二个交换规范。当前类型手写并通过校验与契约同步；正式客户端/DTO 须从契约生成，或持续校验字段、枚举、样例与响应。
+固定样例封套为 `{synthetic:true,schema,data}`，仅按对应schema验证data；固定内容与参考链接不证明当天真实新闻。来源rss/newsnow/search、Source周期单位秒、评估0–5与引用0–100%等规则保留。类型和seed不是另一份权威契约。
 
-## adapter 到 Gateway 的映射
+## 路由
 
-所有路由前缀为 `/api/v1`。读取列表使用 `{items,nextCursor}` 分页封套，adapter 聚合到各自页面状态。
+所有正式路由前缀 `/api/v1`；列表响应 `{items,nextCursor}`，本表省略前缀。
 
-| 内存方法 | 拟采用的 HTTP 操作 | 边界说明 |
+| 操作 | 路由 | 边界 |
 | --- | --- | --- |
-| `load` | `GET /auth/session`、本人资源或管理员列表 | 不提供一个向普通用户暴露所有管理数据的 `/state` |
-| `login/logout/register` | `POST/DELETE /auth/session`、`POST /auth/register` | 注册仅创建普通用户；原型身份是模拟 |
-| `savePreferences` | `PUT /me/preferences` | PreferencesWrite 提交当前 version 和三字段，冲突 409；成功递增并原子标记 onboardingCompleted |
-| `saveDelivery` | `PUT /me/delivery-settings` | 请求/响应只有 time，每日站内发布，系统时区 Asia/Shanghai |
-| `deleteMemory` | `DELETE /me/memories/{id}` | 只删本人资源 |
-| `generateBrief/cancelRun` | `POST /me/briefs`、`/me/runs/{id}/cancel` | 生成返回 runId，取消先进入 cancelling |
-| `markRead` | `PUT /me/news/{id}/read` | adapter 将 toggle 转换为显式 `{read}` |
-| `retryDelivery` | `POST /me/deliveries/{id}/retry` 或 admin 对应路由 | adapter 若收到 briefId，先解析该简报的投递 ID，HTTP 不混用两种 ID |
-| `saveSource/toggleSource/fetchSource` | `POST/PUT /admin/sources`、`/{id}/enabled`、`/{id}/fetch` | 采集状态由后端返回；toggle 转显式 enabled |
-| `saveModel/testModel/toggleModel` | `POST/PUT /admin/models`、`/{id}/test`、`/{id}/enabled` | key 参数映射 write-only apiKey；keyMasked 不可写；撤销走 DELETE `/{id}/secret` |
-| `saveConfig/publishConfig` | `POST/PUT /admin/agent-configs`、`/{id}/publish` | 只能修改草稿，发布后为不可变版本 |
-| `saveEvalCase/runEvaluation` | `POST/PUT /admin/eval-cases`、`POST /admin/evaluations` | 运行返回 evaluationId；固定样例实验不向用户发布简报 |
-| `toggleUser` | `PUT /admin/users/{id}/status` | 转显式 active/disabled，后端验证管理员 |
+| 自动匿名进入 | POST /auth/anonymous | 无有效Cookie且通过IP门槛时建号/Set-Cookie；有Cookie幂等恢复；封禁403不换号 |
+| 恢复会话 | GET /auth/session | Session，不建号；缺失/过期401 |
+| 管理员会话 | POST /admin/auth/login，GET/DELETE /admin/auth/session | 独立Cookie和AdminSession，用户匿名身份不提升权限 |
+| 偏好 | GET/PUT /me/preferences | version与话题/背景/关键词；成功原子完成引导，冲突409 |
+| 推送时间 | GET/PUT /me/delivery-settings | 只有time，每日站内、系统时区Asia/Shanghai |
+| 简报 | GET/POST /me/briefs，GET /me/briefs/{id} | 创建202返回公开GenerationProgress；阅读返回公开Brief |
+| 生成进度 | GET /me/generations/{id} | 仅本人公开进度，不返回运行事件 |
+| 取消生成 | POST /me/generations/{id}/cancel | 服务能力；先cancelling，由worker确认cancelled，不改变每日计划 |
+| 本人记忆/发布服务 | /me/memories、/me/deliveries | 保留原服务能力，用户设置不展示记忆控件，发布重试不重新生成 |
+| 来源/模型/配置/评估/发布 | /admin/sources、models、agent-configs、evaluations、deliveries等 | 保持既有管理契约；key只写不回显 |
+| 管理运行 | /admin/runs、/{id}、/{id}/cancel、/{id}/events | 管理员检查、SSE回放，普通用户不可访问 |
+| 匿名监测 | GET /admin/anonymous-accounts，PUT /{id}/status | 脱敏监测，active/blocked和1–200字原因；管理审计 |
+| 风险事件/策略 | GET /admin/abuse-events，GET/PUT /admin/anonymous-policy | 真实统计与限流，策略整数范围见schema |
 
-`PreferencesWrite/SourceWrite/ModelWrite/ConfigWrite/DeliverySettingsWrite/EvalCaseWrite` 与响应 DTO 分离；adapter 只投递允许写入字段。连接测试返回能力验证结果，不能只凭 HTTP 200 标记支持全部工具。
+已删除用户注册/密码登录写接口、`/me/news/{id}/read`及全部`/me/runs*`。旧管理/users转换为匿名监测接口。旧用户页面链接可重定向，但不保留泄露运行过程的HTTP兼容接口。契约未发布，无生产旧客户端迁移；历史要求见spec/07-changes.md。
 
-## 鉴权、错误与幂等
+## 身份、滥用与错误
 
-拟采用服务端会话 Cookie（HttpOnly/Secure/SameSite），变更请求校验来源/CSRF。401 为未登录或会话过期，403 为角色禁止；本人作用域的跨用户资源返回 404，避免泄露存在性。管理员路由必须服务端检查角色，按钮隐藏不能代替授权。密钥只写，不在配置读取、事件、错误或运行 checkpoint 中回显。
+服务器生成不透明token，仅Set-Cookie传递，生产HttpOnly/Secure/SameSite=Lax/Path=/；保存哈希并执行过期和撤销。同Cookie保持个人偏好、历史和完成标记；Cookie丢失形成新身份，无密码恢复路径。被封禁会话403不自动换号；匿名用户拥有全部用户端功能，但所有管理路由使用独立adminSessionCookie。跨账号资源404，客户端userId声明不作为授权依据。
 
-错误统一为 `{code,message,requestId,fields?}`。400 为可定位的输入错误，409 为版本/状态/幂等冲突，429 为额度限制，503 为依赖不可用。原型目前抛 `Error` 供页面保留输入与显示错误，尚未完成真实 HTTP 错误映射。
+写操作检查允许的Origin和CSRF（JSON/专用头或服务端token），SameSite不单独承担CSRF保护；配置明确的凭据CORS源。具体依据和生产/开发差异见[架构](../spec/04-architecture.md)。
 
-新生成、站内发布重试、手动采集和实验创建要求 `Idempotency-Key`；同身份/路由/key/请求体重放返回原操作，不生成重复工作。相同 key 搭配不同请求体返回 409。新一次用户意图使用新 key。SSE 的 event ID 在同一 run 内递增，`Last-Event-ID` 用于补拉；不是会话权限凭证。
+错误统一 `{code,message,requestId,fields?}`。400输入错误、401会话失效、403角色/ACCOUNT_BLOCKED/CSRF_REJECTED、404不可见、409版本/幂等冲突、429配额、503依赖不可用。429必须返回Retry-After秒数，前端停止立即重试。
 
-## 冻结前仍须细化
+账号每分钟请求、每日生成与并发，另有同IP新账号速率；默认60、20、1、10，范围分别1–600、1–100、1–10、1–100。服务器原子判定并入队，重复幂等请求不重复扣配额；封禁停止新生成/后续调度，解封不重置限制。清Cookie不重置IP桶。监测只含脱敏IP标签、计数、风险与原因，禁止token/原始IP泄漏；封禁、解封及策略修改记录管理员审计。
 
-当前契约刻意对齐可运行原型，尚不能代替完整后端规范：`RunEvent.time` 是页面时间文本；正式事件将补充或替换为完整时间 DTO。DeliverySettings 仅 time，下一次 UTC 调度时刻由后端内部计算。Source 的未知时间为空串是原型兼容约定，持久层使用 null。
+创建生成、发布重试、采集、实验使用Idempotency-Key；同身份/路由/key/body返回原操作，同key不同body409。SSE只在管理域，Last-Event-ID不是权限凭证。
 
-原型 `AgentRun` 数值字段不能表达未知用量，未知不能按 0 成本解释；正式 DTO 需可空指标与估算说明。NewsItem 尚需补采集时间/快照来源 ID；评估详情尚需 dataset 版本、评分器/人工来源与逐项结果；持久消息日志、摘要、文件工具返回和运行配置快照属于后端契约细化范围。以上在 SPECIFY 冻结前与原型/类型同步，不以默认值冒充已采集事实。
+## 冻结前清单
 
-
-## r3 用户反馈与未冻结契约调整
-
-Preferences 只保留 version、role、topics、keywords；未配置读取可为 version 0 和空数组，PreferencesWrite 至少一个话题或关键词。背景最长 500 字；关键词最多 20 个，每个最长 40 字。version 是服务端并发字段，不是可编辑偏好。删除的排除词、匹配模式、来源、语言、窗口、条数与深度不再由用户提交；Harness 仍可使用管理员参数与系统默认值。
-
-Session 新增必填 onboardingCompleted：注册为 false，第一次有效偏好保存与标记 true 在同一事务内提交，刷新/登录保留。原型 DemoState 保存该投影；真实前端应读取 Session，不能根据浏览器历史或已有简报推断。
-
-DeliverySettings 与写请求只有 time；每日自动、系统时区 Asia/Shanghai、仅 in_app。DeliveryStatus.submitted 在此渠道表示站内已发布，不代表已读。删除 `/me/email-verification`、`/me/email-verification/confirm`、`/me/delivery-test` 和两种验证 schema；账号登录邮箱保留。当前 47 schemas、51 操作、14 个固定样例。契约尚未冻结，无生产旧客户端迁移；正式实现不接受 r2 的已移除用户字段。
+RunEvent.time仍是原型短文本，真实事件须完整时间；AgentRun未知用量需可空，不把0解释成真实成本。NewsItem仍待补采集时间/快照引用；评估仍待dataset/评分器版本和逐项结果。正式会话期限、清理保留期、风险阈值、受信代理和原子配额实现需在后端阶段明确验证。上述未实施，不以本轮Cookie演示或契约通过冒充生产验收。

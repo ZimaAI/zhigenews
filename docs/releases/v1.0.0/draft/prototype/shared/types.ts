@@ -6,7 +6,7 @@ export interface Preferences {
 }
 export interface DeliverySettings { time: string; }
 export interface Citation { id: string; name: string; title: string; url: string; publishedAt: string | null; }
-export interface NewsItem { id: string; title: string; summary: string; reason: string; topic: string; source: string; sourceType: string; publishedAt: string | null; url: string; read: boolean; citations: Citation[]; }
+export interface NewsItem { id: string; title: string; summary: string; reason: string; topic: string; source: string; sourceType: string; publishedAt: string | null; url: string; citations: Citation[]; }
 export interface Brief { id: string; title: string; date: string; version: number; summary: string; items: NewsItem[]; generationStatus: RunStatus; deliveryStatus: DeliveryStatus; generatedAt: string; runId: string; preferenceSnapshot: Preferences; }
 export interface RunEvent { id: number; time: string; title: string; detail: string; status: string; duration: string; tool?: string; params?: string; output?: string; }
 export interface Subtask { id: string; name: string; status: RunStatus; detail: string; }
@@ -19,7 +19,10 @@ export interface Evaluation { id: string; name: string; configVersion: string; s
 export interface DemoUser { id: string; name: string; email: string; role: string; status: string; topics: string[]; }
 export interface Delivery { id: string; briefId: string; userName: string; destination: string; channel: string; status: DeliveryStatus; attempts: number; time: string; error: string; }
 export interface Memory { id: string; text: string; source: string; updatedAt: string; }
+export interface GenerationProgress { id: string; status: RunStatus; percent: number | null; remainingSeconds: number | null; updatedAt: string; briefId: string | null; error: string; }
 export interface DemoState {
+  session: { kind: 'anonymous'; userId: string; name: string; onboardingCompleted: boolean } | null;
+  generation: GenerationProgress | null; generationPreferences: Preferences | null;
   scenario: Scenario; loaded: boolean; authenticated: boolean; onboardingCompleted: boolean; preferences: Preferences; delivery: DeliverySettings;
   briefs: Brief[]; runs: AgentRun[]; sources: Source[]; models: ModelConfig[]; configs: AgentConfig[];
   evaluations: Evaluation[]; evalCases: EvalCase[]; users: DemoUser[]; deliveries: Delivery[]; memories: Memory[];

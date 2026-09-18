@@ -1,0 +1,16 @@
+Prototype to Product 4.1.0 — stage-end review edition
+Validated in this response: 2026-09-18
+Python syntax: 6 files parsed
+JSON templates: 10 parsed; declared schema/workflow fields equal 4
+YAML metadata: 1 parsed plus SKILL frontmatter
+Local Markdown references: 60 checked
+Package version/explicit invocation metadata: checked
+No legacy payload or migration guides bundled
+Implement policy remains concise and model-directed; formal boundaries ask first
+New stage review instructions, persistence, resume and guarded registered transitions included
+Tool suite: run separately; see TEST-RESULTS.txt
+No real model, application, installation, external environment or production test is claimed.
+Static validation: PASS
+Full tool suite: PASS (155 tests; 39 stage-review tests and 116 retained current-format regressions)
+Archive CRC check: PASS
+Fresh extraction and independent full test run: PASS (155/155)

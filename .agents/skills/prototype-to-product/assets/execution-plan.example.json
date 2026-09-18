@@ -1,0 +1,14 @@
+{
+  "schema_version": 4,
+  "workflow_version": 4,
+  "mode": "backend-first",
+  "source_roots": {
+    "backend": [
+      "backend"
+    ],
+    "frontend": [
+      "frontend"
+    ]
+  },
+  "pause_after_backend": true
+}

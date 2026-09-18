@@ -1,0 +1,10 @@
+{
+  "schema_version": 4,
+  "skill_version": "4.1.0",
+  "project_name": "示例项目",
+  "active_version": "v1.1.0",
+  "current_delivered": "v1.0.0/b002",
+  "versions": {},
+  "promotion_history": [],
+  "_note": "这只是注册表字段说明，不能直接作为有效项目状态；用工具生成真实版本记录。"
+}

@@ -1,0 +1,23 @@
+{
+  "schema_version": 4,
+  "version": "v1.1.0",
+  "baseline_ref": "v1.1.0/b001",
+  "manifest_sha256": "REPLACE_WITH_EXACT_MANIFEST_SHA256",
+  "phase": "integration",
+  "code_ref": "REPLACE_WITH_EXACT_BACKEND_FRONTEND_COMBINATION",
+  "backend_handoff": "h001",
+  "backend_handoff_sha256": "REPLACE_WITH_ACCEPTED_HANDOFF_SHA256",
+  "source_fingerprints": {
+    "backend": "REPLACE_WITH_CURRENT_BACKEND_SOURCE_ID",
+    "frontend": "REPLACE_WITH_CURRENT_FRONTEND_SOURCE_ID"
+  },
+  "open_blockers": [],
+  "checks": [
+    {
+      "id": "REPLACE_WITH_EVERY_REQUIRED_AC_AND_GATE_FROM_ALL_PHASES",
+      "status": "not_run",
+      "code_ref": "REPLACE_WITH_EXACT_BACKEND_FRONTEND_COMBINATION",
+      "evidence": []
+    }
+  ]
+}

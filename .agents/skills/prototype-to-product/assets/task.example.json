@@ -1,0 +1,79 @@
+{
+  "schema_version": 4,
+  "version": "v1.1.0",
+  "tasks": [
+    {
+      "id": "TASK-BE-001",
+      "phase": "backend",
+      "title": "示例：实现激活码兑换领域规则、事务与公开 API",
+      "requirements": [
+        "REQ-ACT-001"
+      ],
+      "acceptance_ids": [
+        "AC-ACT-BE-001"
+      ],
+      "depends_on": [],
+      "contract_refs": [
+        "contracts/openapi.yaml"
+      ],
+      "baseline_ref": "v1.1.0/b001",
+      "status": "pending",
+      "done_when": [
+        "填写已批准的具体可观察完成条件"
+      ],
+      "verification_commands": [],
+      "evidence": [],
+      "blocker_ids": []
+    },
+    {
+      "id": "TASK-FE-001",
+      "phase": "frontend",
+      "title": "示例：按批准原型对接真实兑换 API",
+      "requirements": [
+        "REQ-ACT-001"
+      ],
+      "acceptance_ids": [
+        "AC-ACT-FE-001"
+      ],
+      "depends_on": [
+        "TASK-BE-001"
+      ],
+      "contract_refs": [
+        "contracts/openapi.yaml"
+      ],
+      "baseline_ref": "v1.1.0/b001",
+      "status": "pending",
+      "done_when": [
+        "填写已批准的具体可观察完成条件"
+      ],
+      "verification_commands": [],
+      "evidence": [],
+      "blocker_ids": []
+    },
+    {
+      "id": "TASK-INT-001",
+      "phase": "integration",
+      "title": "示例：整链路、旧行为回归与升级验证",
+      "requirements": [
+        "REQ-ACT-001"
+      ],
+      "acceptance_ids": [
+        "AC-ACT-INT-001"
+      ],
+      "depends_on": [
+        "TASK-FE-001"
+      ],
+      "contract_refs": [
+        "contracts/openapi.yaml"
+      ],
+      "baseline_ref": "v1.1.0/b001",
+      "status": "pending",
+      "done_when": [
+        "填写已批准的具体可观察完成条件"
+      ],
+      "verification_commands": [],
+      "evidence": [],
+      "blocker_ids": []
+    }
+  ]
+}

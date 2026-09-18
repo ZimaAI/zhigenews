@@ -1,0 +1,59 @@
+{
+  "schema_version": 4,
+  "requirements": [
+    {
+      "id": "REQ-ACT-001",
+      "title": "示例：激活码开通授权",
+      "since": "v1.1.0",
+      "change": "added",
+      "status": "active",
+      "spec_refs": [
+        "spec/01-requirements.md",
+        "spec/03-domain.md"
+      ],
+      "acceptance_ids": [
+        "AC-ACT-BE-001",
+        "AC-ACT-FE-001",
+        "AC-ACT-INT-001"
+      ]
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "AC-ACT-BE-001",
+      "phase": "backend",
+      "status": "active",
+      "required": true,
+      "requirement_ids": [
+        "REQ-ACT-001"
+      ],
+      "spec_refs": [
+        "spec/05-acceptance.md"
+      ]
+    },
+    {
+      "id": "AC-ACT-FE-001",
+      "phase": "frontend",
+      "status": "active",
+      "required": true,
+      "requirement_ids": [
+        "REQ-ACT-001"
+      ],
+      "spec_refs": [
+        "spec/05-acceptance.md"
+      ]
+    },
+    {
+      "id": "AC-ACT-INT-001",
+      "phase": "integration",
+      "status": "active",
+      "required": true,
+      "requirement_ids": [
+        "REQ-ACT-001"
+      ],
+      "spec_refs": [
+        "spec/05-acceptance.md"
+      ]
+    }
+  ]
+}

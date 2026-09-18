@@ -1,0 +1,23 @@
+{
+  "schema_version": 4,
+  "version": "v1.1.0",
+  "stage": "ITERATE",
+  "resume_stage": null,
+  "prototype_revision": 0,
+  "candidate": null,
+  "approved": null,
+  "active_baseline": null,
+  "code_start_ref": null,
+  "approvals": [],
+  "open_questions": [],
+  "blockers": [],
+  "history": [],
+  "next_action": "继续当前版本原型与数据设计；尚未授权正式实现。",
+  "workflow_version": 4,
+  "backend_handoffs": {},
+  "active_backend_handoff": null,
+  "frontend_verification": null,
+  "last_checkpoint": null,
+  "checkpoint_history": [],
+  "pending_stage_review": null
+}

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Prototype to Product · 跨会话阶段确认交付"
+  short_description: "跨会话迭代原型与规范，阶段末尾询问推进或修改，后端先行"
+  default_prompt: "使用 $prototype-to-product 继续或创建项目。先确定产品版本并从文件恢复阶段，迭代原型与契约；规范确认后先实现并验收后端、生成交接，再在原会话或新会话实现前端；保留多版本文档和验证证据；阶段接近收尾时展示成果并询问进入下一阶段还是继续修改，保存待确认状态，未得到选择前不推进。"
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,12 @@
+{
+  "schema_version": 4,
+  "version": "v1.1.0",
+  "baseline_ref": "v1.1.0/b001",
+  "code_ref": "REPLACE_WITH_VERIFIED_BACKEND_CODE_REF",
+  "runbook": ".project-flow/versions/v1.1.0/handoff-input/runbook.md",
+  "endpoint_inventory": ".project-flow/versions/v1.1.0/handoff-input/endpoint-inventory.md",
+  "environment_template": ".project-flow/versions/v1.1.0/handoff-input/.env.example",
+  "smoke_instructions": ".project-flow/versions/v1.1.0/handoff-input/smoke.md",
+  "known_limitations": [],
+  "open_blockers": []
+}

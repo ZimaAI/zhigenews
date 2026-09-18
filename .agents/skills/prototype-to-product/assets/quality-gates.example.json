@@ -1,0 +1,77 @@
+{
+  "schema_version": 4,
+  "gates": [
+    {
+      "id": "GATE-BE-BUILD",
+      "phase": "backend",
+      "required": true,
+      "description": "后端生产构建、静态检查与独立启动"
+    },
+    {
+      "id": "GATE-BE-CONTRACT",
+      "phase": "backend",
+      "required": true,
+      "description": "实际实现与批准契约、逐接口行为一致"
+    },
+    {
+      "id": "GATE-BE-AUTH",
+      "phase": "backend",
+      "required": true,
+      "description": "鉴权、角色/资源权限与适用租户隔离"
+    },
+    {
+      "id": "GATE-BE-DATA",
+      "phase": "backend",
+      "required": true,
+      "description": "真实持久化、事务/幂等/并发、适用安装/升级测试"
+    },
+    {
+      "id": "GATE-BE-HANDOFF",
+      "phase": "backend",
+      "required": true,
+      "description": "所有原型所需接口齐备，运行/环境/鉴权/冒烟说明可复现"
+    },
+    {
+      "id": "GATE-FE-BUILD",
+      "phase": "frontend",
+      "required": true,
+      "description": "前端类型、静态、组件验证与生产构建"
+    },
+    {
+      "id": "GATE-FE-API",
+      "phase": "frontend",
+      "required": true,
+      "description": "对接真实后端的成功/失败/身份/权限路径"
+    },
+    {
+      "id": "GATE-FE-UX",
+      "phase": "frontend",
+      "required": true,
+      "description": "符合批准原型的交互、状态与适用可访问性/响应式要求"
+    },
+    {
+      "id": "GATE-SYSTEM-E2E",
+      "phase": "integration",
+      "required": true,
+      "description": "新前后端完整关键业务链路实际通过"
+    },
+    {
+      "id": "GATE-REGRESSION",
+      "phase": "integration",
+      "required": true,
+      "description": "本版完整必需新旧行为及适用兼容/带数据升级验证"
+    },
+    {
+      "id": "GATE-SPEC-REVIEW",
+      "phase": "integration",
+      "required": true,
+      "description": "需求审查阻塞清零"
+    },
+    {
+      "id": "GATE-ENGINEERING-REVIEW",
+      "phase": "integration",
+      "required": true,
+      "description": "两端工程审查阻塞清零"
+    }
+  ]
+}

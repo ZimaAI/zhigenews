@@ -1,0 +1,20 @@
+{
+  "schema_version": 4,
+  "version": "v1.1.0",
+  "baseline_ref": "v1.1.0/b001",
+  "manifest_sha256": "REPLACE_WITH_EXACT_MANIFEST_SHA256",
+  "phase": "frontend",
+  "code_ref": "REPLACE_WITH_ACTUAL_VERIFIED_CODE_REF",
+  "source_fingerprint": "REPLACE_WITH_OBSERVED_SOURCE_ID",
+  "open_blockers": [],
+  "checks": [
+    {
+      "id": "REPLACE_WITH_REQUIRED_FRONTEND_AC_OR_GATE_ID",
+      "status": "not_run",
+      "code_ref": "REPLACE_WITH_ACTUAL_VERIFIED_CODE_REF",
+      "evidence": []
+    }
+  ],
+  "backend_handoff": "h001",
+  "backend_handoff_sha256": "REPLACE_WITH_ACCEPTED_HANDOFF_SHA256"
+}

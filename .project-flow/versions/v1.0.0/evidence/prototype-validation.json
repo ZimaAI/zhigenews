@@ -1,0 +1,100 @@
+{
+  "schema_version": 4,
+  "version": "v1.0.0",
+  "stage": "ITERATE",
+  "prototype_revision": 1,
+  "date": "2026-09-18",
+  "discovery_commit": "98fd673",
+  "scope": "仅验证双端交互原型与候选契约，不是正式前端或后端验收",
+  "commands": [
+    {
+      "cwd": "docs/releases/v1.0.0/draft/prototype",
+      "command": "npm run check:contract",
+      "exit_code": 0,
+      "result": {
+        "examples": 14,
+        "schemas": 48,
+        "operations": 54,
+        "instancesChecked": 48,
+        "failures": []
+      }
+    },
+    {
+      "cwd": "docs/releases/v1.0.0/draft/prototype",
+      "command": "npm run build",
+      "exit_code": 0,
+      "result": "vue-tsc --noEmit、用户端1626模块和管理端1608模块的Vite生产构建通过"
+    },
+    {
+      "cwd": ".",
+      "command": "python .agents/skills/prototype-to-product/scripts/version_flow.py doctor --root .",
+      "exit_code": 0,
+      "result": {
+        "ok": true,
+        "problems": [],
+        "repairs_performed": false
+      }
+    },
+    {
+      "cwd": ".",
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "无空白错误；Git 提示后续换行转换为 CRLF"
+    }
+  ],
+  "browser": {
+    "engine": "Codex In-app Browser / CUA",
+    "urls": [
+      "http://127.0.0.1:5173/today",
+      "http://127.0.0.1:5174/overview"
+    ],
+    "passed_observations": [
+      "标记已读后条目状态变更；将每期条数设为4并保存，生成新简报含4条",
+      "初始失败邮件重试后同一brief-18变为已提交发送，尝试次数1变2",
+      "error场景保存值7失败后输入保留；重试加载后再次保存成功，偏好版本变4",
+      "发布Agent v4后显示已发布，进入已发布只读配置；后续模拟运行使用发布配置",
+      "启用并测试评估模型后新实验自动完成，详情与A/B表显示固定结果",
+      "运行取消后时间线出现已取消，未出现生成产物",
+      "empty提示首次订阅；unauthorized显示没有访问权限；恢复正常和重置可用",
+      "320px新闻源弹窗位于视口内；Escape关闭后焦点返回添加新闻源按钮",
+      "最终双端浏览器error日志均为空；视口恢复默认"
+    ],
+    "viewport_checks": {
+      "widths": [
+        320,
+        375,
+        768,
+        1024,
+        1440,
+        1920
+      ],
+      "pages": [
+        "user:/today",
+        "admin:/runs/:id"
+      ],
+      "assertion": "document.documentElement.scrollWidth等于clientWidth，无整页横向溢出",
+      "additional_320px": [
+        "user:/preferences",
+        "user:/delivery",
+        "user:/briefs",
+        "user:/onboarding",
+        "user:/settings",
+        "admin:/sources",
+        "admin:/agent-configs",
+        "admin:/models",
+        "admin:/evaluations",
+        "admin:/overview"
+      ]
+    },
+    "screenshots": "桌面与手机截图在工具会话中目视检查，未另存图片文件"
+  },
+  "known_limits": [
+    "数据synthetic，双端独立localStorage不互通",
+    "语言/深度偏好保存，固定正文不由模型重写",
+    "工具、摘要、消息修复、沙箱、子任务、指标均为交互展示",
+    "未执行真实鉴权/HTTP、MySQL、调度、NewsNow/RSS、Tavily、模型、SMTP、进程隔离或并发CAS",
+    "34条AC为未来正式验收定义，不宣称通过"
+  ],
+  "unresolved_observed_blockers": [],
+  "next_action": "保留ITERATE，按用户反馈继续调整原型、领域、契约、样例和方案"
+}

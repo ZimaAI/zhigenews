@@ -1,0 +1,11 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue';
+import { state, api, notify } from '@shared/mock';
+import Badge from '@shared/Badge.vue';
+import EmptyState from '@shared/EmptyState.vue';
+const search = ref(''); const filter = ref('all'); const busy = ref(''); const error = ref('');
+const users = computed(() => state.users.filter(u => (filter.value === 'all' || u.status === filter.value) && `${u.name} ${u.id}`.includes(search.value)));
+const mask = (email: string) => email.replace(/^(.).*(@.*)$/, '$1•••$2');
+async function toggle(id: string) { busy.value = id; error.value = ''; try { await api.toggleUser(id); notify('用户状态已更新，示例调度权限随之变更。'); } catch (e) { error.value = (e as Error).message; } finally { busy.value = ''; } }
+</script>
+<template><header class="page-header"><div><div class="eyebrow">USER MANAGEMENT</div><h1>用户管理</h1><p class="muted">管理账户使用状态，保留订阅与历史简报。</p></div><span class="chip">{{ state.users.length }} 位示例用户</span></header><p v-if="error" class="alert alert--danger" role="alert">{{ error }}</p><div class="admin-toolbar"><label class="field">搜索用户<input v-model="search" class="field-control" placeholder="姓名或用户 ID"></label><label class="field">账户状态<select v-model="filter" class="field-control"><option value="all">全部状态</option><option value="active">正常</option><option value="disabled">已停用</option></select></label><button v-if="search || filter !== 'all'" class="button" @click="search = ''; filter = 'all'">清除筛选</button></div><EmptyState v-if="!users.length" title="没有匹配的用户" description="清除筛选或重置示例场景后重试。" /><template v-else><p class="admin-scroll-hint">表格可左右滚动。</p><div class="table-wrap"><table class="data-table admin-table"><thead><tr><th>用户</th><th>角色</th><th>状态</th><th>关注主题</th><th>操作</th></tr></thead><tbody><tr v-for="user in users" :key="user.id"><td class="wide-cell"><strong>{{ user.name }}</strong><small>{{ mask(user.email) }}</small><small class="mono">{{ user.id }}</small></td><td>{{ user.role === 'admin' ? '管理员' : '普通用户' }}</td><td><Badge :status="user.status" /></td><td class="wide-cell">{{ user.topics.join('、') || '尚未设置' }}</td><td><button class="button" :disabled="!!busy" @click="toggle(user.id)">{{ busy === user.id ? '正在更新…' : user.status === 'active' ? '停用账户' : '启用账户' }}</button></td></tr></tbody></table></div></template><p class="meta">停用将阻止后续登录与新建运行；已有历史不删除。此处为原型状态模拟。</p></template>

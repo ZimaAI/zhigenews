@@ -1,0 +1,17 @@
+{
+  "synthetic": true,
+  "schema": "Evaluation",
+  "data": {
+    "id": "synthetic-eval-01",
+    "name": "【模拟】固定样例评估",
+    "configVersion": "v3",
+    "status": "completed",
+    "relevance": 4.2,
+    "faithfulness": 4.5,
+    "citations": 100,
+    "cost": 0.24,
+    "latency": 14.3,
+    "cases": 3,
+    "createdAt": "2026-09-18T07:00:00+08:00"
+  }
+}

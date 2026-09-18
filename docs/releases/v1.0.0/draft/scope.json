@@ -1,6 +1,6 @@
 {
   "base_ref": null,
-  "change_summary": "首版从零建设个性化 AI 新闻简报：独立用户端/管理员端，共享 FastAPI Gateway 和 LangChain/LangGraph Harness，MySQL 持久化，NewsNow/RSS/Tavily 三源、每日推送、沙箱、记忆与评估监测。当前仅完成 DISCOVER 草稿。",
+  "change_summary": "首版从零建设个性化 AI 新闻简报：独立用户端/管理员端，共享 FastAPI Gateway 和 LangChain/LangGraph Harness，MySQL 持久化，NewsNow/RSS/Tavily 三源、每日推送、沙箱、记忆与评估监测。当前处于 ITERATE，已完成双端交互原型 r1 与候选领域/契约/验收，待用户调整。",
   "documents": {
     "acceptance": "spec/05-acceptance.md",
     "architecture": "spec/04-architecture.md",

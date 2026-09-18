@@ -31,7 +31,16 @@
     },
     {
       "id": "TASK-ITER-001",
-      "title": "用户选择进入后制作双端交互原型并同步契约/验收",
+      "title": "制作双端交互原型 r1 并同步领域、契约、样例和验收",
+      "status": "done",
+      "evidence": [
+        "docs/releases/v1.0.0/draft/prototype/README.md",
+        ".project-flow/versions/v1.0.0/evidence/prototype-validation.json"
+      ]
+    },
+    {
+      "id": "TASK-ITER-002",
+      "title": "接收用户反馈，调整原型和方案并形成下一修订",
       "status": "pending",
       "evidence": []
     }

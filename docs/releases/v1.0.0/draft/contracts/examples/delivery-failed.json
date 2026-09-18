@@ -1,0 +1,15 @@
+{
+  "synthetic": true,
+  "schema": "Delivery",
+  "data": {
+    "id": "synthetic-delivery-01",
+    "briefId": "synthetic-brief-01",
+    "userName": "示例读者",
+    "destination": "r•••@example.com",
+    "channel": "email",
+    "status": "failed",
+    "attempts": 1,
+    "time": "2026-09-18T08:00:15+08:00",
+    "error": "【模拟】SMTP 连接超时。"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "synthetic": true,
+  "schema": "Source",
+  "data": {
+    "id": "synthetic-source-02",
+    "name": "【模拟】RSS 失败源",
+    "kind": "rss",
+    "sourceId": "",
+    "url": "https://feeds.example.com/rss.xml",
+    "interval": 1800,
+    "upstreamInterval": 0,
+    "status": "failed",
+    "lastSuccess": "",
+    "nextFetch": "2026-09-18T08:30:00+08:00",
+    "lastChanged": "",
+    "items": 0,
+    "error": "【模拟】响应非有效 RSS；保留最后有效快照。"
+  }
+}

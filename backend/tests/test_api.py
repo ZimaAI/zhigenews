@@ -392,13 +392,28 @@ def test_brief_and_delivery_enforce_owner_before_actions(api_sandbox):
     run_id, brief_id, delivery_id = (api_sandbox.prefix + suffix for suffix in ("_run", "_brief", "_delivery"))
     timestamp = iso(utcnow())
     brief_data = dict(id=brief_id, title="Synthetic owner-only brief", date="2026-09-19", version=1, summary="Synthetic fixture", items=[], generationStatus="completed", deliveryStatus="submitted", generatedAt=timestamp, missingSources=[])
+    item = dict(
+        id="synthetic-news", title="Synthetic news", summary="Synthetic summary", topic="test",
+        reason="Internal recommendation reason", source="Synthetic source", sourceType="rss",
+        publishedAt=timestamp, fetchedAt=timestamp, snapshotId="synthetic-snapshot",
+        url="https://example.test/news",
+        citations=[dict(id="synthetic-news", name="Synthetic source", title="Synthetic news",
+                        url="https://example.test/news", publishedAt=timestamp)],
+    )
+    brief_data["items"] = [item]
     with transaction() as session:
         session.add(Run(id=run_id, user_id=user_id, business_key=api_sandbox.prefix, status="completed", preferences={"version": 1, "role": "", "topics": ["test"], "keywords": []}, config={"version": "synthetic-v1", "modelId": "synthetic-model"}, brief_id=brief_id))
         session.flush()
         session.add(Brief(id=brief_id, user_id=user_id, run_id=run_id, date="2026-09-19", version=1, data=brief_data, published=True))
         session.flush()
         session.add(Delivery(id=delivery_id, user_id=user_id, brief_id=brief_id, status="submitted", attempts=1))
-    assert_dto(owner.get(BASE + f"/me/briefs/{brief_id}"), "Brief")
+    detail = assert_dto(owner.get(BASE + f"/me/briefs/{brief_id}"), "Brief")
+    listing = assert_dto(owner.get(BASE + "/me/briefs"), "BriefPage")
+    listed = next(brief for brief in listing["items"] if brief["id"] == brief_id)
+    expected_item = {key: value for key, value in item.items() if key not in {"reason", "citations"}}
+    assert detail["items"] == listed["items"] == [expected_item]
+    with transaction() as session:
+        assert session.get(Brief, brief_id).data["items"] == [item]
     assert other.get(BASE + f"/me/briefs/{brief_id}").status_code == 404
     assert other.post(BASE + f"/me/deliveries/{delivery_id}/retry", headers={"Idempotency-Key": api_sandbox.prefix + "-retry"}).status_code == 404
     with transaction() as session:

@@ -12,7 +12,6 @@ const detailOpen = ref(false);
     <div class="news-meta"><span class="news-source">{{ item.source }}</span><span class="news-time"><Clock3 :size="13" :stroke-width="1.8" aria-hidden="true" /><time v-if="item.publishedAt" :datetime="item.publishedAt">{{ formatDate(item.publishedAt) }}</time><span v-else>时间未知</span></span><span class="topic-label">{{ item.topic }}</span></div>
     <h2><button class="news-title" aria-haspopup="dialog" :aria-expanded="detailOpen" @click="detailOpen = true">{{ item.title }}</button></h2>
     <p class="news-summary">{{ item.summary }}</p>
-    <p v-if="expanded" class="news-reason">{{ item.reason }}</p>
     <div class="news-actions"><button class="user-inline-link detail-button" aria-haspopup="dialog" :aria-expanded="detailOpen" @click="detailOpen = true"><BookOpen :size="16" :stroke-width="1.8" aria-hidden="true" />阅读详情</button></div>
     <NewsDetailDialog :item="item" :open="detailOpen" @close="detailOpen = false" />
   </article>
@@ -28,7 +27,6 @@ h2 { margin: 12px 0 8px; font-size: 18px; line-height: 28px; font-weight: 600; o
 .news-title { display: block; width: 100%; min-height: 44px; padding: 4px 0; border: 0; background: none; color: var(--color-text); text-align: left; font: inherit; overflow-wrap: anywhere; }
 .news-title:hover { color: var(--color-primary); text-decoration: underline; text-underline-offset: 4px; }
 .news-summary { margin: 0; color: var(--color-text-secondary); font-size: 16px; line-height: 27px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.news-reason { margin: 12px 0 0; color: var(--color-text-muted); font-size: 13px; line-height: 22px; }
 .news-actions { margin-top: 12px; }
 .detail-button { min-height: 44px; padding: 4px 0; border: 0; background: none; color: var(--color-primary); text-decoration: underline; font: inherit; font-size: 13px; }
 .detail-button:hover { color: var(--color-primary-hover); }

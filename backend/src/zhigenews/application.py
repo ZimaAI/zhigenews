@@ -89,7 +89,10 @@ def cancel_run(run, *, now=None):
 
 def public_brief(brief):
     keys = CONTRACT["components"]["schemas"]["Brief"]["properties"]
-    return {k: v for k, v in brief.data.items() if k in keys}
+    data = {k: v for k, v in brief.data.items() if k in keys}
+    item_keys = CONTRACT["components"]["schemas"]["NewsItem"]["properties"]
+    data["items"] = [{k: v for k, v in item.items() if k in item_keys} for item in data["items"]]
+    return data
 
 
 def public_delivery(session, delivery):

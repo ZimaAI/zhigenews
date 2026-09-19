@@ -2611,13 +2611,11 @@
           "id",
           "title",
           "summary",
-          "reason",
           "topic",
           "source",
           "sourceType",
           "publishedAt",
           "url",
-          "citations",
           "fetchedAt",
           "snapshotId"
         ],
@@ -2631,9 +2629,6 @@
             "type": "string"
           },
           "summary": {
-            "type": "string"
-          },
-          "reason": {
             "type": "string"
           },
           "topic": {
@@ -2660,12 +2655,6 @@
           "url": {
             "type": "string",
             "format": "uri"
-          },
-          "citations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Citation"
-            }
           },
           "fetchedAt": {
             "type": "string",
@@ -4076,7 +4065,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NewsItem"
+              "$ref": "#/components/schemas/StoredNewsItem"
             }
           },
           "generationStatus": {
@@ -4202,6 +4191,83 @@
             }
           }
         }
+      },
+      "StoredNewsItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "summary",
+          "reason",
+          "topic",
+          "source",
+          "sourceType",
+          "publishedAt",
+          "url",
+          "citations",
+          "fetchedAt",
+          "snapshotId"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "rss",
+              "newsnow",
+              "search"
+            ]
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "citations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            }
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "实际采集或搜索取得证据的时刻；绝不能代替 publishedAt。"
+          },
+          "snapshotId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "不可变来源或搜索证据快照的公开不透明标识，不是宿主路径或运行标识。"
+          }
+        },
+        "description": "内部持久化新闻条目，保留推荐原因与引用证据；不用于公开简报响应。"
       }
     },
     "responses": {

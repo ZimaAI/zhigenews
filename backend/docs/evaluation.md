@@ -1,6 +1,6 @@
 # 固定输入评估接线
 
-`zhigenews.evaluation` 不依赖 FastAPI、数据库、网络或发布服务。Gateway 创建实验时在事务中复制当前用例修订、每个用例的 `preferenceSnapshot/fixedAt/sourceSnapshotIds`、来源证据以及已发布配置；使用 `freeze_dataset(cases, sources).version` 存储 `datasetVersion`，用 outbox 交给 worker。不存在的快照和空用例集直接拒绝，显式空快照列表是有效的无证据测试。
+`zhigenews.evaluation` 不依赖 FastAPI、数据库、网络或发布服务。Gateway 接收空对象 `{}` 创建实验，在事务中复制当前用例修订、每个用例的 `preferenceSnapshot/fixedAt/sourceSnapshotIds`、来源证据、代码常量 Agent 配置及文件中的模型设置；使用 `freeze_dataset(cases, sources).version` 存储 `datasetVersion`，用 outbox 交给 worker。不存在的快照和空用例集直接拒绝，显式空快照列表是有效的无证据测试。`configVersion`由 Agent 常量内容确定；结果中的`modelId`为实际供应商模型 ID。可选裁判使用`EVALUATION_OPENAI_*`配置，不再从管理员维护的模型记录选择。
 
 内部记录格式（不对前端返回 snapshot）：
 

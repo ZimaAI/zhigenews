@@ -8,7 +8,7 @@ from sqlalchemy import select
 from .db import Resource, User, iso, transaction, uid, utcnow
 from .harness import mysql_persistence
 from .ingestion.catalog import default_sources
-from .security import encrypt, password_hash
+from .security import password_hash
 from .settings import get_settings
 
 
@@ -55,53 +55,11 @@ def initialize():
                 upstreamRevision=source.get("upstream_revision"),
             )
             session.add(Resource(id=source["id"], kind="source", data=data, due_at=utcnow()))
-        if s.openai_api_key and s.openai_model and not session.get(Resource, "initial-model"):
-            model = dict(
-                id="initial-model",
-                name="初始模型",
-                provider="OpenAI-compatible",
-                modelId=s.openai_model,
-                endpoint=s.openai_base_url,
-                keyMasked="已设置",
-                role="主模型",
-                enabled=True,
-                verified=False,
-                contextWindow=32768,
-                thinkingEnabled=False,
-            )
-            session.add(
-                Resource(id="initial-model", kind="model", data=model, secret=encrypt(s.openai_api_key))
-            )
-            config = dict(
-                id="initial-config",
-                name="每日新闻",
-                version="initial-v1",
-                status="draft",
-                modelId="initial-model",
-                summaryModelId="initial-model",
-                maxModelCalls=20,
-                maxToolCalls=40,
-                maxSeconds=180,
-                summaryTokens=12000,
-                summaryMessages=30,
-                summaryRatio=0.7,
-                subagentConcurrency=2,
-                tools=[
-                    "list_dir",
-                    "read_file",
-                    "search_content",
-                    "write_file",
-                    "bash",
-                    "web_search",
-                    "delegate_research",
-                ],
-                systemPrompt="你是知更新闻编辑。按用户话题、背景与关键词检索可信新闻，核对引用，生成简洁中文摘要和推荐理由。证据不足时明确说明，不编造新闻。",
-            )
-            session.add(Resource(id="initial-config", kind="config", data=config))
     with mysql_persistence(s.database_url, setup=True):
         pass
     print(
-        "Database initialized. Model remains unverified and config remains draft until an actual capability test."
+        "Database initialized. Models use the configuration file; Agent settings are code constants. "
+        "No administrator verification or configuration publishing is required."
     )
 
 

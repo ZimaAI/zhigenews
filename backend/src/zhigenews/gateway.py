@@ -14,14 +14,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException
 
-from .application import ACTIVE, Application, resource
+from .application import ACTIVE, Application
 from .contract import CONTRACT, schema, validate
-from .db import Idempotency, Run, RunEvent, iso, transaction, utcnow
+from .db import Idempotency, Run, RunEvent, transaction, utcnow
 from .errors import AppError
-from .models import ModelConfigurationError, build_model
-from .security import audit, authenticated, canonical, decrypt, digest, locked_bucket, policy
+from .security import audit, authenticated, canonical, digest, locked_bucket, policy
 from .settings import get_settings
-from .tracing import tracing_scope
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="知更 API", version="1.0.0", openapi_url="/openapi.json")
@@ -131,63 +129,8 @@ def count_request(request, operation):
         raise error
 
 
-def model_test(request, ident):
-    # Credentials and config are captured in a short transaction; no DB lock spans a model call.
-    with transaction() as session:
-        authenticated(session, request, True)
-        row = resource(session, ident, "model")
-        data, secret = dict(row.data), row.secret
-        fingerprint = digest(canonical(data) + (secret or ""))
-    verified, capabilities, message = False, [], "连接测试失败"
-    if secret:
-        try:
-            thinking_enabled = data.get("thinkingEnabled", False)
-            model = build_model(
-                data,
-                api_key=decrypt(secret),
-                timeout=120 if thinking_enabled else 25,
-                max_tokens=min(16384, max(256, data["contextWindow"] // 4)) if thinking_enabled else 100,
-            )
-            tool = {
-                "type": "function",
-                "function": {
-                    "name": "connection_probe",
-                    "description": "Verify tool calling",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"value": {"type": "string"}},
-                        "required": ["value"],
-                    },
-                },
-            }
-            with tracing_scope(metadata={"model_config_id": ident}, tags=["model-test"]):
-                answer = model.bind_tools([tool], tool_choice="connection_probe").invoke(
-                    "Call connection_probe with value ok.",
-                    config={"run_name": "zhigenews.model_test"},
-                )
-            verified = any(
-                t["name"] == "connection_probe" and t["args"].get("value") == "ok" for t in answer.tool_calls
-            )
-            capabilities = ["chat", "tool_calling"] if verified else ["chat"]
-            message = "模型工具调用能力验证通过" if verified else "模型没有返回要求的工具调用"
-        except ModelConfigurationError as exc:
-            message = str(exc)
-        except Exception:
-            message = "模型请求失败，请检查端点、模型名称和凭据"
-    else:
-        message = "请先配置模型密钥"
-    with transaction() as session:
-        row = resource(session, ident, "model", True)
-        if digest(canonical(row.data) + (row.secret or "")) != fingerprint:
-            raise AppError("VERSION_CONFLICT", "模型配置已改变，请重新测试", 409)
-        row.data = {**row.data, "verified": verified}
-    return dict(verified=verified, message=message, testedAt=iso(utcnow()), capabilities=capabilities)
-
-
 def execute(request, response, operation, body, params):
     count_request(request, operation)
-    if operation == "testModel":
-        return model_test(request, params["id"])
     saved_error = None
     with transaction() as session:
         user = (

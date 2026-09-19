@@ -10,6 +10,7 @@ from zhigenews.application import CN, next_slot
 from zhigenews.contract import CONTRACT, schema, validate
 from zhigenews.db import Brief, Delivery, Resource, Run, SessionToken, User, iso, transaction, utcnow
 from zhigenews.security import decrypt, digest, encrypt, locked_bucket, policy
+from zhigenews.settings import Settings
 
 pytestmark = pytest.mark.mysql
 BASE = "/api/v1"
@@ -28,20 +29,25 @@ def preferences(client, **changes):
     return client.put(BASE + "/me/preferences", json=value)
 
 
-def model_body(sandbox):
-    return {"name": sandbox.prefix + " model", "provider": "OpenAI-compatible", "modelId": "synthetic-test-model", "endpoint": "https://fixture.invalid/v1", "role": "主模型", "contextWindow": 32000, "apiKey": "synthetic-model-secret-" + sandbox.prefix}
+def verified_config(sandbox, monkeypatch, **overrides):
+    """Use synthetic file settings; these API tests never execute model workers."""
+    from zhigenews import runtime_config
 
-
-def verified_config(sandbox):
-    """Seed only configuration facts; model execution is outside these API tests."""
-    model_id = sandbox.resource(sandbox.prefix + "_model")
-    config_id = sandbox.resource(sandbox.prefix + "_config")
-    model = {"id": model_id, "name": sandbox.prefix, "provider": "OpenAI-compatible", "modelId": "synthetic-test-model", "endpoint": "https://fixture.invalid/v1", "keyMasked": "••••", "role": "主模型", "enabled": True, "verified": True, "contextWindow": 32000}
-    config = {"id": config_id, "name": sandbox.prefix, "version": "v99999", "status": "published", "modelId": model_id, "summaryModelId": model_id, "maxModelCalls": 2, "maxToolCalls": 2, "maxSeconds": 10, "summaryTokens": 1000, "summaryMessages": 4, "summaryRatio": 0.7, "subagentConcurrency": 0, "tools": ["list_dir", "read_file"], "systemPrompt": "Synthetic API acceptance configuration; do not contact a real provider."}
-    with transaction() as session:
-        session.add(Resource(id=model_id, kind="model", data=model, secret=encrypt("synthetic-test-secret")))
-        session.add(Resource(id=config_id, kind="config", data=config))
-    return config
+    values = dict(
+        openai_model="synthetic-test-model",
+        openai_base_url="https://fixture.invalid/v1",
+        openai_api_key="synthetic-model-secret-" + sandbox.prefix,
+        summary_openai_model="",
+        summary_openai_base_url="",
+        summary_openai_api_key="",
+        evaluation_openai_model="",
+        evaluation_openai_base_url="",
+        evaluation_openai_api_key="",
+    )
+    values.update(overrides)
+    configured = Settings(_env_file=None, **values)
+    monkeypatch.setattr(runtime_config, "get_settings", lambda: configured)
+    return runtime_config.agent_config()
 
 
 def test_anonymous_cookie_restores_identity_and_persists_only_hash(api_sandbox):
@@ -122,86 +128,89 @@ def test_delivery_settings_accept_only_time_and_do_not_generate(api_sandbox):
     assert client.get(BASE + "/me/generations/current").json() is None
 
 
-def test_model_secrets_are_encrypted_replaceable_and_revocable(api_sandbox):
+def test_model_and_agent_configuration_endpoints_are_removed(api_sandbox):
     admin = api_sandbox.admin()
-    body = model_body(api_sandbox)
-    created = assert_dto(admin.post(BASE + "/admin/models", json=body), "ModelConfig", 201)
-    api_sandbox.resource(created["id"])
-    assert body["apiKey"] not in str(created)
+    for method, path in [
+        ("get", "/admin/models"),
+        ("post", "/admin/models"),
+        ("put", "/admin/models/legacy-model"),
+        ("put", "/admin/models/legacy-model/enabled"),
+        ("post", "/admin/models/legacy-model/test"),
+        ("delete", "/admin/models/legacy-model/secret"),
+        ("get", "/admin/agent-configs"),
+        ("post", "/admin/agent-configs"),
+        ("put", "/admin/agent-configs/legacy-config"),
+        ("post", "/admin/agent-configs/legacy-config/publish"),
+    ]:
+        response = admin.request(method, BASE + path, json={})
+        assert response.status_code == 404, (method, path, response.text)
+    assert not any(path.startswith(("/admin/models", "/admin/agent-configs")) for path in CONTRACT["paths"])
+
+
+def test_generation_uses_file_models_and_code_constants_over_legacy_database_config(api_sandbox, monkeypatch):
+    config = verified_config(api_sandbox, monkeypatch, openai_thinking_enabled=True)
+    legacy_model = api_sandbox.resource(api_sandbox.prefix + "_legacy_model")
+    legacy_config = api_sandbox.resource(api_sandbox.prefix + "_legacy_config")
     with transaction() as session:
-        record = session.get(Resource, created["id"])
-        assert record.secret != body["apiKey"]
-        assert decrypt(record.secret) == body["apiKey"]
-    replacement = {**body, "apiKey": "synthetic-replacement-key"}
-    result = assert_dto(admin.put(BASE + f"/admin/models/{created['id']}", json=replacement), "ModelConfig")
-    assert replacement["apiKey"] not in str(result)
-    assert admin.delete(BASE + f"/admin/models/{created['id']}/secret").status_code == 204
+        session.add(Resource(
+            id=legacy_model, kind="model", secret=encrypt("synthetic-legacy-secret"),
+            data={"id": legacy_model, "name": "Legacy model", "modelId": "legacy-model", "enabled": True, "verified": True},
+        ))
+        session.add(Resource(
+            id=legacy_config, kind="config",
+            data={**config, "id": legacy_config, "version": "v99999", "status": "published",
+                  "modelId": legacy_model, "summaryModelId": legacy_model, "systemPrompt": "Legacy mutable prompt"},
+        ))
+    client, admin = api_sandbox.anonymous(), api_sandbox.admin()
+    assert preferences(client).status_code == 200
+    progress = assert_dto(client.post(
+        BASE + "/me/briefs", json={"preferenceVersion": 1},
+        headers={"Idempotency-Key": api_sandbox.prefix + "-snapshot"},
+    ), "GenerationProgress", 202)
     with transaction() as session:
-        assert not session.get(Resource, created["id"]).secret
+        run = session.get(Run, progress["id"])
+        assert run.config == config
+        frozen_models = run.private["models"]
+        for snapshot in frozen_models.values():
+            assert snapshot["data"]["modelId"] == "synthetic-test-model"
+            assert snapshot["data"]["endpoint"] == "https://fixture.invalid/v1"
+            assert snapshot["data"]["thinkingEnabled"] is True
+            assert "apiKey" not in snapshot["data"]
+            assert decrypt(snapshot["encryptedSecret"]) == "synthetic-model-secret-" + api_sandbox.prefix
+            assert "synthetic-model-secret-" not in str(snapshot)
+        encrypted_secrets = [snapshot["encryptedSecret"] for snapshot in frozen_models.values()]
 
-
-def test_model_thinking_setting_persists_and_requires_revalidation(api_sandbox):
-    admin = api_sandbox.admin()
-    body = {**model_body(api_sandbox), "thinkingEnabled": True}
-    created = assert_dto(admin.post(BASE + "/admin/models", json=body), "ModelConfig", 201)
-    api_sandbox.resource(created["id"])
-    assert created["thinkingEnabled"] is True
+    # Later file edits leave an accepted run's frozen dependencies intact.
+    verified_config(api_sandbox, monkeypatch, openai_model="synthetic-later-model", openai_api_key="synthetic-later-key")
+    public_run = assert_dto(admin.get(BASE + f"/admin/runs/{progress['id']}"), "AgentRun")
+    assert public_run["configVersion"] == config["version"]
+    for response in [public_run, client.get(BASE + f"/me/generations/{progress['id']}").json()]:
+        assert config["systemPrompt"] not in str(response)
+        assert "synthetic-model-secret-" not in str(response)
+        assert all(secret not in str(response) for secret in encrypted_secrets)
     with transaction() as session:
-        record = session.get(Resource, created["id"])
-        assert record.data["thinkingEnabled"] is True
-        record.data = {**record.data, "verified": True}
+        run = session.get(Run, progress["id"])
+        assert run.config == config and run.private["models"] == frozen_models
 
-    # An older client can edit a name without disabling the saved thinking mode.
-    edit = {key: value for key, value in body.items() if key not in {"apiKey", "thinkingEnabled"}}
-    edit["name"] += " renamed"
-    result = assert_dto(admin.put(BASE + f"/admin/models/{created['id']}", json=edit), "ModelConfig")
-    assert result["thinkingEnabled"] is True
-    assert result["verified"] is True
-    listed = assert_dto(admin.get(BASE + "/admin/models?limit=100"), "ModelConfigPage")
-    assert next(item for item in listed["items"] if item["id"] == created["id"])["thinkingEnabled"] is True
 
-    edit["thinkingEnabled"] = False
-    result = assert_dto(admin.put(BASE + f"/admin/models/{created['id']}", json=edit), "ModelConfig")
-    assert result["thinkingEnabled"] is False
-    assert result["verified"] is False
+@pytest.mark.parametrize("missing", ["openai_model", "openai_base_url", "openai_api_key"])
+def test_missing_file_model_configuration_returns_503_without_creating_a_run(api_sandbox, monkeypatch, missing):
+    verified_config(api_sandbox, monkeypatch, **{missing: ""})
+    client = api_sandbox.anonymous()
+    user_id = client.get(BASE + "/auth/session").json()["userId"]
+    assert preferences(client).status_code == 200
+    error = assert_dto(client.post(
+        BASE + "/me/briefs", json={"preferenceVersion": 1},
+        headers={"Idempotency-Key": api_sandbox.prefix + "-missing-config"},
+    ), "Error", 503)
+    assert error["code"] == "DEPENDENCY_UNAVAILABLE" and error["message"]
+    assert "synthetic-model-secret-" not in str(error)
     with transaction() as session:
-        assert session.get(Resource, created["id"]).data["thinkingEnabled"] is False
-    edit["thinkingEnabled"] = "true"
-    assert admin.put(BASE + f"/admin/models/{created['id']}", json=edit).status_code == 400
+        assert not list(session.scalars(select(Run).where(Run.user_id == user_id)))
 
 
-def test_model_thinking_defaults_false_for_new_and_legacy_records(api_sandbox):
-    admin = api_sandbox.admin()
-    body = model_body(api_sandbox)
-    created = assert_dto(admin.post(BASE + "/admin/models", json=body), "ModelConfig", 201)
-    api_sandbox.resource(created["id"])
-    assert created["thinkingEnabled"] is False
-    with transaction() as session:
-        record = session.get(Resource, created["id"])
-        record.data = {key: value for key, value in record.data.items() if key != "thinkingEnabled"}
-
-    listed = assert_dto(admin.get(BASE + "/admin/models?limit=100"), "ModelConfigPage")
-    assert next(item for item in listed["items"] if item["id"] == created["id"])["thinkingEnabled"] is False
-    result = assert_dto(admin.put(BASE + f"/admin/models/{created['id']}/enabled", json={"enabled": False}), "ModelConfig")
-    assert result["thinkingEnabled"] is False
-    edit = {key: value for key, value in body.items() if key != "apiKey"}
-    result = assert_dto(admin.put(BASE + f"/admin/models/{created['id']}", json=edit), "ModelConfig")
-    assert result["thinkingEnabled"] is False
-
-
-def test_published_config_cannot_be_overwritten(api_sandbox):
-    admin = api_sandbox.admin()
-    config = verified_config(api_sandbox)
-    write = {key: value for key, value in config.items() if key not in {"id", "version", "status"}}
-    write["systemPrompt"] = "This must not alter a published snapshot."
-    failure = assert_dto(admin.put(BASE + f"/admin/agent-configs/{config['id']}", json=write), "Error", 409)
-    assert failure["code"] == "INVALID_STATE"
-    with transaction() as session:
-        assert session.get(Resource, config["id"]).data["systemPrompt"] == config["systemPrompt"]
-
-
-def test_generation_idempotency_current_recovery_and_cross_user_visibility(api_sandbox):
-    verified_config(api_sandbox)
+def test_generation_idempotency_current_recovery_and_cross_user_visibility(api_sandbox, monkeypatch):
+    verified_config(api_sandbox, monkeypatch)
     client = api_sandbox.anonymous()
     other = api_sandbox.anonymous()
     assert preferences(client).status_code == 200
@@ -218,8 +227,8 @@ def test_generation_idempotency_current_recovery_and_cross_user_visibility(api_s
     assert failure["code"] == "VERSION_CONFLICT"
 
 
-def test_simultaneous_generation_replays_enqueue_only_one_run(api_sandbox):
-    verified_config(api_sandbox)
+def test_simultaneous_generation_replays_enqueue_only_one_run(api_sandbox, monkeypatch):
+    verified_config(api_sandbox, monkeypatch)
     client = api_sandbox.anonymous()
     user_id = client.get(BASE + "/auth/session").json()["userId"]
     assert preferences(client).status_code == 200
@@ -243,8 +252,8 @@ def test_simultaneous_generation_replays_enqueue_only_one_run(api_sandbox):
         ("completed", None, "completed"),
     ],
 )
-def test_cancel_generation_without_worker(api_sandbox, admin, status, lease_seconds, expected):
-    verified_config(api_sandbox)
+def test_cancel_generation_without_worker(api_sandbox, monkeypatch, admin, status, lease_seconds, expected):
+    verified_config(api_sandbox, monkeypatch)
     reader = api_sandbox.anonymous()
     assert preferences(reader).status_code == 200
     created = assert_dto(
@@ -318,8 +327,8 @@ def test_existing_cookie_session_recovery_cannot_bypass_account_request_limit(ap
     assert client.cookies.get("zg_session") == token
 
 
-def test_daily_generation_limit_does_not_enqueue_or_consume_another_unit(api_sandbox):
-    verified_config(api_sandbox)
+def test_daily_generation_limit_does_not_enqueue_or_consume_another_unit(api_sandbox, monkeypatch):
+    verified_config(api_sandbox, monkeypatch)
     client = api_sandbox.anonymous()
     user_id = client.get(BASE + "/auth/session").json()["userId"]
     assert preferences(client).status_code == 200
@@ -409,8 +418,7 @@ def test_read_endpoints_return_contract_pagination_and_no_private_keys(api_sandb
         payload = assert_dto(client.get(BASE + path), schema_name)
         assert payload["items"] == []
     for path, schema_name in [
-        ("/admin/sources", "SourcePage"), ("/admin/models", "ModelConfigPage"),
-        ("/admin/agent-configs", "AgentConfigPage"), ("/admin/runs", "AgentRunPage"),
+        ("/admin/sources", "SourcePage"), ("/admin/runs", "AgentRunPage"),
         ("/admin/evaluations", "EvaluationPage"), ("/admin/anonymous-accounts", "AnonymousAccountPage"),
         ("/admin/abuse-events", "AbuseEventPage"), ("/admin/deliveries", "DeliveryPage"),
     ]:

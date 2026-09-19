@@ -16,7 +16,7 @@ test('generated metadata covers the active backend operations and contract finge
   const contract = JSON.parse(bytes.toString());
   const operations = Object.entries(contract.paths).flatMap(([path, methods]) =>
     Object.entries(methods as Record<string, { operationId: string }>).map(([method, spec]) => ({ path, method, id: spec.operationId })));
-  assert.equal(operations.length, 53);
+  assert.equal(operations.length, 43);
   assert.equal(contractSha256, createHash('sha256').update(bytes).digest('hex'));
   assert.deepEqual(Object.keys(operationMetadata).sort(), operations.map((operation) => operation.id).sort());
   for (const expected of operations) {

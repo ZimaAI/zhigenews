@@ -244,7 +244,7 @@ def evaluate_record(
         evaluation_id=evaluation["id"],
         name=evaluation["name"],
         config_version=evaluation["configVersion"],
-        model_id=config["modelId"],
+        model_id=evaluation.get("modelId", config["modelId"]),
         generate=generate,
         judge=judge,
         scorer_version=evaluation.get("scorerVersion", SCORER_VERSION),

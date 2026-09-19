@@ -12,13 +12,13 @@ from types import SimpleNamespace
 import httpx
 import pytest
 from sqlalchemy import func, select
+from test_api import verified_config
 
 from zhigenews import workers
 from zhigenews.application import next_slot
 from zhigenews.contract import schema, validate
 from zhigenews.db import Brief, Delivery, Outbox, Resource, Run, User, iso, transaction, utcnow
 from zhigenews.ingestion import fetch_source
-from zhigenews.security import encrypt
 
 pytestmark = pytest.mark.mysql
 RSS = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>Synthetic worker feed</title>
@@ -29,6 +29,7 @@ RSS = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>Synthetic work
 
 @pytest.fixture
 def sandbox(api_sandbox, tmp_path, monkeypatch):
+    verified_config(api_sandbox, monkeypatch)
     monkeypatch.setattr(workers, "get_settings", lambda: SimpleNamespace(data_dir=tmp_path))
     yield api_sandbox
     with transaction() as session:
@@ -77,10 +78,6 @@ def collector(source, storage, **kwargs):
 def configured_user(sandbox, suffix="_user", *, status="active", onboarding=True, due=None):
     ident = sandbox.prefix + suffix
     sandbox.users.add(ident)
-    model_id, config_id = (
-        sandbox.resource(sandbox.prefix + suffix + ending) for ending in ("_model", "_cfg")
-    )
-    model = {"id": model_id, "name": "Synthetic scheduling model", "enabled": True, "verified": True}
     with transaction() as session:
         session.add(
             User(
@@ -91,22 +88,6 @@ def configured_user(sandbox, suffix="_user", *, status="active", onboarding=True
                 onboarding=onboarding,
                 next_run_at=due or utcnow(),
                 preference={"version": 1, "role": "", "topics": ["AI"], "keywords": []},
-            )
-        )
-        session.add(
-            Resource(id=model_id, kind="model", data=model, secret=encrypt("synthetic-no-provider-call"))
-        )
-        session.add(
-            Resource(
-                id=config_id,
-                kind="config",
-                data={
-                    "id": config_id,
-                    "version": "synthetic-worker-v1",
-                    "status": "published",
-                    "modelId": model_id,
-                    "summaryModelId": model_id,
-                },
             )
         )
     return ident

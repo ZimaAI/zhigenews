@@ -7,6 +7,7 @@ from test_api import verified_config
 
 from zhigenews.contract import CONTRACT, schema, validate
 from zhigenews.db import Brief, Delivery, Resource, Run, RunEvent, iso, transaction, utcnow
+from zhigenews.security import decrypt
 
 pytestmark = pytest.mark.mysql
 
@@ -47,8 +48,9 @@ class ContractProbe:
         return response
 
 
-def test_all_frozen_operations_return_their_real_http_contract(api_sandbox):
+def test_all_frozen_operations_return_their_real_http_contract(api_sandbox, monkeypatch):
     probe = ContractProbe(api_sandbox)
+    config = verified_config(api_sandbox, monkeypatch)
     user, admin = api_sandbox.anonymous(), api_sandbox.admin()
     probe.call("ensureAnonymousSession", user)
     identity = probe.call("getSession", user).json()["userId"]
@@ -71,24 +73,6 @@ def test_all_frozen_operations_return_their_real_http_contract(api_sandbox):
     probe.call("setSourceEnabled", admin, ident=source["id"], body={"enabled": True})
     probe.call("fetchSource", admin, ident=source["id"])
     probe.call("listSources", admin)
-
-    model_write = {"name": api_sandbox.prefix + " model", "provider": "OpenAI-compatible", "modelId": "synthetic", "endpoint": "https://fixture.invalid/v1", "role": "主模型", "contextWindow": 32000}
-    model = probe.call("createModel", admin, body=model_write).json()
-    api_sandbox.resource(model["id"])
-    probe.call("saveModel", admin, ident=model["id"], body={**model_write, "name": api_sandbox.prefix + " updated"})
-    probe.call("setModelEnabled", admin, ident=model["id"], body={"enabled": False})
-    connection = probe.call("testModel", admin, ident=model["id"]).json()
-    assert connection["verified"] is False  # No key: no provider call and no fabricated capability.
-    probe.call("revokeModelSecret", admin, ident=model["id"])
-    probe.call("listModels", admin)
-
-    seeded = verified_config(api_sandbox)
-    config_write = {key: value for key, value in seeded.items() if key not in {"id", "version", "status"}}
-    config = probe.call("createConfig", admin, body=config_write).json()
-    api_sandbox.resource(config["id"])
-    probe.call("saveConfig", admin, ident=config["id"], body={**config_write, "maxSeconds": 20})
-    probe.call("publishConfig", admin, ident=config["id"])
-    probe.call("listConfigs", admin)
 
     generation = probe.call("generateBrief", user, body={"preferenceVersion": 1}).json()
     probe.call("getCurrentGeneration", user)
@@ -127,15 +111,26 @@ def test_all_frozen_operations_return_their_real_http_contract(api_sandbox):
     updated = probe.call("saveEvalCase", admin, ident=case["id"], body={"name": case["name"], "preference": "Agent", "expected": "Updated synthetic expectation"}).json()
     assert updated["fixedAt"] == case["fixedAt"] and updated["revision"] == 2
     probe.call("listEvalCases", admin)
-    accepted = probe.call("runEvaluation", admin, body={"configVersion": config["version"]}).json()
+    probe.call("runEvaluation", admin, body={"configVersion": config["version"]}, status=400)
+    accepted = probe.call("runEvaluation", admin, body={}).json()
     evaluation_id = api_sandbox.resource(accepted["evaluationId"])
     evaluation = probe.call("getEvaluation", admin, ident=evaluation_id).json()
     assert evaluation["relevance"] is None and evaluation["citations"] is None
+    assert evaluation["configVersion"] == config["version"]
+    assert evaluation["modelId"] == "synthetic-test-model"
     probe.call("listEvaluations", admin)
     with transaction() as session:
-        frozen = session.get(Resource, evaluation_id).private["snapshot"]
+        private = session.get(Resource, evaluation_id).private
+        frozen = private["snapshot"]
         own = next(row for row in frozen["cases"] if row["id"] == case["id"])
         assert own["revision"] == 2 and own["sourceSnapshotIds"] == []
+        assert private["config"] == config and private["judge"] is None
+        for model in private["models"].values():
+            assert model["data"]["modelId"] == "synthetic-test-model"
+            assert decrypt(model["encryptedSecret"]) == "synthetic-model-secret-" + api_sandbox.prefix
+            assert model["encryptedSecret"] not in str(evaluation)
+        assert "synthetic-model-secret-" not in str(evaluation)
+        assert config["systemPrompt"] not in str(evaluation)
     probe.call("saveEvalCase", admin, ident=case["id"], body={"name": case["name"], "preference": "Different", "expected": "Later edit"})
     with transaction() as session:
         frozen = session.get(Resource, evaluation_id).private["snapshot"]

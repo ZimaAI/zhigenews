@@ -23,6 +23,7 @@ from .db import (
     utcnow,
 )
 from .errors import AppError
+from .runtime_config import agent_config, evaluation_judge, runtime_models
 from .security import (
     ADMIN_COOKIE,
     audit,
@@ -30,7 +31,6 @@ from .security import (
     canonical,
     check_password,
     digest,
-    encrypt,
     ip_hash,
     issue_session,
     locked_bucket,
@@ -172,24 +172,14 @@ def create_run(session, user, business_key, preference_version=None):
             429,
             retry_after=max(1, int((bucket.expires_at - now).total_seconds())),
         )
-    configs = session.scalars(
-        select(Resource).where(Resource.kind == "config").order_by(Resource.created_at.desc())
-    ).all()
-    selected = next((x for x in configs if x.data["status"] == "published"), None)
-    if not selected:
-        raise AppError("CONFIGURATION_REQUIRED", "管理员尚未发布可用配置", 503)
-    models = {}
-    for key in ("modelId", "summaryModelId"):
-        m = resource(session, selected.data[key], "model")
-        if not m.data["enabled"] or not m.data["verified"] or not m.secret:
-            raise AppError("MODEL_UNAVAILABLE", "运行模型暂不可用", 503)
-        models[key] = {"data": deepcopy(m.data), "encryptedSecret": m.secret}
+    config = agent_config()
+    models = runtime_models()
     run = Run(
         id=uid("gen_"),
         user_id=user.id,
         business_key=business_key,
         preferences=deepcopy(user.preference),
-        config=deepcopy(selected.data),
+        config=config,
         private={"models": models, "modelName": models["modelId"]["data"]["name"]},
         status="queued",
         percent=None,
@@ -452,14 +442,6 @@ class Application:
     def listSources(self):
         return self.listing("source")
 
-    def listModels(self):
-        result = self.listing("model")
-        result["items"] = [{"thinkingEnabled": False, **item} for item in result["items"]]
-        return result
-
-    def listConfigs(self):
-        return self.listing("config")
-
     def listEvalCases(self):
         return self.listing("case")
 
@@ -536,71 +518,6 @@ class Application:
             add_outbox(self.db, "source", row.id)
         return self.source_view(row)
 
-    def write_model(self, row=None):
-        body = deepcopy(self.body)
-        key = body.pop("apiKey", None)
-        old = row.data if row else {}
-        body.setdefault("thinkingEnabled", old.get("thinkingEnabled", False))
-        changed = (
-            key is not None
-            or any(body[k] != old.get(k) for k in ("endpoint", "modelId", "contextWindow"))
-            or body["thinkingEnabled"] != old.get("thinkingEnabled", False)
-        )
-        data = {
-            **body,
-            "id": row.id if row else uid("model_"),
-            "keyMasked": "已设置" if key or row and row.secret else "未设置",
-            "enabled": old.get("enabled", True),
-            "verified": False if changed else old.get("verified", False),
-        }
-        if not row:
-            row = Resource(id=data["id"], kind="model", data=data)
-            self.db.add(row)
-        row.data = data
-        if key:
-            row.secret = encrypt(key)
-        return data
-
-    def createModel(self):
-        return self.write_model()
-
-    def saveModel(self):
-        return self.write_model(resource(self.db, self.ident, "model", True))
-
-    def setModelEnabled(self):
-        row = resource(self.db, self.ident, "model", True)
-        row.data = {"thinkingEnabled": False, **row.data, "enabled": self.body["enabled"]}
-        return row.data
-
-    def revokeModelSecret(self):
-        row = resource(self.db, self.ident, "model", True)
-        row.secret = None
-        row.data = {**row.data, "keyMasked": "未设置", "verified": False}
-
-    def createConfig(self):
-        ident = uid("cfg_")
-        data = {**self.body, "id": ident, "version": ident[-12:], "status": "draft"}
-        self.db.add(Resource(id=ident, kind="config", data=data))
-        return data
-
-    def saveConfig(self):
-        row = resource(self.db, self.ident, "config", True)
-        if row.data["status"] != "draft":
-            raise AppError("IMMUTABLE_CONFIG", "已发布版本不可修改，请创建新草稿", 409)
-        row.data = {**self.body, "id": row.id, "version": row.data["version"], "status": "draft"}
-        return row.data
-
-    def publishConfig(self):
-        row = resource(self.db, self.ident, "config", True)
-        if row.data["status"] == "published":
-            return row.data
-        for field in ("modelId", "summaryModelId"):
-            m = resource(self.db, row.data[field], "model")
-            if not m.data["enabled"] or not m.data["verified"] or not m.secret:
-                raise AppError("MODEL_UNVERIFIED", "主模型与摘要模型必须启用并通过能力测试", 409)
-        row.data = {**row.data, "status": "published"}
-        return row.data
-
     def write_case(self, row=None):
         body = deepcopy(self.body)
         if row:
@@ -636,17 +553,9 @@ class Application:
     def runEvaluation(self):
         from .evaluation import freeze_dataset
 
-        configs = self.db.scalars(select(Resource).where(Resource.kind == "config")).all()
-        cfg = next(
-            (
-                c
-                for c in configs
-                if c.data["version"] == self.body["configVersion"] and c.data["status"] == "published"
-            ),
-            None,
-        )
-        if not cfg:
-            raise AppError("CONFIGURATION_REQUIRED", "请选择已发布配置", 409)
+        config = agent_config()
+        models = runtime_models()
+        judge = evaluation_judge()
         cases = [deepcopy(c.data) for c in self.db.scalars(select(Resource).where(Resource.kind == "case"))]
         if not cases:
             raise AppError("EMPTY_DATASET", "请先保存评估用例")
@@ -660,7 +569,7 @@ class Application:
         data = dict(
             id=ident,
             name="评估 " + iso(utcnow()),
-            configVersion=cfg.data["version"],
+            configVersion=config["version"],
             status="queued",
             relevance=None,
             faithfulness=None,
@@ -671,38 +580,17 @@ class Application:
             createdAt=iso(utcnow()),
             datasetVersion=frozen.version,
             scorerVersion="rules-v1",
-            modelId=cfg.data["modelId"],
+            modelId=models["modelId"]["data"]["modelId"],
             results=[],
         )
-        models = {
-            k: {
-                "data": resource(self.db, cfg.data[k], "model").data,
-                "encryptedSecret": resource(self.db, cfg.data[k], "model").secret,
-            }
-            for k in ("modelId", "summaryModelId")
-        }
-        if any(
-            not m["data"]["enabled"] or not m["data"]["verified"] or not m["encryptedSecret"]
-            for m in models.values()
-        ):
-            raise AppError("MODEL_UNAVAILABLE", "评估使用的模型暂不可用", 503)
-        judges = self.db.scalars(select(Resource).where(Resource.kind == "model")).all()
-        judge = next(
-            (
-                m
-                for m in judges
-                if m.data["role"] == "评估模型" and m.data["enabled"] and m.data["verified"] and m.secret
-            ),
-            None,
-        )
         data["scorerVersion"] = "rules-v1+judge-v1-" + (
-            digest(canonical(judge.data))[:24] if judge else "unavailable"
+            digest(canonical(judge["data"]))[:24] if judge else "unavailable"
         )
         private = dict(
             snapshot=dict(cases=cases, sources=sources),
-            config=deepcopy(cfg.data),
+            config=config,
             models=models,
-            judge={"data": judge.data, "encryptedSecret": judge.secret} if judge else None,
+            judge=judge,
         )
         self.db.add(Resource(id=ident, kind="evaluation", data=data, private=private))
         add_outbox(self.db, "evaluation", ident)

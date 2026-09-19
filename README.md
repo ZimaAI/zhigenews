@@ -73,11 +73,13 @@ docker compose --profile app up -d api worker beat
 
 `POST /auth/anonymous`自动签发HttpOnly匿名Cookie，管理员使用独立登录Cookie。所有写请求发送 `X-Zhige-Request: 1`；有Origin时必须在ALLOWED_ORIGINS白名单。创建生成、采集、评估与发布重试发送稳定 `Idempotency-Key`（8–128字符），同键不同body返回409。429遵循Retry-After。
 
-CLI初始化的模型保留未验证、Agent配置保留草稿。管理员真实测试工具调用能力后发布配置，才能创建生成；密钥只写、加密保存、不回显。用户只看公开进度，完整事件/SSE只对管理员开放。`submitted`只表示站内发布，不表示已读。
+模型连接统一在 `backend/.env` 配置，字段示例见 [backend/.env.example](backend/.env.example)。`OPENAI_BASE_URL`、`OPENAI_MODEL`、`OPENAI_API_KEY` 指定主模型；`SUMMARY_OPENAI_*` 可覆盖摘要模型，未设置时继承主模型；`EVALUATION_OPENAI_MODEL` 启用可选评估模型。管理员端不再提供模型与连接、Agent 配置页面和管理 API，无需在页面验证或发布配置。
 
-管理员在「模型配置」的新建或编辑弹窗中设置「开启深度思考」，新模型及旧配置默认关闭。切换后需重新测试模型能力，保存结果用于后续运行；已经启动的任务继续使用创建时冻结的配置。深度思考会消耗额外时间与输出 Token，可在 Agent 配置中调整运行时间上限。
+Agent 预算、工具、摘要阈值、子任务并发和系统提示词集中在 [runtime_config.py](backend/src/zhigenews/runtime_config.py) 的常量中维护。运行与评估自动使用当前部署配置，并保存私有快照；已有数据库模型和 Agent 配置不再影响新任务，历史运行仍可查询。API key 在任务快照中加密，不通过公开接口返回。修改 `.env` 后重启本机 API，并重新创建容器 worker/beat；修改代码常量后重新构建镜像并重启 API、worker、beat。
 
-当前已适配 `deepseek-v4-flash`、`deepseek-v4-pro`、`deepseek-flash`、`MiniMax-M3`，以及 `gpt-5.1`、`gpt-5.2`、`gpt-5.4`、`gpt-5.5` 和对应日期快照。MiniMax 使用其 API 的 adaptive/disabled 模式，GPT 使用 medium/none；未适配的模型开启时，连接测试会明确提示，不能误报已启用。参见 [MiniMax 接口说明](https://platform.minimax.io/docs/api-reference/text-openai-api)。
+`OPENAI_THINKING_ENABLED` 控制主模型深度思考，默认关闭；`OPENAI_CONTEXT_WINDOW` 设置上下文窗口。摘要和评估模型可用对应前缀单独配置。深度思考会消耗额外时间与输出 Token，运行时间上限在 Agent 常量中调整。用户只看公开进度，完整事件/SSE只对管理员开放。`submitted`只表示站内发布，不表示已读。
+
+当前代码已适配 `deepseek-v4-flash`、`deepseek-v4-pro`、`deepseek-flash`、`MiniMax-M3`，以及 `gpt-5.1`、`gpt-5.2`、`gpt-5.4`、`gpt-5.5` 和对应日期快照。MiniMax 使用其 API 的 adaptive/disabled 模式，GPT 使用 medium/none；未适配的模型开启时会返回明确的配置错误。参见 [MiniMax 接口说明](https://platform.minimax.io/docs/api-reference/text-openai-api)。
 
 DeepSeek 的思考模式使用自动工具选择，并在内部保留模型协议要求的思考上下文，公开进度和管理员消息记录不展示私有思维链。最终简报仍须通过结构、引用与来源校验。参见 [DeepSeek 思考与工具调用说明](https://api-docs.deepseek.com/guides/thinking_mode/)。
 
@@ -85,7 +87,7 @@ DeepSeek 的思考模式使用自动工具选择，并在内部保留模型协�
 
 ### LangSmith 追踪
 
-正式 LangGraph Agent 已接入 LangSmith 自动追踪，主图名为 `zhigenews.agent`，子图名为 `zhigenews.subagent`。模型、工具及摘要调用保留父子层级；`run_id`、`agent_thread_id`、`resumed` 元数据可关联站内运行。管理员模型连接测试和评估裁判也会记录追踪。
+正式 LangGraph Agent 已接入 LangSmith 自动追踪，主图名为 `zhigenews.agent`，子图名为 `zhigenews.subagent`。模型、工具及摘要调用保留父子层级；`run_id`、`agent_thread_id`、`resumed` 元数据可关联站内运行。命令行模型探针和评估裁判也会记录追踪。
 
 在现有 `backend/.env` 中设置以下字段，保留其他配置：
 
@@ -107,7 +109,7 @@ docker compose --profile app up -d --force-recreate worker beat
 uv run --project backend python -m zhigenews.cli environment
 ```
 
-环境检查只显示配置状态与项目名，不输出 key。到管理员端测试模型，或在用户端生成一份简报，然后在 [LangSmith](https://smith.langchain.com/) 的 `my-first-agent` 项目查看新 trace。模型测试名为 `zhigenews.model_test`，评估裁判名为 `zhigenews.evaluation_judge`；评估运行附带 `evaluation_id`。
+环境检查只显示配置状态与项目名，不输出 key。运行下方 `verify_live.py` 探针，或在用户端生成一份简报，然后在 [LangSmith](https://smith.langchain.com/) 的 `my-first-agent` 项目查看新 trace。模型探针名为 `zhigenews.live_model_probe`，评估裁判名为 `zhigenews.evaluation_judge`；评估运行附带 `evaluation_id`。
 
 启用后会上传提示词、新闻证据、可见模型输出和工具输入输出，便于排查运行过程；上传前移除结构化私有思考字段及已识别的密钥。模型内部协议重放与检查点保持原状。自动化测试使用离线模拟导出，不会向真实项目发送 synthetic 数据。接入与配置方式参见 [LangChain/LangGraph 追踪文档](https://docs.langchain.com/langsmith/trace-with-langchain) 和 [敏感数据过滤文档](https://docs.langchain.com/langsmith/mask-inputs-outputs)。
 

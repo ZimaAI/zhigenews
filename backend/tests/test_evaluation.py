@@ -86,9 +86,10 @@ class EvaluationTests(unittest.TestCase):
         self.assertIsNone(result["relevance"])
 
     def test_record_adapter_rejects_changed_persisted_dataset(self):
-        record = dict(id="eval-1", name="Synthetic", configVersion="v1", datasetVersion=self.dataset().version, snapshot={"cases": [self.case], "sources": self.snapshots})
+        record = dict(id="eval-1", name="Synthetic", configVersion="v1", modelId="provider-model", datasetVersion=self.dataset().version, snapshot={"cases": [self.case], "sources": self.snapshots})
         result = evaluate_record(record, {"modelId": "model-1"}, generate=lambda _: {"items": [self.article], "cost": 0.01}, judge=lambda *_: {"relevance": 4, "faithfulness": 5, "cost": 0.02})
         self.assertAlmostEqual(result["cost"], 0.03)
+        self.assertEqual(result["modelId"], "provider-model")
         self.assertNotIn("snapshot", result)
         self.case["revision"] = 2
         with self.assertRaisesRegex(EvaluationInputError, "DATASET_CHANGED"):

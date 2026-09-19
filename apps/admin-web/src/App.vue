@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Leaf, LayoutDashboard, Radio, Bot, SlidersHorizontal, Activity, FlaskConical, Users, Send, Menu, LogOut, Settings } from 'lucide-vue-next';
+import { Leaf, LayoutDashboard, Radio, Activity, FlaskConical, Users, Send, Menu, LogOut, Settings } from 'lucide-vue-next';
 import Modal from '@ui/Modal.vue';
 import EmptyState from '@ui/EmptyState.vue';
 import { request, errorText, toast, notify } from './lib';
@@ -9,7 +9,6 @@ import { session, sessionError, loadSession } from './session';
 const route = useRoute(); const router = useRouter(); const menu = ref(false); const busy = ref(false);
 const nav = [
   { path: '/overview', label: '概览', icon: LayoutDashboard }, { path: '/sources', label: '新闻来源', icon: Radio },
-  { path: '/models', label: '模型与连接', icon: Bot }, { path: '/agent-configs', label: 'Agent 配置', icon: SlidersHorizontal },
   { path: '/runs', label: '运行观察', icon: Activity }, { path: '/evaluations', label: '评估实验', icon: FlaskConical },
   { path: '/users', label: '匿名账户', icon: Users }, { path: '/deliveries', label: '投递记录', icon: Send },
 ];
@@ -26,7 +25,7 @@ async function retrySession() { busy.value = true; try { await loadSession(); se
         <RouterLink class="brand" to="/overview" aria-label="知更管理概览"><span class="brand-mark"><Leaf :size="23" aria-hidden="true" /></span><span class="brand-name">知更<span>ZHIGE NEWS</span></span></RouterLink>
         <div class="sidebar-section-label">管理工作台</div>
         <nav class="desktop-nav"><RouterLink v-for="item in nav" :key="item.path" :to="item.path" :class="{ selected: route.path.startsWith(item.path) }" :aria-current="route.path.startsWith(item.path) ? 'page' : undefined" :title="item.label" :aria-label="item.label"><component :is="item.icon" :size="19" aria-hidden="true" /><span>{{ item.label }}</span></RouterLink></nav>
-        <div class="sidebar-note"><Settings :size="19" aria-hidden="true" /><strong>让信息有据可查</strong><p>来源、配置与发布状态<br>汇聚在同一工作台。</p></div>
+        <div class="sidebar-note"><Settings :size="19" aria-hidden="true" /><strong>让信息有据可查</strong><p>来源、运行与发布状态<br>汇聚在同一工作台。</p></div>
         <div class="sidebar-account"><span class="avatar" aria-hidden="true">管</span><div><strong>{{ session?.name || '管理员' }}</strong><p>管理控制台</p></div><button class="icon-button" :disabled="busy" aria-label="退出登录" title="退出登录" @click="logout"><LogOut :size="18" /></button></div>
       </aside>
       <div class="app-body">

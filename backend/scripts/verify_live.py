@@ -22,8 +22,11 @@ def main():
         try:
             model = build_model(
                 {"modelId": settings.openai_model, "endpoint": settings.openai_base_url,
-                 "thinkingEnabled": False},
-                api_key=settings.openai_api_key, timeout=30, max_tokens=100,
+                 "thinkingEnabled": settings.openai_thinking_enabled},
+                api_key=settings.openai_api_key,
+                timeout=120 if settings.openai_thinking_enabled else 30,
+                max_tokens=min(16384, max(256, settings.openai_context_window // 4))
+                if settings.openai_thinking_enabled else 100,
             )
             tool = {"type": "function", "function": {"name": "verify_connection", "description": "Check tool calling",
                     "parameters": {"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]}}}

@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +20,18 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = ""
     openai_api_key: str = ""
+    openai_context_window: int = Field(default=32768, ge=1024)
+    openai_thinking_enabled: bool = False
+    summary_openai_base_url: str = ""
+    summary_openai_model: str = ""
+    summary_openai_api_key: str = ""
+    summary_openai_context_window: int | None = Field(default=None, ge=1024)
+    summary_openai_thinking_enabled: bool | None = None
+    evaluation_openai_base_url: str = ""
+    evaluation_openai_model: str = ""
+    evaluation_openai_api_key: str = ""
+    evaluation_openai_context_window: int | None = Field(default=None, ge=1024)
+    evaluation_openai_thinking_enabled: bool | None = None
     tavily_api_key: str = ""
     langsmith_tracing: bool = False
     langsmith_api_key: SecretStr = SecretStr("")

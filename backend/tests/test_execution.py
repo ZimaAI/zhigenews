@@ -81,9 +81,7 @@ def execution_case():
         maxModelCalls=6,
         maxToolCalls=6,
         maxSeconds=60,
-        summaryTokens=12000,
-        summaryMessages=30,
-        summaryRatio=0.7,
+        summaryRatio=0.9,
         subagentConcurrency=0,
         tools=["list_dir", "read_file", "search_content"],
         systemPrompt="Synthetic integration test: use the fixed supplied Agent evidence.",
@@ -235,8 +233,9 @@ def test_real_harness_saves_artifacts_then_publication_confirms_completion(execu
     assert rows(case).deliveries[0].attempts == 1
 
 
+@pytest.mark.parametrize("legacy_layout", [False, True])
 def test_new_run_discovers_collected_news_without_preloading_and_uses_actual_start(
-    execution_case, monkeypatch, tmp_path,
+    execution_case, monkeypatch, tmp_path, legacy_layout,
 ):
     case = execution_case
     started = datetime.now(UTC).replace(microsecond=0)
@@ -253,16 +252,20 @@ def test_new_run_discovers_collected_news_without_preloading_and_uses_actual_sta
         f'<pubDate>{published.strftime("%a, %d %b %Y %H:%M:%S +0000")}</pubDate>'
         '</item></channel></rss>'
     ).encode()
-    with Client(transport=MockTransport(lambda request: Response(200, content=body))) as client:
-        collected = fetch_source(source, tmp_path, client=client, now=started)
-        disabled = {**source, "id": source["id"] + "_disabled", "name": "Synthetic disabled RSS"}
-        fetch_source(disabled, tmp_path, client=client, now=started)
+    with monkeypatch.context() as patch:
+        if legacy_layout:
+            patch.setattr("zhigenews.ingestion.service._source_dir", lambda s, storage: storage / s["kind"] / s["id"])
+            patch.setattr("zhigenews.ingestion.service._maintain_source_index", lambda *args: None)
+        with Client(transport=MockTransport(lambda request: Response(200, content=body))) as client:
+            collected = fetch_source(source, tmp_path, client=client, now=started)
+            disabled = {**source, "id": source["id"] + "_disabled", "name": "Synthetic disabled RSS"}
+            fetch_source(disabled, tmp_path, client=client, now=started)
     item = collected["items"][0]
     with transaction() as session:
         session.add(Resource(
             id=source["id"], owner_id=case.user_id, kind="source",
             data={"id": source["id"], "name": source["name"], "kind": "rss", "sourceId": "",
-                  "url": source["url"], "status": "healthy", "snapshotId": item["snapshot_id"]},
+                  "url": source["url"], "status": "healthy", "interval": 300, "snapshotId": item["snapshot_id"]},
         ))
         session.add(Resource(
             id=item["snapshot_id"], owner_id=case.user_id, kind="snapshot",
@@ -271,7 +274,7 @@ def test_new_run_discovers_collected_news_without_preloading_and_uses_actual_sta
         session.add(Resource(
             id=disabled["id"], owner_id=case.user_id, kind="source",
             data={"id": disabled["id"], "name": disabled["name"], "kind": "rss", "sourceId": "",
-                  "url": disabled["url"], "status": "disabled"},
+                  "url": disabled["url"], "status": "disabled", "interval": 300},
         ))
         run = session.get(Run, case.run_id)
         run.private = {"models": run.private["models"]}
@@ -279,6 +282,11 @@ def test_new_run_discovers_collected_news_without_preloading_and_uses_actual_sta
     settings = get_settings().model_copy(update={"data_dir": tmp_path})
     monkeypatch.setattr(execution, "get_settings", lambda: settings)
     monkeypatch.setattr(execution, "utcnow", lambda: started.replace(tzinfo=None))
+    if legacy_layout:
+        from zhigenews import workers
+
+        monkeypatch.setattr(workers, "get_settings", lambda: settings)
+        assert source["id"] in workers.migrate_news_indexes()["migratedSources"]
     before = {p.relative_to(tmp_path) for p in tmp_path.rglob("*") if p.is_file()}
     model = patch_model(monkeypatch, ScriptedModel(responses=[
         ai_call("list_dir", {"path": "/news"}, "discover-sources"),

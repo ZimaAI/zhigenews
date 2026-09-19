@@ -458,6 +458,9 @@ def fetch_source(
         raise ValueError("now must include a timezone")
     started = time.monotonic()
     state = _normalize_source(source)
+    from .upgrade import migrate_source_news
+
+    migrate_source_news(state, storage, now=now, before_publish=before_publish)
     previous = read_latest_snapshot(state, storage)
     if previous is None:
         # A new configuration (or pre-index installation) must obtain a full

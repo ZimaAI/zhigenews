@@ -7,9 +7,7 @@ from .settings import Settings, get_settings
 MAX_MODEL_CALLS = 20
 MAX_TOOL_CALLS = 40
 MAX_SECONDS = 180
-SUMMARY_TOKENS = 12000
-SUMMARY_MESSAGES = 30
-SUMMARY_RATIO = 0.7
+SUMMARY_RATIO = 0.9
 SUBAGENT_CONCURRENCY = 2
 TOOLS = (
     "list_dir",
@@ -36,8 +34,6 @@ def agent_config() -> dict:
         maxModelCalls=MAX_MODEL_CALLS,
         maxToolCalls=MAX_TOOL_CALLS,
         maxSeconds=MAX_SECONDS,
-        summaryTokens=SUMMARY_TOKENS,
-        summaryMessages=SUMMARY_MESSAGES,
         summaryRatio=SUMMARY_RATIO,
         subagentConcurrency=SUBAGENT_CONCURRENCY,
         tools=list(TOOLS),

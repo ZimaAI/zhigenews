@@ -21,7 +21,7 @@ from .contract import schema, validate
 from .db import Brief, Delivery, Outbox, Resource, Run, RunEvent, User, iso, transaction, uid, utcnow
 from .errors import AppError
 from .ingestion import fetch_source
-from .ingestion.service import IngestionError
+from .ingestion.service import SAFE_ID, IngestionError
 from .settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -224,6 +224,25 @@ def _source_input(row):
         }
     )
     return state
+
+
+def migrate_news_indexes():
+    """Offline upgrade preflight; finish before this worker consumes queued runs."""
+    from .ingestion.upgrade import migrate_source_news
+
+    storage = get_settings().data_dir
+    lock_dir = storage / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    with transaction() as session:
+        sources = [_source_input(row) for row in session.scalars(select(Resource).where(Resource.kind == "source"))]
+    migrated = []
+    for source in sources:
+        if not SAFE_ID.fullmatch(source["id"]):
+            raise ValueError("Invalid source ID")
+        with FileLock(lock_dir / ("source-" + source["id"] + ".lock"), timeout=SOURCE_LEASE_SECONDS):
+            if migrate_source_news(source, storage):
+                migrated.append(source["id"])
+    return {"migratedSources": migrated}
 
 
 def _source_dto(old, state):

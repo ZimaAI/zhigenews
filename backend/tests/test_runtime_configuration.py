@@ -57,6 +57,20 @@ def test_model_settings_load_from_env_file(tmp_path, model_settings):
     assert runtime_config.evaluation_judge(settings)["data"]["modelId"] == "synthetic-file-judge"
 
 
+def test_default_context_window_is_inherited_by_summary(model_settings):
+    settings = Settings(
+        _env_file=None,
+        openai_model="synthetic-main",
+        openai_api_key="synthetic-key",
+    )
+    snapshots = runtime_config.runtime_models(settings)
+    assert snapshots["modelId"]["data"]["contextWindow"] == 258000
+    assert snapshots["summaryModelId"]["data"]["contextWindow"] == 258000
+    config = runtime_config.agent_config()
+    assert config["summaryRatio"] == 0.9
+    assert "summaryTokens" not in config and "summaryMessages" not in config
+
+
 def test_summary_inherits_main_and_snapshots_encrypt_credentials(model_settings):
     model_settings.openai_model = " synthetic-main "
     model_settings.openai_base_url = " https://fixture.invalid/v1 "

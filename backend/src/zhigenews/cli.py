@@ -65,10 +65,14 @@ def initialize():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["init", "environment", "collect", "tick"])
+    parser.add_argument("command", choices=["init", "environment", "collect", "tick", "migrate-news"])
     args = parser.parse_args()
     if args.command == "init":
         initialize()
+    elif args.command == "migrate-news":
+        from .workers import migrate_news_indexes
+
+        print(json.dumps(migrate_news_indexes()))
     elif args.command == "environment":
         s = get_settings()
         print(

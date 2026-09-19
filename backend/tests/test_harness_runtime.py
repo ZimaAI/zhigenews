@@ -18,7 +18,7 @@ from pydantic import Field
 from zhigenews.harness import HarnessRequest, HarnessRunner
 from zhigenews.harness.errors import HarnessError
 from zhigenews.harness.messages import repair_messages
-from zhigenews.harness.middleware import NewsSummarizationMiddleware, SummaryContextMiddleware
+from zhigenews.harness.middleware import NewsSummarizationMiddleware, SummaryContextMiddleware, token_count
 from zhigenews.harness.runtime import Budget
 
 
@@ -171,6 +171,82 @@ def test_repair_order_missing_orphans_duplicates_and_idempotency():
         repair_messages([ai, ai.model_copy(update={"id": "another"})])
 
 
+def test_large_recent_parallel_news_reads_are_compacted_before_context_limit(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "index.json").write_text(
+        "\n".join(f'{i}: 新闻目录索引证据来源发布时间' * 3 for i in range(200)), encoding="utf-8"
+    )
+    model = ScriptedModel(responses=[
+        AIMessage(content="", tool_calls=[
+            {"id": f"index-{i}", "name": "read_file", "args": {"path": "/news/source/index.json"}}
+            for i in range(3)
+        ]),
+        ai_call("read_file", {"path": "/news/source/index.json", "start_line": 50}, "more-news"),
+        ai_call("BriefOutput", {"title": "Synthetic compacted brief", "items": [{
+            "evidence_id": "n1", "summary": "Synthetic news summary", "reason": "Matches AI", "topic": "AI",
+        }]}, "final"),
+    ])
+    summary = ScriptedModel(responses=[AIMessage(content="Synthetic index inspected; evidence_id=n1 matches AI.")])
+    events = []
+    request = HarnessRequest(
+        "u", "r", "t", {"topics": ["AI"]},
+        {"tools": ["read_file"], "contextWindow": 32768, "outputReserve": 8192,
+         "summaryContextWindow": 32768, "summaryOutputReserve": 8192},
+        tmp_path / "rss", tmp_path / "run", model, summary_model=summary,
+        news_roots={"source": source}, fixed_at="2026-09-19T00:00:00Z",
+        evidence=[{"id": "n1", "title": "Synthetic AI news", "source": "Synthetic",
+                   "url": "https://example.test/news", "published_at": "2026-09-18T23:00:00Z",
+                   "fetched_at": "2026-09-19T00:00:00Z", "snapshot_id": "synthetic"}],
+    )
+    result = HarnessRunner(checkpointer=InMemorySaver()).run(request, event_sink=events.append)
+    assert result.title == "Synthetic compacted brief"
+    assert result.items[0]["id"] == "n1"
+    assert summary.position > 0
+    journal_ids = {event["messageId"] for event in events if event["type"] == "message_recorded"}
+    assert set(result.state["summary_covered_ids"]) <= journal_ids
+    original = next(m for m in model.received[0] if isinstance(m, HumanMessage))
+    assert all(any(m.content == original.content for m in messages) for messages in model.received)
+    for messages in model.received:
+        repaired, audit = repair_messages(messages)
+        assert not audit and repaired == messages
+
+
+def test_token_pressure_compacts_complete_groups_and_keeps_small_recent_result():
+    middleware = NewsSummarizationMiddleware(
+        ScriptedModel(responses=[]), context_window=2200,
+    )
+    user = HumanMessage(content="Exact user preference", id="user")
+    large = ai_call("read_file", {}, "large")
+    recent = ai_call("list_dir", {}, "recent")
+    state = {"messages": [user, large, ToolMessage(content="news " * 3000, tool_call_id="large"),
+                          recent, ToolMessage(content="small directory listing", tool_call_id="recent")]}
+    runtime = SimpleNamespace(context=SimpleNamespace(config={}))
+    old, keep, groups = middleware._plan(state, runtime)
+    assert old == state["messages"][1:3]
+    assert keep == [user, *state["messages"][3:]]
+    assert groups == [old]
+
+
+def test_oversized_user_prompt_is_not_summarized_or_silently_truncated():
+    from langchain.agents.middleware.types import ModelRequest
+
+    from zhigenews.harness.middleware import RuntimeMiddleware
+
+    model = ScriptedModel(responses=[])
+    middleware = NewsSummarizationMiddleware(model, context_window=1000)
+    user = HumanMessage(content="Exact user preference " * 1000, id="user")
+    state = {"messages": [user]}
+    context = SimpleNamespace(config={"contextWindow": 1000, "outputReserve": 256})
+    runtime = SimpleNamespace(context=context)
+    assert middleware._plan(state, runtime) is None
+    request = ModelRequest(model=model, messages=[user], tools=[], state=state, runtime=runtime)
+    with pytest.raises(HarnessError) as exc:
+        RuntimeMiddleware()._before(request)
+    assert exc.value.code == "CONTEXT_BUDGET"
+    assert state["messages"] == [user] and model.position == 0
+
+
 def test_summary_keeps_user_merges_old_and_renders_separately():
     model = ScriptedModel(
         responses=[
@@ -180,7 +256,7 @@ def test_summary_keeps_user_merges_old_and_renders_separately():
             )
         ]
     )
-    middleware = NewsSummarizationMiddleware(model, messages=4, keep=2)
+    middleware = NewsSummarizationMiddleware(model, ratio=0.001, keep=2)
     original = HumanMessage(content="Latest exact user prompt", id="latest")
     messages = [HumanMessage(content="old", id="old"), AIMessage(content="answer", id="a1"), original]
     messages += [AIMessage(content=str(i), id=f"a{i + 2}") for i in range(6)]
@@ -216,31 +292,49 @@ def test_summary_keeps_user_merges_old_and_renders_separately():
     assert SummaryContextMiddleware()._render(without_summary) is without_summary
 
 
-@pytest.mark.parametrize("kind", ["tokens", "ratio"])
-def test_summary_all_trigger_modes(kind):
+@pytest.mark.parametrize("offset", [-1, 0, 1])
+def test_summary_triggers_at_ninety_percent(offset):
     model = ScriptedModel(responses=[AIMessage(content="summary")])
+    state = {
+        "messages": [
+            HumanMessage(content="hello", id="u"),
+            AIMessage(content="long old message", id="a"),
+            AIMessage(content="latest", id="b"),
+        ],
+        "summary": "previous summary",
+    }
+    context = SimpleNamespace(
+        config={"systemPrompt": "Synthetic system prompt"},
+        budget=Budget(), cancelled=lambda: False, emit=lambda *a, **k: None,
+    )
+    counted = (
+        token_count(state["messages"])
+        + token_count(state["summary"])
+        + token_count(context.config["systemPrompt"])
+    )
     middleware = NewsSummarizationMiddleware(
         model,
-        messages=1000,
-        tokens=1 if kind == "tokens" else 999999,
-        ratio=0.01 if kind == "ratio" else 1,
-        context_window=500,
+        fixed_overhead=232200 + offset - counted,
         keep=1,
     )
-    context = SimpleNamespace(
-        config={}, budget=Budget(), cancelled=lambda: False, emit=lambda *a, **k: None
-    )
-    update = middleware.before_model(
-        {
-            "messages": [
-                HumanMessage(content="hello", id="u"),
-                AIMessage(content="long old message", id="a"),
-                AIMessage(content="latest", id="b"),
-            ]
-        },
-        SimpleNamespace(context=context),
-    )
-    assert update and update["summary"] == "summary"
+    update = middleware.before_model(state, SimpleNamespace(context=context))
+    if offset < 0:
+        assert update is None and model.position == 0
+    else:
+        assert update and update["summary"] == "summary"
+        assert model.position == 1
+
+
+def test_summary_does_not_trigger_at_old_token_or_message_thresholds():
+    model = ScriptedModel(responses=[])
+    messages = [HumanMessage(content="Keep my request verbatim", id="u")]
+    messages += [AIMessage(content="news " * 400, id=f"a{i}") for i in range(40)]
+    assert len(messages) > 30
+    assert 12000 < token_count(messages) < 232200
+    middleware = NewsSummarizationMiddleware(model)
+    runtime = SimpleNamespace(context=SimpleNamespace(config={}))
+    assert middleware.before_model({"messages": messages}, runtime) is None
+    assert model.position == 0
 
 
 def test_create_agent_repeated_tool_loop_and_budget(tmp_path):

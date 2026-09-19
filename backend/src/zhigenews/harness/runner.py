@@ -214,7 +214,7 @@ class HarnessRunner:
             request.rss_root, workspace, actor=request.thread_id, news_roots=request.news_roots
         )
         config = copy.deepcopy(request.config)
-        context_window = config.get("contextWindow", 32768)
+        context_window = config.get("contextWindow", 258000)
         fixed_at = request.fixed_at or datetime.now(timezone.utc)
         if isinstance(fixed_at, str):
             fixed_at = datetime.fromisoformat(fixed_at.replace("Z", "+00:00"))
@@ -452,9 +452,7 @@ class HarnessRunner:
             MessageRepairMiddleware(),
             NewsSummarizationMiddleware(
                 request.summary_model or request.model,
-                messages=config.get("summaryMessages", 30),
-                tokens=config.get("summaryTokens", 12000),
-                ratio=config.get("summaryRatio", 0.7),
+                ratio=config.get("summaryRatio", 0.9),
                 context_window=context_window,
                 summary_window=config.get("summaryContextWindow", context_window),
                 output_reserve=config.get("summaryOutputReserve", 2048),

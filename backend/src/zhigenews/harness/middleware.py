@@ -54,22 +54,19 @@ class NewsSummarizationMiddleware(SummarizationMiddleware):
         self,
         model,
         *,
-        messages: int = 30,
-        tokens: int = 12000,
-        ratio: float = 0.7,
-        context_window: int = 32768,
-        summary_window: int = 32768,
+        ratio: float = 0.9,
+        context_window: int = 258000,
+        summary_window: int = 258000,
         keep: int = 8,
         fixed_overhead: int = 0,
         output_reserve: int = 2048,
     ):
         super().__init__(
             model=model,
-            trigger=("messages", messages),
             keep=("messages", keep),
             trim_tokens_to_summarize=None,
         )
-        self.message_threshold, self.token_threshold, self.ratio = messages, tokens, ratio
+        self.ratio = ratio
         self.context_window, self.summary_window, self.keep_count = context_window, summary_window, keep
         self.fixed_overhead = fixed_overhead
         self.output_reserve = output_reserve
@@ -83,11 +80,7 @@ class NewsSummarizationMiddleware(SummarizationMiddleware):
             + token_count(state.get("summary", ""))
             + token_count(context.config.get("systemPrompt", ""))
         )
-        if (
-            len(messages) < self.message_threshold
-            and total < self.token_threshold
-            and total < self.context_window * self.ratio
-        ):
+        if total < self.context_window * self.ratio:
             return None
         latest = next(
             (
@@ -102,10 +95,23 @@ class NewsSummarizationMiddleware(SummarizationMiddleware):
         # Never cut inside an AI + Tool group.
         while cutoff > 0 and cutoff < len(messages) and isinstance(messages[cutoff], ToolMessage):
             cutoff -= 1
+
+        def retained(start):
+            return ([messages[latest]] if latest is not None and latest < start else []) + messages[start:]
+
+        # keep_count is a preference, not a capacity guarantee: a handful of
+        # parallel file results can fill the window. Compact additional complete
+        # AI/tool groups until the retained view fits the configured token target.
+        target = self.context_window * self.ratio
+        overhead = total - token_count(messages)
+        while cutoff < len(messages) and overhead + token_count(retained(cutoff)) > target:
+            cutoff += 1
+            while cutoff < len(messages) and isinstance(messages[cutoff], ToolMessage):
+                cutoff += 1
         old = [m for i, m in enumerate(messages[:cutoff]) if i != latest]
         if not old:
             return None
-        keep = ([messages[latest]] if latest is not None and latest < cutoff else []) + messages[cutoff:]
+        keep = retained(cutoff)
         groups, group = [], []
         for message in old:
             if not isinstance(message, ToolMessage) and group:
@@ -277,7 +283,7 @@ class RuntimeMiddleware(AgentMiddleware):
 
     def _before(self, request):
         context = request.runtime.context
-        window = context.config.get("contextWindow", 32768)
+        window = context.config.get("contextWindow", 258000)
         reserve = context.config.get("outputReserve", 2048)
         count = request_tokens(request)
         if count + reserve + max(256, count // 10) > window:

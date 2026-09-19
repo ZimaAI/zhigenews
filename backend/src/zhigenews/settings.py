@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = ""
     openai_api_key: str = ""
-    openai_context_window: int = Field(default=32768, ge=1024)
+    openai_context_window: int = Field(default=258000, ge=1024)
     openai_thinking_enabled: bool = False
     summary_openai_base_url: str = ""
     summary_openai_model: str = ""

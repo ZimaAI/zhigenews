@@ -44,6 +44,8 @@ uv run --project backend uvicorn zhigenews.gateway:app --host 127.0.0.1 --port 1
 
 本机 API 与容器 worker/beat 共用上述 MySQL 和 Redis。生成请求由 API 入库，beat 将持久任务投递到队列，worker 执行生成与发布；仅启动 API 无法完成简报。运行文件由 Linux worker 写入 `zhigenews_runtime` 卷，供 Docker 沙箱使用。修改后端代码后重新构建镜像并启动 worker/beat，确保执行器使用新代码。
 
+来源新闻索引升级：容器 worker 启动前自动运行 `python -m zhigenews.cli migrate-news`，将匹配当前来源配置的旧快照复制到新目录并建立索引，保留原文件和证据 ID，无需等待下一次联网采集。独立启动 worker 时，先使用同一 `DATA_DIR` 执行该命令；重复执行不会重复迁移。
+
 ## VS Code 启动与断点调试
 
 用 VS Code 打开仓库根目录，安装工作区推荐的 Python、Python Debugger、Vue - Official 扩展，并准备 Node.js 22.12+、Python 3.12、uv 与 Microsoft Edge。先启动 Docker Desktop 的 Linux engine，后端准备任务需要 MySQL/Redis。
@@ -79,7 +81,7 @@ docker compose --profile app up -d api worker beat
 
 Agent 预算、工具、摘要阈值、子任务并发和系统提示词集中在 [runtime_config.py](backend/src/zhigenews/runtime_config.py) 的常量中维护。运行与评估自动使用当前部署配置，并保存私有快照；已有数据库模型和 Agent 配置不再影响新任务，历史运行仍可查询。API key 在任务快照中加密，不通过公开接口返回。修改 `.env` 后重启本机 API，并重新创建容器 worker/beat；修改代码常量后重新构建镜像并重启 API、worker、beat。
 
-`OPENAI_THINKING_ENABLED` 控制主模型深度思考，默认关闭；`OPENAI_CONTEXT_WINDOW` 设置上下文窗口。摘要和评估模型可用对应前缀单独配置。深度思考会消耗额外时间与输出 Token，运行时间上限在 Agent 常量中调整。用户只看公开进度，完整事件/SSE只对管理员开放。`submitted`只表示站内发布，不表示已读。
+`OPENAI_THINKING_ENABLED` 控制主模型深度思考，默认关闭；`OPENAI_CONTEXT_WINDOW` 设置上下文窗口，默认 258000 token。摘要仅在估算上下文预算达到窗口的 90% 时触发，不设固定 token 或消息条数阈值；预算包含消息、已有摘要、系统提示词、工具等开销与输出预留。摘要和评估模型可用对应前缀单独配置。深度思考会消耗额外时间与输出 Token，运行时间上限在 Agent 常量中调整。用户只看公开进度，完整事件/SSE只对管理员开放。`submitted`只表示站内发布，不表示已读。
 
 当前代码已适配 `deepseek-v4-flash`、`deepseek-v4-pro`、`deepseek-flash`、`MiniMax-M3`，以及 `gpt-5.1`、`gpt-5.2`、`gpt-5.4`、`gpt-5.5` 和对应日期快照。MiniMax 使用其 API 的 adaptive/disabled 模式，GPT 使用 medium/none；未适配的模型开启时会返回明确的配置错误。参见 [MiniMax 接口说明](https://platform.minimax.io/docs/api-reference/text-openai-api)。
 

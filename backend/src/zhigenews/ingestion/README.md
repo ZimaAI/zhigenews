@@ -52,10 +52,17 @@ selected citations using `resolve_source_evidence(source, storage, evidence_id)`
 That resolver reads the identified immutable manifest and article, so a
 citation remains resolvable when its index entry expires or is superseded.
 
-Existing installations acquire the new configuration directory and index on
-their next collection attempt. If this directory lacks a valid snapshot,
-stored conditional HTTP validators are cleared to obtain a complete feed.
-Agent startup never creates an index or presents old storage as ready.
+Existing installations migrate matching legacy snapshots locally with
+`python -m zhigenews.cli migrate-news`. The Compose worker runs this preflight
+before consuming tasks; standalone workers must run it against their data
+directory before startup. Collection also migrates its source before using
+conditional HTTP validators. Migration preserves original files and evidence
+IDs, copies the latest snapshot and snapshots containing recent news into the
+configuration directory, and builds the 24-hour index without external HTTP.
+It uses the collection lock, keeps newer indexes/snapshots, and can be rerun.
+Only matching source IDs, kinds and normalized request URLs are imported.
+If no matching snapshot exists, stored validators are cleared to obtain a
+complete feed. Agent startup never builds a news index.
 
 Normalized evidence includes `id`, `evidence_id`, `external_id`, `source_id`,
 `source`, `source_type`, `title`, `url`, `summary`, `content`, `published_at`,

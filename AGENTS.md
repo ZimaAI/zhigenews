@@ -13,3 +13,15 @@ If a `.codegraph/` directory exists at the repository root, use CodeGraph before
 ## 当前产品流程
 
 当前版本和阶段以 `.project-flow/project.json`、目标版本 state 与 resume 输出为准。原型位于 `docs/releases/v1.0.0/draft/prototype/`，与正式应用实现隔离。
+
+## Agent skills
+
+### Issue tracker
+
+使用本地 Markdown 管理任务，存放于 `.scratch/<feature-slug>/`。
+详见 `docs/agents/issue-tracker.md`。
+
+### Domain docs
+
+采用 single-context 布局：根目录 `CONTEXT.md` 与 `docs/adr/`。
+详见 `docs/agents/domain.md`。

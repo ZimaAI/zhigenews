@@ -10,7 +10,6 @@
 - `load()` 保留全局加载/失败场景。`savePreferences(Preferences)` 只接受version/role/topics/keywords，至少话题或关键词非空，背景最多500字、关键词20个且单项40字；保存后完成首次引导。`saveDelivery(DeliverySettings)` 只接受HH:mm时间，Asia/Shanghai每日站内发布。
 - `generateBrief()` 创建公开生成并返回其ID，轮询更新 `state.generation: GenerationProgress | null`；完成后按保存的偏好快照生成模拟简报。`cancelGeneration()` 是服务能力；用户无运行详情页。
 - `login(email,password)`、`logout()` 仅供管理员演示登录；用户页面不调用，原用户register和markRead已删除。
-- `deleteMemory(id)` 为原型内部保留能力，不在用户设置展示。
 
 `GenerationProgress`只有id/status/percent/remainingSeconds/updatedAt/briefId/error；模型、工具和事件不进入用户投影。新闻已删除read；共享内部Brief仍有runId/preferenceSnapshot，按管理AdminBrief校验，公开HTTP必须剔除这两项。用户组件不能读取内部运行字段。
 

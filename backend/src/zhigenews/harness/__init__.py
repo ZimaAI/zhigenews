@@ -1,5 +1,5 @@
 from .errors import HarnessError, RunCancelled
-from .persistence import UserMemory, mysql_persistence
+from .persistence import mysql_persistence
 from .runner import HarnessRequest, HarnessResult, HarnessRunner
 
 __all__ = [
@@ -8,6 +8,5 @@ __all__ = [
     "HarnessRunner",
     "HarnessError",
     "RunCancelled",
-    "UserMemory",
     "mysql_persistence",
 ]

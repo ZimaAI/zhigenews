@@ -8,7 +8,18 @@ from sqlalchemy import select
 
 from zhigenews.application import CN, next_slot
 from zhigenews.contract import CONTRACT, schema, validate
-from zhigenews.db import Brief, Delivery, Resource, Run, SessionToken, User, iso, transaction, utcnow
+from zhigenews.db import (
+    Brief,
+    Delivery,
+    PreferenceRevision,
+    Resource,
+    Run,
+    SessionToken,
+    User,
+    iso,
+    transaction,
+    utcnow,
+)
 from zhigenews.security import decrypt, digest, encrypt, locked_bucket, policy
 from zhigenews.settings import Settings
 
@@ -108,6 +119,13 @@ def test_preferences_validation_atomic_onboarding_and_cas(api_sandbox):
     assert client.get(BASE + "/auth/session").json()["onboardingCompleted"] is True
     assert preferences(client, version=0, topics=["stale"]).status_code == 409
     assert client.get(BASE + "/me/preferences").json() == saved
+    user_id = client.get(BASE + "/auth/session").json()["userId"]
+    with transaction() as session:
+        revision = session.scalar(select(PreferenceRevision).where(PreferenceRevision.user_id == user_id))
+        assert revision.version == 1 and revision.data == saved
+        assert session.scalar(
+            select(Resource).where(Resource.kind == "memory", Resource.owner_id == user_id)
+        ) is None
 
 
 def test_two_simultaneous_preference_writes_have_one_winner(api_sandbox):
@@ -126,6 +144,13 @@ def test_delivery_settings_accept_only_time_and_do_not_generate(api_sandbox):
     assert client.put(BASE + "/me/delivery-settings", json={"time": "24:00"}).status_code == 400
     assert client.put(BASE + "/me/delivery-settings", json={"time": "09:00", "timezone": "UTC"}).status_code == 400
     assert client.get(BASE + "/me/generations/current").json() is None
+
+
+def test_long_term_memory_endpoints_are_removed(api_sandbox):
+    client = api_sandbox.anonymous()
+    assert client.get(BASE + "/me/memories").status_code == 404
+    assert client.delete(BASE + "/me/memories/legacy-memory").status_code == 404
+    assert not any(path.startswith("/me/memories") for path in CONTRACT["paths"])
 
 
 def test_model_and_agent_configuration_endpoints_are_removed(api_sandbox):
@@ -360,12 +385,11 @@ def test_expired_cookie_creates_new_identity_but_never_recovers_another_users_da
     assert client.get(BASE + "/me/preferences").json()["version"] == 0
 
 
-def test_brief_memory_and_delivery_enforce_owner_before_actions(api_sandbox):
+def test_brief_and_delivery_enforce_owner_before_actions(api_sandbox):
     owner = api_sandbox.anonymous()
     other = api_sandbox.anonymous()
     user_id = owner.get(BASE + "/auth/session").json()["userId"]
     run_id, brief_id, delivery_id = (api_sandbox.prefix + suffix for suffix in ("_run", "_brief", "_delivery"))
-    memory_id = api_sandbox.resource(api_sandbox.prefix + "_memory")
     timestamp = iso(utcnow())
     brief_data = dict(id=brief_id, title="Synthetic owner-only brief", date="2026-09-19", version=1, summary="Synthetic fixture", items=[], generationStatus="completed", deliveryStatus="submitted", generatedAt=timestamp, missingSources=[])
     with transaction() as session:
@@ -374,13 +398,10 @@ def test_brief_memory_and_delivery_enforce_owner_before_actions(api_sandbox):
         session.add(Brief(id=brief_id, user_id=user_id, run_id=run_id, date="2026-09-19", version=1, data=brief_data, published=True))
         session.flush()
         session.add(Delivery(id=delivery_id, user_id=user_id, brief_id=brief_id, status="submitted", attempts=1))
-        session.add(Resource(id=memory_id, kind="memory", owner_id=user_id, data=dict(id=memory_id, text="Synthetic user fact", source="explicit-user", updatedAt=timestamp)))
     assert_dto(owner.get(BASE + f"/me/briefs/{brief_id}"), "Brief")
     assert other.get(BASE + f"/me/briefs/{brief_id}").status_code == 404
-    assert other.delete(BASE + f"/me/memories/{memory_id}").status_code == 404
     assert other.post(BASE + f"/me/deliveries/{delivery_id}/retry", headers={"Idempotency-Key": api_sandbox.prefix + "-retry"}).status_code == 404
     with transaction() as session:
-        assert session.get(Resource, memory_id) is not None
         assert session.get(Delivery, delivery_id).attempts == 1
 
 
@@ -413,7 +434,7 @@ def test_read_endpoints_return_contract_pagination_and_no_private_keys(api_sandb
     client = api_sandbox.anonymous()
     admin = api_sandbox.admin()
     for path, schema_name in [
-        ("/me/briefs", "BriefPage"), ("/me/memories", "MemoryPage"), ("/me/deliveries", "DeliveryPage"),
+        ("/me/briefs", "BriefPage"), ("/me/deliveries", "DeliveryPage"),
     ]:
         payload = assert_dto(client.get(BASE + path), schema_name)
         assert payload["items"] == []

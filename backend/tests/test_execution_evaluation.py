@@ -18,7 +18,7 @@ from zhigenews import execution
 from zhigenews.contract import schema, validate
 from zhigenews.db import Brief, Delivery, MessageJournal, Outbox, Resource, Run, iso, transaction, utcnow
 from zhigenews.evaluation import freeze_dataset
-from zhigenews.harness import UserMemory, mysql_persistence
+from zhigenews.harness import mysql_persistence
 from zhigenews.security import encrypt
 from zhigenews.settings import get_settings
 
@@ -159,10 +159,8 @@ def evaluation_case():
     try:
         yield fixture
     finally:
-        with mysql_persistence(settings.database_url) as (saver, store):
+        with mysql_persistence(settings.database_url) as saver:
             saver.delete_thread(fixture.thread_key)
-            for item in UserMemory(store, user_namespace).list():
-                UserMemory(store, user_namespace).delete(item["id"])
         with transaction() as session:
             session.execute(delete(Outbox).where(Outbox.target_id == evaluation_id))
             session.execute(delete(MessageJournal).where(MessageJournal.thread_id == case_run_id))
@@ -251,7 +249,7 @@ def test_evaluation_executes_frozen_case_with_real_agent_and_persists_unknown_ju
     assert actual_evidence == case.frozen["sources"][case.snapshot_id]
     artifact = json.loads((case.workspace / "output" / "brief.json").read_text("utf-8"))
     assert artifact["items"][0]["snapshotId"] == case.snapshot_id
-    with mysql_persistence(get_settings().database_url) as (saver, _):
+    with mysql_persistence(get_settings().database_url) as saver:
         checkpoint = saver.get_tuple({"configurable": {"thread_id": case.thread_key}})
         assert checkpoint is not None
         assert checkpoint.checkpoint["channel_values"]["messages"]

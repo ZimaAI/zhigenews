@@ -87,7 +87,6 @@ class RunContext:
     event_sink: Callable[[dict], None]
     cancelled: Callable[[], bool]
     evidence: dict
-    memory: list[dict] = field(default_factory=list)
     depth: int = 0
     child_semaphore: Any = None
     subtasks: list[dict] = field(default_factory=list)

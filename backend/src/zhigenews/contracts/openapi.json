@@ -258,116 +258,6 @@
         }
       }
     },
-    "/me/memories": {
-      "get": {
-        "operationId": "listMemories",
-        "tags": [
-          "User"
-        ],
-        "summary": "列出本人长期记忆",
-        "x-required-role": "authenticated",
-        "parameters": [
-          {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MemoryPage"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthenticated"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/me/memories/{id}": {
-      "delete": {
-        "operationId": "deleteMemory",
-        "tags": [
-          "User"
-        ],
-        "summary": "删除本人记忆",
-        "x-required-role": "authenticated",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 120
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "成功"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthenticated"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
     "/me/briefs": {
       "get": {
         "operationId": "listBriefs",
@@ -3390,33 +3280,6 @@
           }
         }
       },
-      "Memory": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "id",
-          "text",
-          "source",
-          "updatedAt"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120
-          },
-          "text": {
-            "type": "string"
-          },
-          "source": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
       "Session": {
         "type": "object",
         "additionalProperties": false,
@@ -3701,28 +3564,6 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AgentRun"
-            }
-          },
-          "nextCursor": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      },
-      "MemoryPage": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "items",
-          "nextCursor"
-        ],
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Memory"
             }
           },
           "nextCursor": {

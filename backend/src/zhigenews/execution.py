@@ -24,7 +24,7 @@ from .db import (
     utcnow,
 )
 from .evaluation import evaluate_record
-from .harness import HarnessRequest, HarnessRunner, RunCancelled, UserMemory, mysql_persistence
+from .harness import HarnessRequest, HarnessRunner, RunCancelled, mysql_persistence
 from .models import build_model
 from .security import canonical, decrypt, redact
 from .settings import get_settings
@@ -201,28 +201,6 @@ def materialize_inputs(workspace, rss, evidence, preferences):
             file.write_text(content, encoding="utf-8")
 
 
-def sync_memory(user_id):
-    with transaction() as session:
-        data = [
-            r.data
-            for r in session.scalars(
-                select(Resource).where(Resource.kind == "memory", Resource.owner_id == user_id)
-            )
-        ]
-    with mysql_persistence(get_settings().database_url) as (_, store):
-        memory = UserMemory(store, user_id)
-        current = {m["id"] for m in data}
-        for old in memory.iter_all():
-            if old["id"] not in current:
-                memory.delete(old["id"])
-        for item in data:
-            memory.put(
-                item["id"],
-                {"text": item["text"]},
-                source="published_brief" if item["source"] == "published_brief" else "explicit_preference",
-            )
-
-
 def execute_run(run_id):
     token = uid("lease_")
     with transaction() as session:
@@ -290,9 +268,8 @@ def execute_run(run_id):
                 sandbox_image=get_settings().sandbox_image,
                 fixed_at=private["fixedAt"],
             )
-            sync_memory(user_id)
             # Only resume when a durable graph checkpoint actually exists.
-            with mysql_persistence(get_settings().database_url) as (saver, _):
+            with mysql_persistence(get_settings().database_url) as saver:
                 resume = (
                     resume
                     and saver.get_tuple({"configurable": {"thread_id": user_id + ":" + run_id}}) is not None

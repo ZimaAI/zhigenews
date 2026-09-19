@@ -92,7 +92,6 @@ def test_summary_keeps_user_merges_old_and_renders_separately():
     messages += [AIMessage(content=str(i), id=f"a{i + 2}") for i in range(6)]
     events = []
     context = SimpleNamespace(
-        memory=[],
         config={},
         budget=Budget(),
         cancelled=lambda: False,
@@ -115,8 +114,12 @@ def test_summary_keeps_user_merges_old_and_renders_separately():
         runtime=SimpleNamespace(context=context),
     )
     rendered = SummaryContextMiddleware()._render(request)
-    assert "merged old and new" in str(rendered.messages[0])
+    assert json.loads(rendered.messages[0].content.split("\n", 1)[1]) == {
+        "summary": "merged old and new"
+    }
     assert len(request.messages) == len(after)
+    without_summary = request.override(state={**state, "summary": ""})
+    assert SummaryContextMiddleware()._render(without_summary) is without_summary
 
 
 @pytest.mark.parametrize("kind", ["tokens", "ratio"])
@@ -131,7 +134,7 @@ def test_summary_all_trigger_modes(kind):
         keep=1,
     )
     context = SimpleNamespace(
-        memory=[], config={}, budget=Budget(), cancelled=lambda: False, emit=lambda *a, **k: None
+        config={}, budget=Budget(), cancelled=lambda: False, emit=lambda *a, **k: None
     )
     update = middleware.before_model(
         {
@@ -424,7 +427,7 @@ def test_create_agent_mysql_cancel_resume_without_repeating_completed_model(tmp_
         )
         == 1
     )
-    with mysql_persistence(url) as (saver, _):
+    with mysql_persistence(url) as saver:
         saver.delete_thread("test-user:" + thread)
 
 

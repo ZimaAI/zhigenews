@@ -34,7 +34,7 @@ from zhigenews.db import (
     transaction,
     utcnow,
 )
-from zhigenews.harness import UserMemory, mysql_persistence
+from zhigenews.harness import mysql_persistence
 from zhigenews.models import tool_model_options
 from zhigenews.security import encrypt
 from zhigenews.settings import get_settings
@@ -153,10 +153,8 @@ def execution_case():
     try:
         yield case
     finally:
-        with mysql_persistence(settings.database_url) as (saver, store):
+        with mysql_persistence(settings.database_url) as saver:
             saver.delete_thread(user_id + ":" + run_id)
-            for item in UserMemory(store, user_id).list():
-                UserMemory(store, user_id).delete(item["id"])
         with transaction() as session:
             delivery_ids = list(session.scalars(select(Delivery.id).where(Delivery.user_id == user_id)))
             session.execute(delete(Outbox).where(Outbox.target_id.in_([run_id, *delivery_ids])))

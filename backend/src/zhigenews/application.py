@@ -278,14 +278,6 @@ class Application:
         if not self.user.onboarding:
             self.user.next_run_at = next_slot(self.user.delivery_time)
         self.user.onboarding = True
-        # Explicitly supplied preferences are trusted memory; online text never enters here.
-        ident = "pref_" + self.user.id
-        row = self.db.get(Resource, ident)
-        data = dict(id=ident, text=canonical(body), source="explicit_preferences", updatedAt=iso(utcnow()))
-        if row:
-            row.data = data
-        else:
-            self.db.add(Resource(id=ident, kind="memory", owner_id=self.user.id, data=data))
         return body
 
     def getDeliverySettings(self):
@@ -296,25 +288,6 @@ class Application:
         if self.user.onboarding:
             self.user.next_run_at = next_slot(self.user.delivery_time)
         return self.getDeliverySettings()
-
-    def listMemories(self):
-        return paginated(
-            [
-                r.data
-                for r in self.db.scalars(
-                    select(Resource)
-                    .where(Resource.kind == "memory", Resource.owner_id == self.user.id)
-                    .order_by(Resource.created_at.desc())
-                )
-            ],
-            self.params,
-        )
-
-    def deleteMemory(self):
-        row = resource(self.db, self.ident, "memory", True)
-        if row.owner_id != self.user.id:
-            raise AppError("NOT_FOUND", "记录不存在", 404)
-        self.db.delete(row)
 
     def generateBrief(self):
         key = digest(self.user.id + ":" + self.request.headers["idempotency-key"])

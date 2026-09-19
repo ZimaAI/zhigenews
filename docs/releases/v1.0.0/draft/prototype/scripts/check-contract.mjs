@@ -75,7 +75,7 @@ validate('Preferences', seed.preferences, 'seed.preferences');
 validate('DeliverySettings', seed.delivery, 'seed.delivery');
 // Brief is still the prototype's internal aggregate; HTTP readers receive its public projection.
 // Legacy seed.users is private demonstration data, no longer a public user DTO.
-for (const [collection, name] of Object.entries({ briefs: 'AdminBrief', runs: 'AgentRun', sources: 'Source', models: 'ModelConfig', configs: 'AgentConfig', evaluations: 'Evaluation', evalCases: 'EvalCase', deliveries: 'Delivery', memories: 'Memory' })) {
+for (const [collection, name] of Object.entries({ briefs: 'AdminBrief', runs: 'AgentRun', sources: 'Source', models: 'ModelConfig', configs: 'AgentConfig', evaluations: 'Evaluation', evalCases: 'EvalCase', deliveries: 'Delivery' })) {
   for (const row of seed[collection]) validate(name, row, `seed.${collection}.${row.id}`);
 }
 for (const brief of seed.briefs) {

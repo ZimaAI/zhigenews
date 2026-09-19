@@ -54,7 +54,7 @@ export function setScenario(scenario: Scenario) {
   state.preferences = preferences; state.onboardingCompleted = onboardingCompleted;
   if (scenario === 'loading') { state.loaded = false; schedule(() => state.loaded = true, 1800); }
   if (scenario === 'empty') {
-    state.briefs = []; state.runs = []; state.sources = []; state.models = []; state.configs = []; state.evaluations = []; state.evalCases = []; state.users = []; state.deliveries = []; state.memories = [];
+    state.briefs = []; state.runs = []; state.sources = []; state.models = []; state.configs = []; state.evaluations = []; state.evalCases = []; state.users = []; state.deliveries = [];
   }
   if (scenario === 'partial') { state.briefs[0]!.generationStatus = 'partial'; state.runs[0]!.status = 'partial'; }
   notify(`已切换为${{ normal: '正常', loading: '加载', empty: '空内容', error: '请求失败', partial: '部分完成', unauthorized: '无权限' }[scenario]}示例。`);
@@ -158,7 +158,6 @@ export const api = {
     state.delivery = { time: value.time };
     notify('推送时间已保存。');
   },
-  async deleteMemory(key: string) { await guard(); state.memories = state.memories.filter(x => x.id !== key); notify('这条示例记忆已清理。'); },
   async generateBrief() {
     await guard();
     if (!state.preferences.topics.length && !state.preferences.keywords.length) throw new Error('请先设置关注话题或关键词。');

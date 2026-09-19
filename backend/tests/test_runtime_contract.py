@@ -48,7 +48,7 @@ class ContractProbe:
         return response
 
 
-def test_all_frozen_operations_return_their_real_http_contract(api_sandbox, monkeypatch):
+def test_all_active_operations_return_their_real_http_contract(api_sandbox, monkeypatch):
     probe = ContractProbe(api_sandbox)
     config = verified_config(api_sandbox, monkeypatch)
     user, admin = api_sandbox.anonymous(), api_sandbox.admin()
@@ -60,9 +60,6 @@ def test_all_frozen_operations_return_their_real_http_contract(api_sandbox, monk
     probe.call("savePreferences", user, body={"version": 0, "role": "Synthetic reader", "topics": ["Agent"], "keywords": []})
     probe.call("getDeliverySettings", user)
     probe.call("saveDeliverySettings", user, body={"time": "09:35"})
-    memories = probe.call("listMemories", user).json()["items"]
-    assert memories
-    probe.call("deleteMemory", user, ident=memories[0]["id"])
 
     source_write = {"name": api_sandbox.prefix + " RSS", "kind": "rss", "sourceId": "", "url": "https://fixture.invalid/feed.xml", "interval": 900}
     source = probe.call("createSource", admin, body=source_write).json()

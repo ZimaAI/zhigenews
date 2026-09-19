@@ -18,12 +18,11 @@ export interface EvalCase { id: string; name: string; preference: string; expect
 export interface Evaluation { id: string; name: string; configVersion: string; status: string; relevance: number | null; faithfulness: number | null; citations: number | null; cost: number | null; latency: number | null; cases: number; createdAt: string; }
 export interface DemoUser { id: string; name: string; email: string; role: string; status: string; topics: string[]; }
 export interface Delivery { id: string; briefId: string; userName: string; destination: string; channel: string; status: DeliveryStatus; attempts: number; time: string; error: string; }
-export interface Memory { id: string; text: string; source: string; updatedAt: string; }
 export interface GenerationProgress { id: string; status: RunStatus; percent: number | null; remainingSeconds: number | null; updatedAt: string; briefId: string | null; error: string; }
 export interface DemoState {
   session: { kind: 'anonymous'; userId: string; name: string; onboardingCompleted: boolean } | null;
   generation: GenerationProgress | null; generationPreferences: Preferences | null;
   scenario: Scenario; loaded: boolean; authenticated: boolean; onboardingCompleted: boolean; preferences: Preferences; delivery: DeliverySettings;
   briefs: Brief[]; runs: AgentRun[]; sources: Source[]; models: ModelConfig[]; configs: AgentConfig[];
-  evaluations: Evaluation[]; evalCases: EvalCase[]; users: DemoUser[]; deliveries: Delivery[]; memories: Memory[];
+  evaluations: Evaluation[]; evalCases: EvalCase[]; users: DemoUser[]; deliveries: Delivery[];
 }

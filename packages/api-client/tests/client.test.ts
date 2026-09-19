@@ -16,7 +16,7 @@ test('generated metadata covers the active backend operations and contract finge
   const contract = JSON.parse(bytes.toString());
   const operations = Object.entries(contract.paths).flatMap(([path, methods]) =>
     Object.entries(methods as Record<string, { operationId: string }>).map(([method, spec]) => ({ path, method, id: spec.operationId })));
-  assert.equal(operations.length, 43);
+  assert.equal(operations.length, 41);
   assert.equal(contractSha256, createHash('sha256').update(bytes).digest('hex'));
   assert.deepEqual(Object.keys(operationMetadata).sort(), operations.map((operation) => operation.id).sort());
   for (const expected of operations) {
@@ -77,7 +77,7 @@ test('DELETE and bodyless POST still send CSRF; 204 remains empty', async () => 
     assert.equal(init.body, undefined);
     return init.method === 'DELETE' ? new Response(null, { status: 204 }) : Response.json({ kind: 'anonymous' });
   }) });
-  assert.equal(await client.api('deleteMemory', { path: { id: 'synthetic-memory' } }), undefined);
+  assert.equal(await client.api('adminLogout'), undefined);
   assert.deepEqual(await client.api('ensureAnonymousSession'), { kind: 'anonymous' });
   assert.deepEqual(methods, ['DELETE', 'POST']);
 });

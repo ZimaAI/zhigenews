@@ -46,7 +46,7 @@ backend/src/zhigenews/
     middleware/    # 消息修复、摘要、上下文渲染、限制、事件
     tools/         # 六个必需工具 + 受控子任务委派
     sandbox/       # 虚拟路径、CAS 文件服务、bash backend
-    memory/        # MySQL checkpointer/store、用户记忆
+    persistence/   # MySQL checkpointer、线程恢复
     models/        # 提供商适配、模型能力与 usage
   ingestion/       # newsnow、rss、规范化、快照管理
   infrastructure/ # SQLAlchemy、队列、凭据、HTTP
@@ -68,7 +68,7 @@ SQLAlchemy 2 + Alembic，目标 MySQL 8.4 LTS/InnoDB/utf8mb4；UTC 存储时间�
 | Agent 配置 | model_endpoints、secret_refs、agent_config_versions | 数据库存加密凭据；主加密密钥来自环境；运行绑定配置版本 |
 | 运行 | agent_runs、run_events、message_journal、subtasks | 每条 run 归属用户；事件和原始消息序号单调递增；子任务归属父 run |
 | 内容与投递 | briefs、brief_items、citations、deliveries、task_outbox | 简报版本不可原地覆写；投递指向精确版本；重新生成不等于重投 |
-| 记忆 | LangGraph checkpoint tables、user_memories | thread_id 与 user_id 归属服务端验证，不能只靠客户端 namespace |
+| 线程持久化 | LangGraph checkpoint tables | thread_id 与 user_id 归属服务端验证，不能只靠客户端 namespace |
 | 评估 | eval_datasets、eval_cases、eval_runs、eval_scores | 绑定样例快照、模型/配置版本、评分方式；无样本不报准确率 |
 
 MySQL durable checkpointer 优先评估社区 `langgraph-checkpoint-mysql`，外包在自有 adapter 后；后端验收必须覆盖 pending writes、断点恢复、子图 namespace、并发/取消和升级。实现不能使用只存在于 RAM 的 saver 冒充持久恢复；也不悄悄改用 PostgreSQL。
@@ -121,7 +121,7 @@ RSS 以配置周期为起点，遵守 ETag/Last-Modified、304、缓存头/可�
 
 ## Agent 组装与循环
 
-组装时从不可变配置快照构建模型、工具集合、系统提示词、middleware、state_schema、context_schema、checkpointer 和 store。以 `create_agent` 的模型/工具循环作为实际执行引擎；外层 worker 负责入队、恢复、取消与最终结果持久化，不用固定 DAG 替代自主循环。
+组装时从不可变配置快照构建模型、工具集合、系统提示词、middleware、state_schema、context_schema 和 checkpointer。以 `create_agent` 的模型/工具循环作为实际执行引擎；外层 worker 负责入队、恢复、取消与最终结果持久化，不用固定 DAG 替代自主循环。
 
 运行 state 保存 messages、summary、summary_revision、子任务状态、预算用量、文件读取版本和产物引用。runtime context 注入 user_id、run_id、thread_id、配置/偏好快照、授权挂载、取消令牌和适配器；秘密不作为可序列化 state/message 写入检查点。
 
@@ -141,9 +141,9 @@ Agent 输出结构化简报和 Markdown。服务端在发布前校验条目数�
 4. 孤儿结果不发给模型，重复结果确定性去重并审计；无法消歧的重复调用 ID 不编造配对，报可恢复诊断。
 5. 修复后的模型输入不得存在孤儿 ToolMessage 或未配齐的 AI 工具调用。用户/AI 的相对顺序不变。
 
-继承 `SummarizationMiddleware` 的子类处理 summary state、触发和压缩边界，单独 ContextRenderer 在调用模型时渲染摘要。推荐实际执行顺序为“修复 → 选择完整消息块压缩 → 原位保留最近用户原话与保留后缀 → 渲染摘要/记忆 → 总预算检查 → 模型”，必须以选定 LangChain 版本的 hook 调用顺序验证，不仅凭列表位置推测。
+继承 `SummarizationMiddleware` 的子类处理 summary state、触发和压缩边界，单独 ContextRenderer 在调用模型时渲染摘要。推荐实际执行顺序为“修复 → 选择完整消息块压缩 → 原位保留最近用户原话与保留后缀 → 渲染摘要 → 总预算检查 → 模型”，必须以选定 LangChain 版本的 hook 调用顺序验证，不仅凭列表位置推测。
 
-摘要生成输入 = 现有 summary + 本轮可压缩旧消息；成功后更新 summary 与覆盖的 seq 范围，重建保留列表。摘要失败时不删除历史。触发可配置消息数、token 数、模型容量比例，任一阈值达到即压缩；token 预算包含系统提示词、工具 schema、长期记忆、现有 summary、保留消息、输出预留。保留最新真实用户输入可能导致超预算，此时明确拒绝/请求缩短，不能偷偷压缩原话。
+摘要生成输入 = 现有 summary + 本轮可压缩旧消息；成功后更新 summary 与覆盖的 seq 范围，重建保留列表。摘要失败时不删除历史。触发可配置消息数、token 数、模型容量比例，任一阈值达到即压缩；token 预算包含系统提示词、工具 schema、现有 summary、保留消息、输出预留。保留最新真实用户输入可能导致超预算，此时明确拒绝/请求缩短，不能偷偷压缩原话。
 
 上述为本系统算法设计，不能直接等同框架基类行为，源码差异见[Agent 调研](../../../../research/agent-runtime.md)。
 
@@ -157,11 +157,11 @@ bash 每次运行在最小 Linux 容器环境：无模型/数据库凭据、无�
 
 容器运行时自带的 `/bin` 等不是用户宿主数据根，shell 环境仅保留执行必需的运行时文件。无容器时 `bash` 不退回宿主 subprocess；该能力应显示不可用，必须在正式验收环境恢复并通过测试，不能当作永久省略需求。
 
-## 模型、记忆、监测和评估
+## 模型、上下文、监测和评估
 
 模型首版支持 OpenAI 兼容 chat/tool calling 端点，通过 LangChain adapter 隔离；每模型记录真实 model ID、context window、工具/结构化输出能力和价格配置来源。端点连接成功不代表工具调用能力验证通过。敏感配置只在受信 worker 解密，用量缺失记录 unknown，费用是基于配置价格的估算。
 
-长期记忆按 user namespace 保存显式关注背景、反馈和简报去重指纹；新任务将当前偏好放在更高优先级。RSS/搜索文本标识为不可信资料，不能写入系统指令或提升为用户偏好。记忆有来源/更新时间与删除能力，不在本轮用户设置中展示记忆管理。
+2026-09-19 用户要求删除现有长期记忆机制，后续另行实现。新任务使用显式偏好快照；当前线程的消息与摘要通过 checkpoint 持久化。摘要和上下文中间件不读写或嵌入长期记忆，不再保存跨线程偏好推断、反馈或简报指纹。RSS/搜索文本标识为不可信资料，不能写入系统指令或提升为用户偏好。
 
 观测记录实际模型/工具事件、耗时、tokens、状态、错误、摘要覆盖范围和子 run 关联。用户只见本人的公开百分比与预计剩余时间，管理员看脱敏事件；不采集/展示模型私有思维链。SSE 的 Last-Event-ID/游标可补拉已持久化事件，断线不改变 run 状态。
 

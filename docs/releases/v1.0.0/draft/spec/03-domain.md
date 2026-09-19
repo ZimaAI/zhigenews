@@ -6,7 +6,7 @@
 
 | 层次 | 对象与职责 | 不应混入的内容 |
 | --- | --- | --- |
-| 领域 | 用户、偏好版本、来源/快照、运行/子任务、简报版本、投递尝试、配置版本、记忆、评估实验 | 组件是否展开、表单脏状态、toast |
+| 领域 | 用户、偏好版本、来源/快照、运行/子任务、简报版本、投递尝试、配置版本、评估实验 | 组件是否展开、表单脏状态、toast |
 | 交换 | Preferences/NewsItem/公开 Brief/GenerationProgress，以及仅管理员 AgentRun/AnonymousAccount 等 DTO，写请求、分页、错误、SSE | ORM 对象、密钥原文、宿主物理路径、模型私有思维链 |
 | 页面 | DemoState、Scenario、筛选/页码、编辑草稿、loading/error、新闻弹窗与对比选项 | 不承担权限、调度、投递保证 |
 | 持久化 | MySQL 主外键/唯一约束/版本、不可变文件快照、checkpoint、outbox 与事件日志 | 不解析格式化的页面时间作为调度依据 |
@@ -27,10 +27,11 @@
 | MessageJournal / Summary | `(threadId,messageSeq)` 单调唯一；调用实例关联 toolCallId | 原始日志保留，修复重建模型视图不重新编号；摘要另存覆盖范围与版本；最新用户原文不压缩 |
 | BriefRevision | 简报归属用户与 run；日期内可有多个 version | 内容一经发布不可覆盖，引用及偏好快照可追溯；部分完成仍说明缺失来源；内部对应 AdminBrief；公开 Brief 不含 runId/偏好技术快照 |
 | DeliveryAttempt | 归属精确 briefId/版本与渠道 | 生成完成不意味着站内发布成功；channel 固定 in_app；管理端重试复用同一简报并增加尝试；对应 Delivery |
-| UserMemory | 归属用户 namespace，带来源/更新时间 | 显式偏好高于推断；网上内容不可当用户事实；删除仅影响后续读取；对应 Memory |
 | EvaluationDataset / EvaluationRun | 固定 case/来源快照与时钟；实验绑定配置与评分器版本 | 无评分为 null，非 0；规则/人工/LLM 分开；没有样本不显示准确率；对应 EvalCase/Evaluation |
 
 ## 状态与动作
+
+2026-09-19 按用户要求移除 `UserMemory` 长期记忆模型及其保存、读取、删除和上下文注入能力。`MessageJournal / Summary` 仍属于当前线程，checkpoint 用于该线程恢复；用户显式偏好和既有简报独立保留。
 
 运行通常为 `queued → running → completed/partial/failed`。取消为 `queued/running → cancelling → cancelled`，只有 worker 确认才显示已取消；终态不会因 SSE 断线改变。恢复在同一逻辑 run/thread 的 checkpoint 上继续，不能偷偷新建一次有副作用的工具执行。工具错误可被 Agent 处理后继续，单个失败事件不必等于整个 run 失败。
 

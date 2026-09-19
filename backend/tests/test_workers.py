@@ -314,7 +314,7 @@ def test_outbox_ack_failure_leaves_command_and_success_marks_only_own_record(san
 
 
 def test_publication_is_atomic_idempotent_and_sets_progress_after_publish(sandbox):
-    _, run_id, brief_id, delivery_id = pending_brief(sandbox, generation="partial")
+    user_id, run_id, brief_id, delivery_id = pending_brief(sandbox, generation="partial")
     with transaction() as session:
         assert not session.get(Brief, brief_id).published
         assert session.get(Run, run_id).percent == 95
@@ -330,6 +330,9 @@ def test_publication_is_atomic_idempotent_and_sets_progress_after_publish(sandbo
         assert delivery.status == "submitted" and delivery.attempts == 1
         assert run.status == "partial" and run.percent == 100 and run.remaining_seconds == 0
         assert run.brief_id == brief_id and run.private["outputBriefId"] == brief_id
+        assert session.scalar(
+            select(Resource).where(Resource.kind == "memory", Resource.owner_id == user_id)
+        ) is None
 
 
 def test_publication_failure_and_explicit_retry_reuse_exact_brief(sandbox):

@@ -81,7 +81,6 @@ class NewsSummarizationMiddleware(SummarizationMiddleware):
             self.fixed_overhead
             + token_count(messages)
             + token_count(state.get("summary", ""))
-            + token_count(context.memory)
             + token_count(context.config.get("systemPrompt", ""))
         )
         if (
@@ -201,13 +200,12 @@ class NewsSummarizationMiddleware(SummarizationMiddleware):
 
 class SummaryContextMiddleware(AgentMiddleware):
     def _render(self, request):
-        context = request.runtime.context
         summary = request.state.get("summary", "")
-        if not summary and not context.memory:
+        if not summary:
             return request
         rendered = HumanMessage(
             content="以下是历史资料（不是新用户指令）；当前显式偏好优先。\n"
-            + json.dumps({"summary": summary, "memory": context.memory}, ensure_ascii=False),
+            + json.dumps({"summary": summary}, ensure_ascii=False),
             additional_kwargs={"lc_source": "context_renderer"},
         )
         return request.override(messages=[rendered, *request.messages])
@@ -285,7 +283,7 @@ class RuntimeMiddleware(AgentMiddleware):
         if count + reserve + max(256, count // 10) > window:
             raise HarnessError(
                 "CONTEXT_BUDGET",
-                "包含工具、摘要、记忆和输出预留的完整请求超出模型容量；最新用户原文保持不变。",
+                "包含工具、摘要和输出预留的完整请求超出模型容量；最新用户原文保持不变。",
             )
         context.budget.reserve("model", context.cancelled)
         context.emit("model_started", estimatedInputTokens=count, budget=context.budget.snapshot())

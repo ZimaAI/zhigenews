@@ -70,6 +70,5 @@ export function createSeed(): DemoState {
       { id: 'delivery-01', briefId: 'brief-18', userName: '林序', destination: '站内简报', channel: 'in_app', status: 'failed', attempts: 1, time: '2026-09-18T08:00:15+08:00', error: '示例：站内通知写入失败。简报仍可阅读，重试仅补发通知。' },
       { id: 'delivery-02', briefId: 'brief-17', userName: '林序', destination: '站内简报', channel: 'in_app', status: 'submitted', attempts: 1, time: '2026-09-17T08:00:15+08:00', error: '' },
     ],
-    memories: [{ id: 'mem-01', text: '偏好工程实现细节和可复用的开源方案。', source: '示例用户反馈', updatedAt: '2026-09-16T09:00:00+08:00' }, { id: 'mem-02', text: '减少重复事件，优先解释相比已有方案的变化。', source: '示例用户反馈', updatedAt: '2026-09-17T09:00:00+08:00' }],
   } as DemoState);
 }

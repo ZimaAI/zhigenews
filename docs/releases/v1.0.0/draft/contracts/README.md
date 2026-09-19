@@ -1,6 +1,8 @@
 # v1.0.0 交换契约
 
-唯一交换主源为 [openapi.json](openapi.json)，OpenAPI 3.1 / JSON Schema 2020-12；当前52 schemas、53操作、23个synthetic固定样例。本规范将已批准 r5 行为细化为正式 HTTP 边界，冻结身份以工作流基线快照为准。原型 `/__demo` 是独立的开发服务命名空间，不能当作正式API；契约验证不等于后端实现通过。
+本草稿的交换契约为 [openapi.json](openapi.json)，OpenAPI 3.1 / JSON Schema 2020-12；当前50 schemas、51操作、22个synthetic固定样例。本规范将已批准 r5 行为细化为正式 HTTP 边界，冻结身份以工作流基线快照为准。正式运行与客户端类型生成使用 `backend/src/zhigenews/contracts/openapi.json`。原型 `/__demo` 是独立的开发服务命名空间，不能当作正式API；契约验证不等于后端实现通过。
+
+2026-09-19 用户要求移除现有长期记忆机制，后续另行设计实现。当前草稿与运行契约均已删除长期记忆列表/删除接口及 `Memory`、`MemoryPage`；历史冻结基线仅供追溯，不代表当前支持这些能力。线程 checkpoint、会话摘要和显式订阅偏好继续保留。
 
 ## 交换与内部模型
 
@@ -27,7 +29,7 @@
 | 生成进度 | GET /me/generations/{id} | 仅本人公开进度，不返回运行事件 |
 | 恢复当前生成 | GET /me/generations/current | 仅凭Cookie恢复最近一次本人生成（含终态）；尚无生成时返回null |
 | 取消生成 | POST /me/generations/{id}/cancel | 服务能力；先cancelling，由worker确认cancelled，不改变每日计划 |
-| 本人记忆/发布服务 | /me/memories、/me/deliveries | 保留原服务能力，用户设置不展示记忆控件，发布重试不重新生成 |
+| 本人发布服务 | /me/deliveries | 发布重试不重新生成 |
 | 来源/模型/配置/评估/发布 | /admin/sources、models、agent-configs、evaluations、deliveries等 | 保持既有管理契约；key只写不回显 |
 | 管理运行 | /admin/runs、/{id}、/{id}/cancel、/{id}/events | 管理员检查、SSE回放，普通用户不可访问 |
 | 匿名监测 | GET /admin/anonymous-accounts，PUT /{id}/status | 脱敏监测，active/blocked和1–200字原因；管理审计 |

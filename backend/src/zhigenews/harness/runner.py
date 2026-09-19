@@ -35,7 +35,7 @@ from .middleware import (
     SummaryContextMiddleware,
     token_count,
 )
-from .persistence import UserMemory, mysql_persistence
+from .persistence import mysql_persistence
 from .runtime import Budget, NewsAgentState, RunContext
 from .sandbox import SANDBOX_IMAGE, DockerSandbox
 from .search import TavilySearch
@@ -200,8 +200,8 @@ def validate_items(
 
 
 class HarnessRunner:
-    def __init__(self, database_url: str | None = None, *, checkpointer=None, store=None):
-        self.database_url, self.checkpointer, self.store = database_url, checkpointer, store
+    def __init__(self, database_url: str | None = None, *, checkpointer=None):
+        self.database_url, self.checkpointer = database_url, checkpointer
 
     def run(
         self,
@@ -216,11 +216,11 @@ class HarnessRunner:
         try:
             with FileLock(str(metadata / "run.lock"), timeout=0):
                 if self.database_url:
-                    with mysql_persistence(self.database_url) as (saver, store):
-                        return self._run(request, event_sink, cancelled, resume, saver, store)
+                    with mysql_persistence(self.database_url) as saver:
+                        return self._run(request, event_sink, cancelled, resume, saver)
                 if self.checkpointer is None:
                     raise HarnessError("CHECKPOINTER_REQUIRED", "正式 Harness 必须配置持久检查点。")
-                return self._run(request, event_sink, cancelled, resume, self.checkpointer, self.store)
+                return self._run(request, event_sink, cancelled, resume, self.checkpointer)
         except Timeout:
             raise HarnessError("RUN_ALREADY_ACTIVE", "同一运行已由另一个 Worker 执行。") from None
 
@@ -228,7 +228,7 @@ class HarnessRunner:
         return await asyncio.to_thread(self.run, *args, **kwargs)
 
     def _run(
-        self, request, event_sink, cancelled, resume, saver, store, *, shared_context=None, shared_search=None
+        self, request, event_sink, cancelled, resume, saver, *, shared_context=None, shared_search=None
     ):
         workspace = Path(request.workspace_root)
         workspace.mkdir(parents=True, exist_ok=True)
@@ -273,7 +273,6 @@ class HarnessRunner:
             budget.persist = persist
         if shared_context:
             evidence = shared_context.evidence
-        memory = UserMemory(store, request.user_id).list() if store else []
         context = RunContext(
             request.user_id,
             request.run_id,
@@ -285,7 +284,6 @@ class HarnessRunner:
             event_sink,
             cancelled,
             evidence,
-            memory,
             depth=(shared_context.depth + 1) if shared_context else 0,
             child_semaphore=shared_context.child_semaphore
             if shared_context
@@ -434,7 +432,6 @@ class HarnessRunner:
                         cancelled,
                         child_resume,
                         saver,
-                        store,
                         shared_context=context,
                         shared_search=search,
                     )
@@ -503,7 +500,6 @@ class HarnessRunner:
             state_schema=NewsAgentState,
             context_schema=RunContext,
             checkpointer=saver,
-            store=store,
             response_format=ToolStrategy(BriefOutput),
         )
         # A user prefix makes otherwise colliding caller-supplied thread IDs isolated.

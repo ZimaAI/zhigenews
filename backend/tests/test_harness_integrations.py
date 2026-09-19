@@ -13,7 +13,7 @@ from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
 from zhigenews.harness.errors import HarnessError
-from zhigenews.harness.persistence import UserMemory, mysql_persistence
+from zhigenews.harness.persistence import mysql_persistence
 from zhigenews.harness.sandbox import DockerSandbox
 from zhigenews.harness.search import TavilySearch
 
@@ -48,12 +48,12 @@ def test_tavily_bounded_synthetic_response():
 @pytest.mark.skipif(
     not os.environ.get("HARNESS_TEST_MYSQL_URL"), reason="requires an actual MySQL 8 test database"
 )
-def test_mysql_pending_writes_namespaces_restart_and_memory():
+def test_mysql_pending_writes_namespaces_and_restart():
     url = os.environ["HARNESS_TEST_MYSQL_URL"]
     thread = "harness-test-" + uuid.uuid4().hex
     config = {"configurable": {"thread_id": thread, "checkpoint_ns": ""}}
     child_config = {"configurable": {"thread_id": thread, "checkpoint_ns": "child"}}
-    with mysql_persistence(url, setup=True) as (saver, store):
+    with mysql_persistence(url, setup=True) as saver:
         cp = empty_checkpoint()
         cp["channel_values"] = {"value": {"unicode": "中文", "nested": [1, None]}}
         cp["channel_versions"] = {"value": "1"}
@@ -64,13 +64,7 @@ def test_mysql_pending_writes_namespaces_restart_and_memory():
         child["channel_values"] = {"value": "child"}
         child["channel_versions"] = {"value": "1"}
         saver.put(child_config, child, {"source": "input", "step": -1, "parents": {}}, {"value": "1"})
-        memory = UserMemory(store, thread)
-        memory.put("preference", {"text": "AI"}, source="explicit_preference")
-        assert not UserMemory(store, thread + "-other").list()
-        assert len(memory.list()) == 1
-        with pytest.raises(HarnessError):
-            memory.put("bad", {"text": "untrusted"}, source="rss")
-    script = "from zhigenews.harness.persistence import mysql_persistence; import os,json;\nwith mysql_persistence(os.environ['HARNESS_TEST_MYSQL_URL']) as (s,st):\n t=s.get_tuple({'configurable':{'thread_id':os.environ['HARNESS_THREAD'],'checkpoint_ns':''}}); print(json.dumps({'value':t.checkpoint['channel_values']['value'],'pending':len(t.pending_writes)}))"
+    script = "from zhigenews.harness.persistence import mysql_persistence; import os,json;\nwith mysql_persistence(os.environ['HARNESS_TEST_MYSQL_URL']) as s:\n t=s.get_tuple({'configurable':{'thread_id':os.environ['HARNESS_THREAD'],'checkpoint_ns':''}}); print(json.dumps({'value':t.checkpoint['channel_values']['value'],'pending':len(t.pending_writes)}))"
     result = subprocess.run(
         [sys.executable, "-c", script],
         env={**os.environ, "HARNESS_THREAD": thread},
@@ -80,12 +74,9 @@ def test_mysql_pending_writes_namespaces_restart_and_memory():
     )
     restored = json.loads(result.stdout)
     assert restored["value"]["unicode"] == "中文" and restored["pending"] == 2
-    with mysql_persistence(url) as (saver, store):
+    with mysql_persistence(url) as saver:
         assert saver.get_tuple(child_config).checkpoint["channel_values"]["value"] == "child"
         assert len(list(saver.list({"configurable": {"thread_id": thread}}))) == 2
-        memory = UserMemory(store, thread)
-        memory.delete("preference")
-        assert not memory.list()
         saver.delete_thread(thread)
         assert saver.get_tuple(config) is None
 
@@ -109,24 +100,11 @@ def test_mysql_actual_graph_interrupt_resume():
         graph.add_edge("second", END)
         return graph.compile(checkpointer=saver, interrupt_before=["second"])
 
-    with mysql_persistence(url) as (saver, _):
+    with mysql_persistence(url) as saver:
         assert build(saver).invoke({"count": 0}, config)["count"] == 1
-    with mysql_persistence(url) as (saver, _):
+    with mysql_persistence(url) as saver:
         assert build(saver).invoke(None, config)["count"] == 11
         saver.delete_thread(thread)
-
-
-def test_memory_sync_iterator_includes_pages_while_deleting():
-    from langgraph.store.memory import InMemoryStore
-
-    memory = UserMemory(InMemoryStore(), "many-memories")
-    for index in range(105):
-        memory.put(str(index), {"text": f"memory {index}"}, source="published_brief")
-    seen = []
-    for item in memory.iter_all():
-        seen.append(item["id"])
-        memory.delete(item["id"])
-    assert len(seen) == 105 and memory.list() == []
 
 
 @pytest.mark.skipif(

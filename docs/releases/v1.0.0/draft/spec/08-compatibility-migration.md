@@ -2,7 +2,7 @@
 
 这是首个正式版本，没有既有生产数据库、公开客户端或已交付来源基线。原型 localStorage 和 dev-only `.demo` 数据均为模拟数据，不迁移至正式数据库；原型保持独立用于对照，不打包进正式应用。
 
-数据库采用 MySQL 8.4/InnoDB/utf8mb4，通过 Alembic 显式迁移。首版迁移创建会话、偏好、配额、采集、运行/事件、配置、简报/发布、记忆、评估及 outbox 表；LangGraph 适配器自己的 setup 创建 checkpoint 表。新环境先迁移，再通过 CLI 创建管理员与非秘密默认配置。启动 API 不得静默删除或重置数据库。
+数据库采用 MySQL 8.4/InnoDB/utf8mb4，通过 Alembic 显式迁移。当前表结构包含会话、偏好、配额、采集、运行/事件、配置、简报/发布、评估及 outbox 表；LangGraph 适配器自己的 setup 创建 checkpoint 表。2026-09-19 按用户要求移除长期记忆实现，不再初始化或访问长期记忆 Store，也不读写既有 `Resource(kind="memory")` 记录；本次不执行数据库历史数据删除。线程 checkpoint、摘要、显式偏好与简报历史保留。新环境先迁移，再通过 CLI 创建管理员与非秘密默认配置。启动 API 不得静默删除或重置数据库。
 
 API 前缀 `/api/v1`，唯一边界为 OpenAPI。服务器 UTC 存储时间，展示/每日计划使用 Asia/Shanghai；未知发布时间和用量保持 null。用户及管理员不同 Cookie，生产 Secure、HttpOnly、SameSite=Lax；本地 HTTP 开发允许关闭 Secure。
 

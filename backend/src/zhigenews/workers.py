@@ -6,8 +6,6 @@ redelivery; source publication is additionally fenced by a lease and file lock.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
@@ -424,28 +422,6 @@ def _publish_in_app(session, delivery, brief, run):
     run.updated_at = utcnow()
     run.private = {**run.private, "outputBriefId": brief.id}
     run.lease_until = run.lease_token = None
-    memory_id = "briefmem_" + brief.id
-    fingerprints = [
-        {
-            "title": item["title"],
-            "url": item["url"],
-            "fingerprint": hashlib.sha256(item["url"].encode()).hexdigest(),
-        }
-        for item in data["items"]
-    ]
-    memory_data = {
-        "id": memory_id,
-        "source": "published_brief",
-        "updatedAt": iso(utcnow()),
-        "text": json.dumps(
-            {"briefId": brief.id, "date": brief.date, "articles": fingerprints}, ensure_ascii=False
-        ),
-    }
-    memory = session.get(Resource, memory_id)
-    if memory:
-        memory.data = memory_data
-    else:
-        session.add(Resource(id=memory_id, kind="memory", owner_id=brief.user_id, data=memory_data))
     _publication_event(session, run, "站内发布完成", "简报版本已发布，可在用户站内阅读。", "completed")
 
 

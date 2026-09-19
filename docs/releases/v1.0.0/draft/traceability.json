@@ -153,7 +153,7 @@
     },
     {
       "id": "REQ-AGENT-001",
-      "title": "Gateway 处理 HTTP/鉴权/DTO；Harness 负责组装、运行、模型、工具、沙箱、记忆、子 Agent；核心 Agent 使用 `create_agent(model, tools, middleware, system_prompt, context_schema, ...)`",
+      "title": "Gateway 处理 HTTP/鉴权/DTO；Harness 负责组装、运行、模型、工具、沙箱、线程状态、子 Agent；核心 Agent 使用 `create_agent(model, tools, middleware, system_prompt, context_schema, ...)`",
       "status": "active",
       "change": "added",
       "since": "v1.0.0",
@@ -245,7 +245,7 @@
     },
     {
       "id": "REQ-MEM-001",
-      "title": "thread 状态包含消息、摘要、子任务、预算、文件读取版本；runtime context 包含用户、线程、运行参数；长期记忆跨会话且按用户隔离",
+      "title": "thread 状态包含消息、摘要、子任务、预算、文件读取版本；runtime context 包含用户、线程、运行参数；保留 checkpoint 恢复，不包含跨会话长期记忆",
       "status": "active",
       "change": "added",
       "since": "v1.0.0",
@@ -578,7 +578,7 @@
     },
     {
       "id": "AC-BE-002",
-      "title": "首次无Cookie请求由服务器建立匿名账号并签发HttpOnly Cookie；生产Secure/SameSite=Lax，服务器只存token哈希且执行过期/撤销；同Cookie幂等恢复，封禁403不换号。匿名全部用户功能可用但管理接口403；跨用户简报/进度/记忆404，CSRF跨源写请求拒绝。",
+      "title": "首次无Cookie请求由服务器建立匿名账号并签发HttpOnly Cookie；生产Secure/SameSite=Lax，服务器只存token哈希且执行过期/撤销；同Cookie幂等恢复，封禁403不换号。匿名全部用户功能可用但管理接口403；跨用户简报/进度404，CSRF跨源写请求拒绝。",
       "phase": "backend",
       "status": "active",
       "required": true,
@@ -688,7 +688,7 @@
     },
     {
       "id": "AC-BE-010",
-      "title": "Agent 能按工具结果继续选择行动且受总预算限制；MySQL checkpoint 经进程重启可恢复；子任务共享预算/取消并隔离 thread；长期记忆按用户持久化。",
+      "title": "Agent 能按工具结果继续选择行动且受总预算限制；MySQL checkpoint 经进程重启可恢复；子任务共享预算/取消并隔离 thread；保留线程摘要，不保存或注入跨会话长期记忆。",
       "phase": "backend",
       "status": "active",
       "required": true,
@@ -843,5 +843,5 @@
       ]
     }
   ],
-  "note": "v1.0.0 定稿：24REQ/36AC；原型模拟描述适用说明见05-acceptance末节，正式功能使用真实后端，不能继承原型通过状态。"
+  "note": "v1.0.0 定稿：24REQ/36AC；原型模拟描述适用说明见05-acceptance末节，正式功能使用真实后端，不能继承原型通过状态。 2026-09-19 用户要求删除现有长期记忆；REQ-MEM-001/AC-BE-010 保留线程状态、摘要与 checkpoint 恢复，长期记忆保存、删除和上下文嵌入不属于当前实现。"
 }

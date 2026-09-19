@@ -1,0 +1,63 @@
+name: zhigenews
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: zhigenews
+      MYSQL_USER: zhigenews
+      MYSQL_PASSWORD: local-development
+      MYSQL_ROOT_PASSWORD: local-root-development
+    ports: ["127.0.0.1:13316:3306"]
+    volumes: ["mysql-data:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:8-alpine
+    ports: ["127.0.0.1:56386:6379"]
+    volumes: ["redis-data:/data"]
+    command: ["redis-server", "--appendonly", "yes"]
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: zhigenews-backend:1.0.0
+    env_file: ["backend/.env"]
+    environment: &backend-env
+      DATABASE_URL: mysql+pymysql://zhigenews:local-development@mysql:3306/zhigenews
+      REDIS_URL: redis://redis:6379/0
+      DATA_DIR: /var/lib/docker/volumes/zhigenews_runtime/_data
+    ports: ["127.0.0.1:18000:8000"]
+    volumes:
+      - runtime:/var/lib/docker/volumes/zhigenews_runtime/_data
+    depends_on:
+      mysql: {condition: service_healthy}
+      redis: {condition: service_started}
+  worker:
+    profiles: ["app"]
+    image: zhigenews-backend:1.0.0
+    env_file: ["backend/.env"]
+    environment: *backend-env
+    command: ["celery", "-A", "zhigenews.workers:celery_app", "worker", "--loglevel=INFO", "--concurrency=2"]
+    volumes:
+      - runtime:/var/lib/docker/volumes/zhigenews_runtime/_data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      mysql: {condition: service_healthy}
+      redis: {condition: service_started}
+  beat:
+    profiles: ["app"]
+    image: zhigenews-backend:1.0.0
+    env_file: ["backend/.env"]
+    environment: *backend-env
+    command: ["celery", "-A", "zhigenews.workers:celery_app", "beat", "--loglevel=INFO", "--schedule=/tmp/zhigenews-beat"]
+    depends_on:
+      redis: {condition: service_started}
+volumes:
+  mysql-data:
+  redis-data:
+  runtime:
+    name: zhigenews_runtime

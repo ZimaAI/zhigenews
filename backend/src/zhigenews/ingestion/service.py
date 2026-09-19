@@ -1,0 +1,542 @@
+"""Fetch a source, publish immutable evidence, and return state for a DB transaction.
+
+The caller owns the source lease. No database lock should be held during HTTP.
+All returned timestamps are UTC ISO strings. Raw/parsed paths are relative to
+``storage`` and must never be returned through a public DTO.
+"""
+
+from __future__ import annotations
+
+import calendar
+import hashlib
+import json
+import os
+import random
+import re
+import tempfile
+import time
+import uuid
+from datetime import UTC, datetime, timedelta
+from email.utils import parsedate_to_datetime
+from pathlib import Path
+from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+import feedparser
+import httpx
+
+from .catalog import DEFAULT_NEWSNOW_URL, catalog_source
+
+MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+USER_AGENT = "Mozilla/5.0 (compatible; ZhigeNews/1.0; news feed reader)"
+SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+
+
+class IngestionError(ValueError):
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
+def _iso(value: datetime) -> str:
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _datetime(value: Any) -> datetime | None:
+    if value is None or value == "":
+        return None
+    try:
+        if isinstance(value, datetime):
+            result = value
+        elif isinstance(value, (int, float)):
+            result = datetime.fromtimestamp(value / 1000 if value > 100_000_000_000 else value, UTC)
+        else:
+            try:
+                result = datetime.fromisoformat(str(value))
+            except ValueError:
+                result = parsedate_to_datetime(str(value))
+        # Unqualified dates cannot supply an invented publication timezone.
+        return result.astimezone(UTC) if result.tzinfo else None
+    except (ValueError, TypeError, OverflowError, OSError):
+        return None
+
+
+def _json_bytes(value: Any) -> bytes:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def _hash(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _path(storage: Path, relative: str) -> Path:
+    root = storage.resolve()
+    path = (root / relative).resolve()
+    if not path.is_relative_to(root):
+        raise IngestionError("INVALID_SNAPSHOT_PATH", "Snapshot path is outside source storage")
+    return path
+
+
+def _source_dir(source: dict, storage: Path) -> Path:
+    if not SAFE_ID.fullmatch(str(source.get("id", ""))):
+        raise IngestionError("INVALID_SOURCE_ID", "Source ID must be a system-generated safe identifier")
+    if source.get("kind") not in {"rss", "newsnow"}:
+        raise IngestionError("INVALID_SOURCE_KIND", "Source kind must be rss or newsnow")
+    return _path(storage, f"{source['kind']}/{source['id']}")
+
+
+def _atomic_write(path: Path, raw: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix=".ingest-", dir=path.parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(raw)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def read_latest_snapshot(source: dict, storage: Path) -> dict | None:
+    latest = _source_dir(source, storage) / "latest.json"
+    if not latest.exists():
+        return None
+    snapshot = json.loads(latest.read_text(encoding="utf-8"))
+    if source.get("url") and snapshot.get("request_url") != source["url"]:
+        return None
+    return snapshot
+
+
+def load_snapshot_items(snapshot: dict | None, storage: Path) -> list[dict]:
+    if snapshot is None:
+        return []
+    return [
+        json.loads(line)
+        for line in _path(storage, snapshot["parsed_path"]).read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+
+
+def _http_url(value: str) -> str:
+    try:
+        parts = urlsplit(value)
+        if parts.scheme not in {"http", "https"} or not parts.hostname or parts.username or parts.password:
+            raise ValueError
+        _ = parts.port
+    except ValueError:
+        raise IngestionError(
+            "INVALID_URL", "Source and article URLs must be HTTP(S) without embedded credentials"
+        ) from None
+    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path or "/", parts.query, ""))
+
+
+def _normalize_source(source: dict) -> dict:
+    result = dict(source)
+    configured = source.get("configured_interval_seconds", source.get("interval", 1800))
+    result["configured_interval_seconds"] = max(1, int(configured))
+    if result["kind"] == "newsnow":
+        source_id = source.get("source_id", source.get("sourceId", ""))
+        if not source_id:
+            source_id = dict(parse_qsl(urlsplit(source.get("url", "")).query)).get("id", "")
+        entry = catalog_source(source_id)
+        result.update({key: value for key, value in entry.items() if key != "name"})
+        result.setdefault("name", entry["name"])
+        url = source.get("url") or source.get("base_url", DEFAULT_NEWSNOW_URL).rstrip("/") + "/api/s"
+        parts = urlsplit(_http_url(url))
+        query = dict(parse_qsl(parts.query))
+        query["id"] = entry["source_id"]
+        # Poll the available anonymous cache; do not claim latest forces refresh.
+        query.pop("latest", None)
+        result["url"] = urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), ""))
+    else:
+        result["url"] = _http_url(source["url"])
+        result["upstream_interval_seconds"] = 0
+        result["upstream_revision"] = None
+    result["effective_interval_seconds"] = max(
+        result["configured_interval_seconds"],
+        result["upstream_interval_seconds"],
+        int(result.get("feed_ttl_seconds", 0)),
+    )
+    return result
+
+
+def _item(
+    source: dict,
+    external_id: str,
+    title: str,
+    url: str,
+    published: datetime | None,
+    summary: str,
+    content: str = "",
+) -> dict:
+    canonical = _http_url(url)
+    identity = _hash(f"{source['id']}:{external_id or canonical}".encode())[:32]
+    return {
+        "id": identity,
+        "external_id": external_id or canonical,
+        "source_id": source["id"],
+        "source": source.get("name", source["id"]),
+        "source_type": source["kind"],
+        "title": title.strip(),
+        "url": canonical,
+        "published_at": _iso(published) if published else None,
+        "summary": summary,
+        "content": content,
+    }
+
+
+def _parse_rss(raw: bytes, source: dict, headers: dict) -> tuple[list[dict], dict]:
+    parsed = feedparser.parse(raw, response_headers=headers)
+    if not parsed.get("version"):
+        raise IngestionError("INVALID_FEED", "Response is not an RSS or Atom feed")
+    if parsed.get("bozo") and not parsed.entries:
+        raise IngestionError("INVALID_FEED", "Feed XML could not be parsed")
+    items, dropped, seen = [], 0, set()
+    for entry in parsed.entries:
+        title, url = entry.get("title", ""), entry.get("link", "")
+        if not title or not url:
+            dropped += 1
+            continue
+        published = None
+        if entry.get("published_parsed"):
+            published = datetime.fromtimestamp(calendar.timegm(entry.published_parsed), UTC)
+        content = "\n".join(part.get("value", "") for part in entry.get("content", []))
+        try:
+            item = _item(
+                source, str(entry.get("id", "")), title, url, published, entry.get("summary", ""), content
+            )
+        except IngestionError:
+            dropped += 1
+            continue
+        if item["id"] not in seen:
+            items.append(item)
+            seen.add(item["id"])
+    if parsed.entries and not items:
+        raise IngestionError("INVALID_FEED_ITEMS", "Feed contains no usable article links")
+    try:
+        ttl = max(0, int(parsed.feed.get("ttl", 0))) * 60
+    except (TypeError, ValueError):
+        ttl = 0
+    return items, {
+        "feed_format": parsed.version,
+        "feed_ttl_seconds": ttl,
+        "parse_warning": type(parsed.get("bozo_exception")).__name__ if parsed.get("bozo") else None,
+        "dropped_items": dropped,
+        "content_hash": _hash(raw),
+        "upstream_status": None,
+        "upstream_updated_at": None,
+    }
+
+
+def _parse_newsnow(raw: bytes, source: dict, headers: dict) -> tuple[list[dict], dict]:
+    try:
+        payload = json.loads(raw)
+    except (ValueError, UnicodeError):
+        raise IngestionError("INVALID_NEWSNOW", "NewsNow response is not valid JSON") from None
+    if (
+        not isinstance(payload, dict)
+        or payload.get("status") not in {"success", "cache"}
+        or not isinstance(payload.get("items"), list)
+    ):
+        raise IngestionError("INVALID_NEWSNOW", "NewsNow response does not match the source contract")
+    if payload.get("id") != source["source_id"]:
+        raise IngestionError("SOURCE_MISMATCH", "NewsNow returned a different source ID")
+    items, dropped, seen = [], 0, set()
+    for entry in payload["items"]:
+        if not isinstance(entry, dict) or not entry.get("title") or not entry.get("url"):
+            dropped += 1
+            continue
+        try:
+            item = _item(
+                source,
+                str(entry.get("id", "")),
+                str(entry["title"]),
+                str(entry["url"]),
+                _datetime(entry.get("pubDate")),
+                "",
+            )
+        except IngestionError:
+            dropped += 1
+            continue
+        if item["id"] not in seen:
+            items.append(item)
+            seen.add(item["id"])
+    if payload["items"] and not items:
+        raise IngestionError("INVALID_NEWSNOW_ITEMS", "NewsNow contains no usable article links")
+    updated = _datetime(payload.get("updatedTime"))
+    return items, {
+        "content_hash": _hash(_json_bytes(payload["items"])),
+        "upstream_status": payload["status"],
+        "upstream_updated_at": _iso(updated) if updated else None,
+        "parse_warning": None,
+        "dropped_items": dropped,
+    }
+
+
+def _publish(
+    source: dict,
+    storage: Path,
+    now: datetime,
+    raw: bytes,
+    items: list[dict],
+    metadata: dict,
+    prior_items: list[dict],
+) -> dict:
+    snapshot_id = uuid.uuid4().hex
+    base = f"{source['kind']}/{source['id']}"
+    date = now.strftime("%Y/%m/%d")
+    extension = "xml" if source["kind"] == "rss" else "json"
+    prior = {item["id"]: item for item in prior_items}
+    for item in items:
+        item.update(
+            {
+                "snapshot_id": snapshot_id,
+                "fetched_at": _iso(now),
+                "first_seen_at": prior.get(item["id"], {}).get("first_seen_at", _iso(now)),
+                "evidence_id": f"{snapshot_id}:{item['id']}",
+            }
+        )
+    manifest = {
+        **metadata,
+        "snapshot_id": snapshot_id,
+        "source_id": source["id"],
+        "kind": source["kind"],
+        "fetched_at": _iso(now),
+        "raw_hash": _hash(raw),
+        "raw_bytes": len(raw),
+        "item_count": len(items),
+        "raw_path": f"{base}/raw/{date}/{snapshot_id}.{extension}",
+        "parsed_path": f"{base}/parsed/{date}/{snapshot_id}.jsonl",
+        "manifest_path": f"{base}/manifests/{snapshot_id}.json",
+    }
+    _atomic_write(_path(storage, manifest["raw_path"]), raw)
+    _atomic_write(
+        _path(storage, manifest["parsed_path"]), b"".join(_json_bytes(item) + b"\n" for item in items)
+    )
+    _atomic_write(_path(storage, manifest["manifest_path"]), _json_bytes(manifest))
+    # Publish only after every immutable file is complete.
+    _atomic_write(_source_dir(source, storage) / "latest.json", _json_bytes(manifest))
+    return manifest
+
+
+def _retry_after(value: str | None, now: datetime) -> int:
+    if not value:
+        return 0
+    try:
+        return max(0, int(value))
+    except ValueError:
+        date = _datetime(value)
+        return max(0, int((date - now).total_seconds())) if date else 0
+
+
+def _cache_delay(headers: dict, now: datetime) -> int:
+    match = re.search(
+        r"(?:^|,)\s*(?:s-maxage|max-age)\s*=\s*\"?(\d+)", headers.get("cache-control", ""), re.IGNORECASE
+    )
+    if match:
+        try:
+            age = max(0, int(headers.get("age", 0)))
+        except ValueError:
+            age = 0
+        return max(0, int(match[1]) - age)
+    expires = _datetime(headers.get("expires"))
+    return max(0, int((expires - now).total_seconds())) if expires else 0
+
+
+def fetch_source(
+    source: dict,
+    storage: Path,
+    *,
+    client: httpx.Client | None = None,
+    now: datetime | None = None,
+    timeout_seconds: float = 20,
+    max_response_bytes: int = MAX_RESPONSE_BYTES,
+    jitter_ratio: float = 0.05,
+    before_publish=None,
+) -> dict:
+    """Perform one bounded request, returning state, attempt, snapshot and items.
+
+    Expected source keys: id, kind, url, source_id (NewsNow), and
+    configured_interval_seconds. The returned source preserves original keys
+    and contains conditional request state for the caller to persist.
+    ``client`` and ``now`` permit deterministic HTTP failure/clock fixtures.
+    A failure returns the previous valid snapshot without replacing it.
+    """
+    storage = Path(storage)
+    now = now or datetime.now(UTC)
+    if now.tzinfo is None:
+        raise ValueError("now must include a timezone")
+    started = time.monotonic()
+    state = _normalize_source(source)
+    previous = read_latest_snapshot(state, storage)
+    items = load_snapshot_items(previous, storage)
+    snapshot = previous
+    if previous:
+        # Recover a successfully published snapshot if the worker stopped
+        # before committing its returned state to the database.
+        if state.get("snapshot_id") != previous["snapshot_id"]:
+            state["last_success_at"] = previous["fetched_at"]
+            state["last_changed_at"] = previous["fetched_at"]
+        for field in ("etag", "last_modified"):
+            if not state.get(field) and previous.get(field):
+                state[field] = previous[field]
+        state.setdefault("last_checked_at", previous["fetched_at"])
+        if "feed_ttl_seconds" in previous:
+            state["feed_ttl_seconds"] = previous["feed_ttl_seconds"]
+            state["effective_interval_seconds"] = max(
+                state["configured_interval_seconds"],
+                state["upstream_interval_seconds"],
+                state["feed_ttl_seconds"],
+            )
+    attempt = {
+        "id": uuid.uuid4().hex,
+        "source_id": state["id"],
+        "started_at": _iso(now),
+        "request_url": state["url"],
+        "final_url": None,
+        "http_status": None,
+        "bytes": 0,
+        "item_count": 0,
+        "changed": False,
+        "snapshot_id": None,
+        "outcome": "failed",
+        "error_type": None,
+        "error": None,
+    }
+    if state.get("enabled") is False or state.get("status") == "disabled":
+        state["status"] = "disabled"
+        attempt["outcome"] = "disabled"
+        return {"source": state, "attempt": attempt, "snapshot": snapshot, "items": items}
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json"
+        if state["kind"] == "newsnow"
+        else "application/atom+xml, application/rss+xml, application/xml, text/xml",
+    }
+    if state.get("etag"):
+        headers["If-None-Match"] = state["etag"]
+    if state.get("last_modified"):
+        headers["If-Modified-Since"] = state["last_modified"]
+    response_headers: dict = {}
+    owned_client = client is None
+    client = client or httpx.Client(follow_redirects=True)
+    try:
+        with client.stream(
+            "GET", state["url"], headers=headers, timeout=timeout_seconds, follow_redirects=True
+        ) as response:
+            attempt.update({"http_status": response.status_code, "final_url": str(response.url)})
+            response_headers = dict(response.headers)
+            if response.status_code == 304:
+                if snapshot is None:
+                    raise IngestionError(
+                        "ORPHAN_304", "Source returned 304 without a previously valid snapshot"
+                    )
+                attempt["outcome"] = "not_modified"
+            elif response.status_code != 200:
+                raise IngestionError(
+                    f"HTTP_{response.status_code}", f"Source returned HTTP {response.status_code}"
+                )
+            else:
+                chunks: list[bytes] = []
+                for chunk in response.iter_bytes():
+                    attempt["bytes"] += len(chunk)
+                    if attempt["bytes"] > max_response_bytes:
+                        raise IngestionError(
+                            "RESPONSE_TOO_LARGE", "Source response exceeds the configured byte limit"
+                        )
+                    chunks.append(chunk)
+                raw = b"".join(chunks)
+                parsed_items, metadata = (_parse_rss if state["kind"] == "rss" else _parse_newsnow)(
+                    raw, state, response_headers
+                )
+                attempt.update(metadata)
+                state["upstream_updated_at"] = metadata.get("upstream_updated_at")
+                state["upstream_status"] = metadata.get("upstream_status")
+                state["feed_ttl_seconds"] = metadata.get("feed_ttl_seconds", 0)
+                state["effective_interval_seconds"] = max(
+                    state["configured_interval_seconds"],
+                    state["upstream_interval_seconds"],
+                    state["feed_ttl_seconds"],
+                )
+                if previous is None or metadata["content_hash"] != previous["content_hash"]:
+                    if before_publish is not None:
+                        before_publish()
+                    metadata.update(
+                        {
+                            "request_url": state["url"],
+                            "final_url": str(response.url),
+                            "http_status": 200,
+                            "etag": response_headers.get("etag"),
+                            "last_modified": response_headers.get("last-modified"),
+                            "upstream_revision": state.get("upstream_revision"),
+                        }
+                    )
+                    snapshot = _publish(state, storage, now, raw, parsed_items, metadata, items)
+                    items = parsed_items
+                    state["last_success_at"] = _iso(now)
+                    state["last_changed_at"] = _iso(now)
+                    attempt.update({"changed": True, "outcome": "published"})
+                else:
+                    attempt["outcome"] = "unchanged"
+        # Only successful/validated responses replace conditional metadata.
+        for header, field in (("etag", "etag"), ("last-modified", "last_modified")):
+            if header in response_headers:
+                state[field] = response_headers[header]
+        state.update({"status": "healthy", "failure_count": 0, "error": "", "last_checked_at": _iso(now)})
+        delay = max(state["effective_interval_seconds"], _cache_delay(response_headers, now))
+    except (httpx.HTTPError, IngestionError) as exc:
+        failures = int(state.get("failure_count", 0)) + 1
+        error_type = (
+            exc.code
+            if isinstance(exc, IngestionError)
+            else ("TIMEOUT" if isinstance(exc, httpx.TimeoutException) else "NETWORK_ERROR")
+        )
+        # Do not echo remote response bodies or arbitrary request exceptions.
+        message = (
+            str(exc)
+            if isinstance(exc, IngestionError)
+            else ("Source request timed out" if error_type == "TIMEOUT" else "Source network request failed")
+        )
+        attempt.update({"error_type": error_type, "error": message})
+        state.update({"status": "failed", "failure_count": failures, "error": message})
+        base = state["effective_interval_seconds"]
+        delay = max(
+            base,
+            min(86400, base * 2 ** min(failures - 1, 12)),
+            _retry_after(response_headers.get("retry-after"), now),
+        )
+    finally:
+        if owned_client:
+            client.close()
+    delay += random.uniform(0, max(0, jitter_ratio)) * delay
+    state.update(
+        {
+            "last_fetched_at": _iso(now),
+            "next_fetch_at": _iso(now + timedelta(seconds=delay)),
+            "snapshot_id": snapshot["snapshot_id"] if snapshot else None,
+            "snapshot_fetched_at": snapshot["fetched_at"] if snapshot else None,
+            "items": len(items),
+        }
+    )
+    fetched = _datetime(state["snapshot_fetched_at"])
+    age = max(0, int((now - fetched).total_seconds())) if fetched else None
+    state["cache_age_seconds"] = age
+    checked = _datetime(state.get("last_checked_at"))
+    validity_age = max(0, int((now - checked).total_seconds())) if checked else age
+    state["stale"] = (
+        snapshot is None or state["status"] == "failed" or validity_age > state["effective_interval_seconds"]
+    )
+    attempt.update(
+        {
+            "finished_at": _iso(now + timedelta(seconds=time.monotonic() - started)),
+            "duration_ms": round((time.monotonic() - started) * 1000),
+            "item_count": len(items),
+            "snapshot_id": state["snapshot_id"],
+            "etag": response_headers.get("etag"),
+            "last_modified": response_headers.get("last-modified"),
+            "next_fetch_at": state["next_fetch_at"],
+        }
+    )
+    return {"source": state, "attempt": attempt, "snapshot": snapshot, "items": items}

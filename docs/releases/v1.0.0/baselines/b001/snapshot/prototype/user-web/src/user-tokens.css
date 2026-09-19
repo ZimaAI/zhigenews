@@ -1,0 +1,33 @@
+/* User-only theme. The admin application keeps shared/tokens.css. */
+:root {
+  --color-primary: #16803C;
+  --color-primary-hover: #126C33;
+  --color-primary-active: #0E5729;
+  --color-primary-soft: #EDF8EF;
+  --color-primary-border: #BDDCC5;
+  --color-brand: #20B24B;
+  --color-accent: var(--color-brand);
+  --color-accent-soft: #EDF8EF;
+  --color-bg: #F3F4F4;
+  --color-surface: #FFFFFF;
+  --color-surface-muted: #F7F8F8;
+  --color-text: #292D32;
+  --color-text-secondary: #62686D;
+  --color-text-muted: #697075;
+  --color-text-disabled: #959B98;
+  --color-disabled-bg: #F0F2F0;
+  --color-border: #E5E7E8;
+  --color-border-control: #89928B;
+  --color-overlay: rgba(27, 36, 30, .32);
+  --radius-sm: 4px;
+  --radius-control: 4px;
+  --radius-card: 6px;
+  --radius-dialog: 8px;
+  --shadow-popover: 0 8px 28px rgba(29, 43, 33, .09);
+  --shadow-dialog: 0 24px 64px rgba(29, 43, 33, .16);
+  --shadow-canvas: 0 8px 48px rgba(37, 48, 42, .045);
+  --font-size-page-title: 1.75rem;
+  --width-page: 1120px;
+  --control-height: 40px;
+}
+@media (max-width: 767px) { :root { --font-size-page-title: 1.5rem; --control-height: 44px; } }

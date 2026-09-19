@@ -71,3 +71,19 @@
 | DEC-027 | 用户要求匿名账号监测；助手原型落地选择 | 管理端查看账号/IP频率、配额、并发、风险和审计，支持封禁/解除及策略；dev-only中间件演示HttpOnly Cookie和实际拒绝结果 | 生产FastAPI/MySQL、分布式配额与网关防护待正式实施；默认60次/分钟、20生成/日、1并发、同IP10账号/小时为候选可调参数 |
 
 本轮仍 ITERATE，未创建基线、未授权正式后端或推进阶段；main/e7251f3与之前未提交变更均保留，本轮未Git提交。
+
+## 连续交付授权 · 2026-09-19
+
+DEC-028（用户本轮原话）：我确认当前原型与文档通过，按顺序实现接下来的所有阶段。先完整实现项目的后端，再完整实现项目的前端。中途不需要我确认，按工作流的顺序完成当前 1.0.0 版本的交付。
+
+本轮从 ITERATE r5 恢复，以该原话批准当前产品行为，整理现有未完成实施/迁移/交付和技术DTO字段后冻结；不改变已批准用户流程。按 baseline/backend/frontend 分别绑定真实 bNNN/hNNN，免除此版本后续阶段重复询问。仍须通过各验收门槛，不授权生产部署或破坏数据。原有“尚未授权”记录是历史状态。
+
+DEC-029（实施细化）：默认匿名会话30日、管理员8小时；事件90日、未引用快照30日；不自动删除简报。真实模型/Tavily凭据尚未发现，已请求用户本地配置，其他工作持续推进。
+
+## 后端实施与独立验收 · 2026-09-19
+
+DEC-030（落实当前授权）：最终冻结v1.0.0/b002，manifest SHA256为420ebd837df8c239cc1b3ecd4b6509ca1ebca98a3fbeaf6fba4efde2fb58e3d3；b001保留为未批准中间候选。b002已分别记录baseline/backend授权。规范、53操作契约与后端源码隔离；正式前端没有开始。
+
+DEC-031（已实施）：后端采用FastAPI、MySQL8.4、Redis/Celery和真实LangChain create_agent/LangGraph MySQL checkpoint/store。模型provider测试替身明确标记ScriptedModel，仅用于确定性业务测试；真实NewsNow/RSS、数据库迁移/重启、Docker沙箱、HTTP/队列/定时运行已单独验证。完整结果由backend-verification.json及evidence记录，不把测试数量当作所有验收条件通过。
+
+DEC-032（实际外部阻塞）：backend/.env仍缺OPENAI_MODEL、OPENAI_API_KEY、TAVILY_API_KEY，真实模型能力、Tavily及实际LLM评估未通过。保留用户连续推进授权，不再询问阶段确认；阻塞解决后从BACKEND_VERIFY继续，接受真实后端hNNN后才绑定frontend授权。不能以缺凭据为理由跳过门槛或伪造交付。密钥在本地填写，不写入验收文件或聊天。

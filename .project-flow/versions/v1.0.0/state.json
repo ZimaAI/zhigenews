@@ -1,11 +1,29 @@
 {
   "active_backend_handoff": null,
-  "active_baseline": null,
-  "approvals": [],
-  "approved": null,
+  "active_baseline": "b002",
+  "approvals": [
+    {
+      "at": "2026-09-18T16:08:24.364184+00:00",
+      "context_reference": "2026-09-19当前用户确认r5原型及文档并连续交付；b002补齐当前语义的技术DTO与实施/迁移/交付资料，b001未批准",
+      "kind": "baseline",
+      "manifest_sha256": "420ebd837df8c239cc1b3ecd4b6509ca1ebca98a3fbeaf6fba4efde2fb58e3d3",
+      "ref": "v1.0.0/b002",
+      "user_quote": "我确认当前原型与文档通过，按顺序实现接下来的所有阶段。先完整实现项目的后端，再完整实现项目的前端。中途不需要我确认，按工作流的顺序完成当前 1.0.0 版本的交付。"
+    },
+    {
+      "at": "2026-09-18T16:08:25.537848+00:00",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0; formal-backend-absent",
+      "context_reference": "同条指令明确先完整后端，再完整前端；后端验收后绑定实际hNNN记录前端授权",
+      "kind": "backend",
+      "manifest_sha256": "420ebd837df8c239cc1b3ecd4b6509ca1ebca98a3fbeaf6fba4efde2fb58e3d3",
+      "ref": "v1.0.0/b002",
+      "user_quote": "我确认当前原型与文档通过，按顺序实现接下来的所有阶段。先完整实现项目的后端，再完整实现项目的前端。中途不需要我确认，按工作流的顺序完成当前 1.0.0 版本的交付。"
+    }
+  ],
+  "approved": "b002",
   "backend_handoffs": {},
   "blockers": [],
-  "candidate": null,
+  "candidate": "b002",
   "checkpoint_history": [
     {
       "id": "c0001",
@@ -41,9 +59,14 @@
       "id": "c0007",
       "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0007/manifest.json",
       "sha256": "6db231925a13a3ba57fea9d43cf017facc182e42ab4eab145cc2d90c2b16d73c"
+    },
+    {
+      "id": "c0008",
+      "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0008/manifest.json",
+      "sha256": "9f6df6a6004d2f34a7e9c05d740a1e31848e962305d74e81ffde44c92bc6b819"
     }
   ],
-  "code_start_ref": null,
+  "code_start_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0; formal-backend-absent",
   "frontend_verification": null,
   "history": [
     {
@@ -117,20 +140,44 @@
         "to_stage": "ITERATE",
         "version": "v1.0.0"
       }
+    },
+    {
+      "at": "2026-09-18T16:01:43.146373+00:00",
+      "event": "stage",
+      "from": "ITERATE",
+      "reason": "",
+      "to": "SPECIFY"
+    },
+    {
+      "at": "2026-09-18T16:06:35.032927+00:00",
+      "event": "sealed",
+      "ref": "v1.0.0/b001"
+    },
+    {
+      "at": "2026-09-18T16:08:05.074349+00:00",
+      "event": "sealed",
+      "ref": "v1.0.0/b002"
+    },
+    {
+      "at": "2026-09-18T16:53:35.468620+00:00",
+      "event": "stage",
+      "from": "BACKEND_BUILD",
+      "reason": "后端代码和独立实现验证完成，开始验收；真实模型与Tavily仍待配置，未接受交接",
+      "to": "BACKEND_VERIFY"
     }
   ],
   "last_checkpoint": {
-    "id": "c0007",
-    "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0007/manifest.json",
-    "sha256": "6db231925a13a3ba57fea9d43cf017facc182e42ab4eab145cc2d90c2b16d73c"
+    "id": "c0008",
+    "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0008/manifest.json",
+    "sha256": "9f6df6a6004d2f34a7e9c05d740a1e31848e962305d74e81ffde44c92bc6b819"
   },
-  "next_action": "继续 ITERATE r5，按用户反馈调整匿名阅读、生成进度与管理方案。",
+  "next_action": "完成独立后端验收与交接，满足门槛后停在 FRONTEND_READY。",
   "open_questions": [],
   "pending_stage_review": null,
   "prototype_revision": 5,
   "resume_stage": null,
   "schema_version": 4,
-  "stage": "ITERATE",
+  "stage": "BACKEND_VERIFY",
   "version": "v1.0.0",
   "workflow_version": 4
 }

@@ -11,3 +11,9 @@
 
 # Local prototype Cookie sessions and anonymous monitoring data
 **/.demo/
+**/.venv/
+**/.pytest_cache/
+**/.ruff_cache/
+/data/
+/backend/data/
+**/*.egg-info/

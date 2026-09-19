@@ -1,0 +1,72 @@
+# 知更 · v1.0.0
+
+基于 FastAPI、MySQL、LangChain/LangGraph 的个性化新闻简报。当前实施基线为 **v1.0.0/b002**，正式前端须在后端独立验收后实现；原型位于 `docs/releases/v1.0.0/draft/prototype/`，其模拟数据与正式应用隔离。
+
+当前阶段与剩余工作请读 [.project-flow/RESUME.md](.project-flow/RESUME.md)，实际验收结果以版本 evidence/ 中的日志为准。不能把自动化测试中的 synthetic 模型结果视为真实模型或 Tavily 服务通过。
+
+## 本地后端
+
+需要 Python 3.12、uv、Docker Linux engine。命令在仓库根执行：
+
+```powershell
+uv sync --project backend --frozen
+docker compose up -d mysql redis
+uv run --project backend alembic -c backend/alembic.ini upgrade head
+```
+
+复制 [backend/.env.example](backend/.env.example) 到 `backend/.env`，设置加密密钥、IP哈希密钥、管理员密码及模型/Tavily配置。当前开发工作区已生成本地安全密钥和随机管理员密码，保存在被 Git 忽略的 `backend/.env`，不要覆盖已有值。初始化从配置创建管理员，不打印密码：
+
+```powershell
+uv run --project backend python -m zhigenews.cli init
+uv run --project backend uvicorn zhigenews.gateway:app --host 127.0.0.1 --port 18000
+```
+
+数据库仅本机 `127.0.0.1:13316`，Redis `127.0.0.1:56386`。开发容器示例使用本地开发数据库密码；正式环境需设置自己的服务凭据。API为 `http://127.0.0.1:18000/api/v1`，健康探针 `/healthz`，契约 `/openapi.json`。
+
+## VS Code 启动与断点调试
+
+用 VS Code 打开仓库根目录，安装工作区推荐的 Python、Python Debugger 扩展；调试 Vue 原型时安装 Vue - Official，并准备 Node.js 22.12+ 与 Microsoft Edge。
+
+1. 首次使用先按上文配置 `backend/.env`，再通过「终端 → 运行任务」执行 `backend: init`。任务会依次同步 Python 依赖、等待 MySQL/Redis 就绪、执行迁移并初始化数据库；已有 `.env` 不会被覆盖。
+2. 在「运行和调试」选择 **后端：API（18001）**，按 F5 启动，在 `backend/src/zhigenews/gateway.py` 的 `health()` 内设置断点，访问 `http://127.0.0.1:18001/healthz` 即可命中。启动后自动打开 `/docs`；Shift+F5 停止调试。调试端口使用 18001，避免与 Docker API 的 18000 冲突。为保持断点稳定，未启用自动重载，修改代码后重启调试。
+3. 异步任务可分别启动 **Worker（本机 solo）** 和 **Beat（本机调度）**。先停止容器中的 worker/beat（`docker compose --profile app stop worker beat`），避免争抢相同队列或重复调度。本机进程共用根目录工作路径及 `.env`；Beat 状态保存在被忽略的 `backend/.venv/`。Windows 的 solo 入口供逐步调试，涉及 Docker 沙箱挂载的完整生成流程仍使用下方 Linux 容器栈。调试结束后可用 `docker compose --profile app up -d worker beat` 恢复容器任务服务。
+4. **后端：CLI** 支持选择 `environment`、`init`、`collect`、`tick` 并设置断点；后两项会执行真实工作。`backend: lint`、`backend: test` 可从任务菜单运行，测试所需服务与环境变量见「验证」章节。测试资源管理器也支持运行与调试 pytest；如曾选过其他 Python，执行「Python: Select Interpreter」选择 `backend/.venv`。
+5. **原型：用户端 / 管理端（模拟数据）** 会自动安装 npm 依赖、启动 Vite 并打开 Edge 调试，支持 Vue/TypeScript 断点。用户端为 5173，管理端为 5174；管理端同时启动用户端以提供模拟会话接口。原型没有接入正式后端。关闭浏览器调试后，可通过「终端 → 终止任务」停止 Vite。
+
+各后端调试入口都会先执行 `backend: prepare`（同步依赖、启动数据库与缓存、迁移），不会重复初始化管理员。调试结束后数据库与缓存继续运行。配置见 [.vscode/launch.json](.vscode/launch.json)、[.vscode/tasks.json](.vscode/tasks.json)；配置字段遵循 [VS Code Python 调试文档](https://code.visualstudio.com/docs/python/debugging) 与 [任务文档](https://code.visualstudio.com/docs/debugtest/tasks)。
+
+## Linux API / worker / scheduler
+
+```powershell
+docker compose --profile app build api
+docker compose --profile app run --rm api alembic upgrade head
+docker compose --profile app run --rm api python -m zhigenews.cli init
+docker compose --profile app up -d api worker beat
+```
+
+服务使用同一 MySQL 与 Redis。单独的 beat 扫描持久计划与 outbox，Celery worker 执行采集、Agent、评估和发布。容器数据位于 `zhigenews_runtime` 卷；API/worker统一挂载到同一绝对路径，使可信worker启动的隔离bash容器能够只读绑定本次工作区。Docker socket仅供可信worker创建沙箱，绝不挂载进Agent沙箱。沙箱无网络、非root、只读根和持久挂载、资源/输出/超时受限；不可用时不回退宿主shell。
+
+本地原生调试和Linux容器使用各自的数据路径，不要混用同一运行的文件目录；正式闭环统一使用容器栈。`docker compose stop`保留数据；本项目不提供自动删除数据卷或无损数据库降级承诺。
+
+## 配置与接口
+
+`POST /auth/anonymous`自动签发HttpOnly匿名Cookie，管理员使用独立登录Cookie。所有写请求发送 `X-Zhige-Request: 1`；有Origin时必须在ALLOWED_ORIGINS白名单。创建生成、采集、评估与发布重试发送稳定 `Idempotency-Key`（8–128字符），同键不同body返回409。429遵循Retry-After。
+
+CLI初始化的模型保留未验证、Agent配置保留草稿。管理员真实测试工具调用能力后发布配置，才能创建生成；密钥只写、加密保存、不回显。用户只看公开进度，完整事件/SSE只对管理员开放。`submitted`只表示站内发布，不表示已读。
+
+## 验证
+
+```powershell
+$env:HARNESS_TEST_MYSQL_URL='mysql+pymysql://zhigenews:local-development@127.0.0.1:13316/zhigenews'
+$env:HARNESS_TEST_DOCKER='1'
+uv run --project backend pytest backend/tests -q
+uv run --project backend ruff check backend
+uv run --project backend python backend/scripts/verify_live.py --report .project-flow/versions/v1.0.0/evidence/live-services.json
+Get-Content backend/scripts/verify_runtime.py -Raw | docker compose exec -T worker python -
+```
+
+测试使用独立测试标识并清理其记录；MySQL、Docker验收须实际开启对应环境，skipped不算通过。`verify_live.py`最多一次模型工具调用和一次Tavily检索，缺少配置明确返回blocked。完整系统验收还要求真实生成、发布、调度与两个正式前端，不能以这些依赖探针代替。
+
+全套测试前先停止beat/worker，避免调度消费测试outbox，完成后再启动。迁移测试还需设置`MIGRATION_ADMIN_DATABASE_URL`指向本地MySQL管理员连接；仅创建/清理随机命名的`zg_migration_test_*`临时库。`verify_runtime.py`验证容器HTTP、队列与嵌套沙箱，并清理自己的synthetic reader；它不验证外部模型。
+
+详细规范见 [基线索引](docs/releases/v1.0.0/baselines/b002/snapshot/spec/00-index.md)，运行事件仅记录可展示结果、耗时和脱敏工具摘要，不采集模型私有思维链。

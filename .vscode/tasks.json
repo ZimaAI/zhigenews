@@ -1,0 +1,211 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "backend: sync",
+      "type": "process",
+      "command": "uv",
+      "args": [
+        "sync",
+        "--project",
+        "backend",
+        "--frozen"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "backend: services",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "compose",
+        "up",
+        "-d",
+        "--wait",
+        "mysql",
+        "redis"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "backend: migrate",
+      "type": "process",
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "backend",
+        "alembic",
+        "-c",
+        "backend/alembic.ini",
+        "upgrade",
+        "head"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "backend: prepare",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "backend: sync",
+        "backend: services",
+        "backend: migrate"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "backend: init",
+      "type": "process",
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "backend",
+        "python",
+        "-m",
+        "zhigenews.cli",
+        "init"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "dependsOn": "backend: prepare"
+    },
+    {
+      "label": "backend: lint",
+      "type": "process",
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "backend",
+        "ruff",
+        "check",
+        "backend"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "backend: test",
+      "type": "process",
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "backend",
+        "pytest",
+        "backend/tests",
+        "-q"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "prototype: install",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "ci"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/docs/releases/v1.0.0/draft/prototype"
+      },
+      "problemMatcher": [],
+      "windows": {
+        "command": "npm.cmd"
+      }
+    },
+    {
+      "label": "prototype: user",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "dev:user"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/docs/releases/v1.0.0/draft/prototype",
+        "env": {
+          "NO_COLOR": "1"
+        }
+      },
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": {
+          "regexp": "^(.+):(\\d+):(\\d+): (error|warning): (.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "VITE v",
+          "endsPattern": "Local:.*http://127\\.0\\.0\\.1:5173/"
+        }
+      },
+      "windows": {
+        "command": "npm.cmd"
+      },
+      "isBackground": true,
+      "dependsOn": [
+        "prototype: install"
+      ]
+    },
+    {
+      "label": "prototype: admin",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "dev:admin"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/docs/releases/v1.0.0/draft/prototype",
+        "env": {
+          "NO_COLOR": "1"
+        }
+      },
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": {
+          "regexp": "^(.+):(\\d+):(\\d+): (error|warning): (.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "VITE v",
+          "endsPattern": "Local:.*http://127\\.0\\.0\\.1:5174/"
+        }
+      },
+      "windows": {
+        "command": "npm.cmd"
+      },
+      "isBackground": true,
+      "dependsOn": [
+        "prototype: user"
+      ]
+    }
+  ]
+}

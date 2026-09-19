@@ -1,0 +1,126 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "后端：API（18001）",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "zhigenews.gateway:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "18001"
+      ],
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/backend/.venv/bin/python",
+      "windows": {
+        "python": "${workspaceFolder}/backend/.venv/Scripts/python.exe"
+      },
+      "envFile": "${workspaceFolder}/backend/.env",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "preLaunchTask": "backend: prepare",
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "Uvicorn running on (http://\\S+)",
+        "uriFormat": "%s/docs"
+      }
+    },
+    {
+      "name": "后端：Worker（本机 solo）",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "celery",
+      "args": [
+        "-A",
+        "zhigenews.workers:celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--pool=solo",
+        "--concurrency=1"
+      ],
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/backend/.venv/bin/python",
+      "windows": {
+        "python": "${workspaceFolder}/backend/.venv/Scripts/python.exe"
+      },
+      "envFile": "${workspaceFolder}/backend/.env",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "preLaunchTask": "backend: prepare"
+    },
+    {
+      "name": "后端：Beat（本机调度）",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "celery",
+      "args": [
+        "-A",
+        "zhigenews.workers:celery_app",
+        "beat",
+        "--loglevel=INFO",
+        "--schedule",
+        "${workspaceFolder}/backend/.venv/celerybeat-schedule"
+      ],
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/backend/.venv/bin/python",
+      "windows": {
+        "python": "${workspaceFolder}/backend/.venv/Scripts/python.exe"
+      },
+      "envFile": "${workspaceFolder}/backend/.env",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "preLaunchTask": "backend: prepare"
+    },
+    {
+      "name": "后端：CLI",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "zhigenews.cli",
+      "args": [
+        "${input:cliCommand}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/backend/.venv/bin/python",
+      "windows": {
+        "python": "${workspaceFolder}/backend/.venv/Scripts/python.exe"
+      },
+      "envFile": "${workspaceFolder}/backend/.env",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "preLaunchTask": "backend: prepare"
+    },
+    {
+      "name": "原型：用户端（模拟数据）",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://127.0.0.1:5173",
+      "webRoot": "${workspaceFolder}/docs/releases/v1.0.0/draft/prototype/user-web",
+      "preLaunchTask": "prototype: user"
+    },
+    {
+      "name": "原型：管理端（模拟数据）",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://127.0.0.1:5174",
+      "webRoot": "${workspaceFolder}/docs/releases/v1.0.0/draft/prototype/admin-web",
+      "preLaunchTask": "prototype: admin"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "cliCommand",
+      "type": "pickString",
+      "description": "选择 CLI 命令；init 初始化数据库，collect/tick 会执行真实采集或调度。",
+      "options": [
+        "environment",
+        "init",
+        "collect",
+        "tick"
+      ],
+      "default": "environment"
+    }
+  ]
+}

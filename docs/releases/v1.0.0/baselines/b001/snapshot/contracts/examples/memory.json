@@ -1,0 +1,10 @@
+{
+  "synthetic": true,
+  "schema": "Memory",
+  "data": {
+    "id": "synthetic-memory-01",
+    "text": "示例：优先阅读工程实践。",
+    "source": "示例用户反馈",
+    "updatedAt": "2026-09-17T09:00:00+08:00"
+  }
+}

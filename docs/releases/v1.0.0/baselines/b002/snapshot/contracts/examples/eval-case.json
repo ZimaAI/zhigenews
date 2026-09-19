@@ -1,0 +1,21 @@
+{
+  "synthetic": true,
+  "schema": "EvalCase",
+  "data": {
+    "id": "synthetic-case-01",
+    "name": "【模拟】固定新闻引用测试",
+    "preference": "关注 Agent 工程",
+    "expected": "来源和引用完整，未知新闻发布时间保持未知",
+    "preferenceSnapshot": {
+      "version": 0,
+      "role": "关注 Agent 工程",
+      "topics": [],
+      "keywords": []
+    },
+    "fixedAt": "2026-09-18T00:12:00Z",
+    "sourceSnapshotIds": [
+      "synthetic-snapshot-01"
+    ],
+    "revision": 1
+  }
+}

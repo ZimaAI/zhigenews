@@ -1,0 +1,11 @@
+{
+  "synthetic": true,
+  "schema": "AbuseEvent",
+  "data": {
+    "id": "abuse-example",
+    "accountId": "anon-example",
+    "time": "2026-09-18T08:12:00+08:00",
+    "kind": "rate_limited",
+    "detail": "请求频率达到限制，请稍后重试。"
+  }
+}

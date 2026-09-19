@@ -1,0 +1,16 @@
+{
+  "synthetic": true,
+  "schema": "Preferences",
+  "data": {
+    "version": 3,
+    "role": "示例：关注 AI 应用落地的开发者。",
+    "topics": [
+      "Agent 工程",
+      "开源生态"
+    ],
+    "keywords": [
+      "Agent",
+      "开源"
+    ]
+  }
+}

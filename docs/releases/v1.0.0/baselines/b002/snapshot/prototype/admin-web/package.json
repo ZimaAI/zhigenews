@@ -1,0 +1,9 @@
+{
+  "name": "@zhigenews/admin-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "vite", "build": "vite build" },
+  "dependencies": { "vue": "^3.5.0", "vue-router": "^4.5.0", "lucide-vue-next": "^0.468.0" },
+  "devDependencies": { "vite": "^7.0.0", "@vitejs/plugin-vue": "^6.0.0", "typescript": "^5.9.0" }
+}

@@ -1,0 +1,11 @@
+.git
+.project-flow
+docs
+**/.venv
+**/__pycache__
+**/node_modules
+**/data
+data
+**/.env
+**/.env.*
+**/.pytest_cache

@@ -8,7 +8,16 @@
   "versions": {
     "v1.0.0": {
       "base": null,
-      "baselines": {},
+      "baselines": {
+        "b001": {
+          "manifest": "docs/releases/v1.0.0/baselines/b001/manifest.json",
+          "sha256": "05365a18656a7e3c3f39a343ebf23597d242596636edf00f75c8b557ebbb03eb"
+        },
+        "b002": {
+          "manifest": "docs/releases/v1.0.0/baselines/b002/manifest.json",
+          "sha256": "420ebd837df8c239cc1b3ecd4b6509ca1ebca98a3fbeaf6fba4efde2fb58e3d3"
+        }
+      },
       "created_at": "2026-09-18T12:06:30.265220+00:00",
       "delivery": null
     }

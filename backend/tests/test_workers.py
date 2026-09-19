@@ -218,7 +218,8 @@ def test_stale_lease_cannot_publish_snapshot_or_overwrite_new_owner(sandbox, tmp
         row = session.get(Resource, ident)
         assert row.lease_token == "synthetic-new-owner"
         assert row.data["snapshotId"] is None
-    assert not (tmp_path / "rss" / ident / "latest.json").exists()
+    assert not list(tmp_path.rglob("latest.json"))
+    assert not list(tmp_path.rglob("index.json"))
 
 
 def test_due_sources_keep_independent_intervals_and_survive_scheduler_restart(sandbox):

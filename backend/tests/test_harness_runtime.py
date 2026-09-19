@@ -49,6 +49,100 @@ def ai_call(name, args, call_id):
     )
 
 
+def test_initial_request_is_independent_of_news_volume(tmp_path):
+    prompts = []
+    for count in (1, 1000):
+        model = ScriptedModel(responses=[ai_call("BriefOutput", {
+            "title": "Synthetic no-match brief", "items": [],
+        }, "final")])
+        request = HarnessRequest(
+            "u", "r", "t", {"topics": ["AI"]}, {"tools": ["read_file"]},
+            tmp_path / "rss", tmp_path / str(count), model,
+            evidence=[{"id": str(i), "title": "Private synthetic headline"} for i in range(count)],
+            fixed_at="2026-09-19T08:00:00+08:00",
+        )
+        HarnessRunner(checkpointer=InMemorySaver()).run(request)
+        prompts.append([message.content for message in model.received[0]])
+    assert prompts[0] == prompts[1]
+    assert "Private synthetic headline" not in str(prompts)
+    initial = json.loads(prompts[0][-1].split("\n", 1)[1])
+    assert initial["windowStart"] == "2026-09-18T08:00:00+08:00"
+    assert initial["windowEnd"] == "2026-09-19T08:00:00+08:00"
+    assert initial["currentDate"] == "2026-09-19" and initial["timezone"] == "+08:00"
+    assert initial["windowHours"] == 24 and initial["preferences"] == {"topics": ["AI"]}
+    assert "evidence_index" not in initial
+
+
+def test_agent_reads_source_files_and_resolves_only_selected_evidence(tmp_path):
+    source = tmp_path / "news-source"
+    source.mkdir()
+    record = {
+        "id": "article", "evidence_id": "snapshot:article", "title": "Synthetic AI release",
+        "source": "Synthetic RSS", "source_id": "source", "source_type": "rss",
+        "url": "https://example.test/article", "published_at": "2026-09-18T23:00:00Z",
+        "fetched_at": "2026-09-19T00:00:00Z", "snapshot_id": "snapshot",
+    }
+    (source / "records.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+    (source / "index.json").write_text(json.dumps({"items": [{
+        "evidence_id": "snapshot:article", "title": record["title"],
+        "file": "records.jsonl", "line": 1,
+    }]}), encoding="utf-8")
+    resolved = []
+
+    def resolve(ident):
+        resolved.append(ident)
+        return record if ident == "snapshot:article" else None
+
+    model = ScriptedModel(responses=[
+        ai_call("read_file", {"path": "/news/source/index.json"}, "index"),
+        ai_call("read_file", {"path": "/news/source/records.jsonl", "start_line": 1, "end_line": 1}, "record"),
+        ai_call("BriefOutput", {"title": "Synthetic brief", "items": [{
+            "evidence_id": "snapshot:article", "summary": "AI release", "reason": "Matches AI", "topic": "AI",
+        }]}, "final"),
+    ])
+    request = HarnessRequest(
+        "u", "r", "t", {"topics": ["AI"]}, {"tools": ["read_file"]},
+        tmp_path / "rss", tmp_path / "run", model,
+        fixed_at="2026-09-19T00:00:00Z", news_roots={"source": source}, resolve_evidence=resolve,
+    )
+    result = HarnessRunner(checkpointer=InMemorySaver()).run(request)
+    assert resolved == ["snapshot:article"]
+    assert [item["id"] for item in result.items] == ["snapshot:article"]
+    tool_results = [message for message in result.state["messages"] if isinstance(message, ToolMessage)]
+    assert "Synthetic AI release" in tool_results[0].content
+    assert "2026-09-18T23:00:00Z" in tool_results[1].content
+    initial = json.loads(model.received[0][-1].content.split("\n", 1)[1])
+    assert "/news" in initial["directories"] and "/rss" not in initial["directories"]
+    assert "Synthetic AI release" not in str(model.received[0])
+
+
+@pytest.mark.parametrize(("published", "accepted"), [
+    (None, False), ("invalid", False), ("2026-09-18T23:00:00", False),
+    ("2026-09-19T00:00:01Z", False), ("2026-09-17T23:59:59Z", False),
+    ("2026-09-18T00:00:00Z", True), ("2026-09-19T00:00:00Z", True),
+    ("2026-09-19T07:00:00+08:00", True),
+])
+def test_brief_only_publishes_explicit_times_in_fixed_window(tmp_path, published, accepted):
+    model = ScriptedModel(responses=[ai_call("BriefOutput", {
+        "title": "Synthetic dated brief", "items": [{
+            "evidence_id": "n1", "summary": "AI summary", "reason": "Matches AI", "topic": "AI",
+        }],
+    }, "final")])
+    request = HarnessRequest(
+        "u", "r", "t", {"topics": ["AI"]}, {"tools": ["read_file"], "windowHours": 72},
+        tmp_path / "rss", tmp_path / "run", model,
+        evidence=[{
+            "id": "n1", "title": "Synthetic AI release", "url": "https://example.test/article",
+            "source": "Synthetic", "published_at": published,
+            "fetched_at": "2026-09-19T00:00:00Z", "snapshot_id": "s1",
+        }], fixed_at="2026-09-19T00:00:00Z",
+    )
+    result = HarnessRunner(checkpointer=InMemorySaver()).run(request)
+    assert bool(result.items) is accepted
+    if not accepted:
+        assert result.limitations
+
+
 def test_repair_order_missing_orphans_duplicates_and_idempotency():
     user = HumanMessage(content="preserve", id="user")
     ai = AIMessage(
@@ -191,15 +285,16 @@ def test_create_agent_repeated_tool_loop_and_budget(tmp_path):
                 "source": "Fixture",
                 "source_type": "rss",
                 "url": "https://example.com/news",
-                "published_at": None,
+                "published_at": "2026-09-18T23:00:00Z",
                 "fetched_at": "2026-09-19T00:00:00Z",
                 "snapshot_id": "s1",
             }
         ],
+        fixed_at="2026-09-19T00:00:00Z",
     )
     result = HarnessRunner(checkpointer=InMemorySaver()).run(req, events.append)
     assert model.position == 3 and result.usage["modelCalls"] == 3 and result.usage["toolCalls"] == 2
-    assert result.items[0]["publishedAt"] is None
+    assert result.items[0]["publishedAt"] == "2026-09-18T23:00:00Z"
     assert (workspace / "output" / "brief.json").exists()
     assert len([event for event in events if event["type"] == "tool_completed"]) == 2
     req.model = ScriptedModel(responses=[ai_call("list_dir", {}, "repeat")])
@@ -215,7 +310,7 @@ def test_create_agent_repeated_tool_loop_and_budget(tmp_path):
      ("synthetic-key", ["read_file", "web_search"], True),
      ("synthetic-key", ["read_file"], False)],
 )
-def test_initial_evidence_supports_direct_brief_and_search_matches_credentials(
+def test_private_evidence_stays_out_of_prompt_and_search_matches_credentials(
     tmp_path, api_key, enabled, search_available
 ):
     class RecordingModel(ScriptedModel):
@@ -234,7 +329,7 @@ def test_initial_evidence_supports_direct_brief_and_search_matches_credentials(
         "source": "Fixture RSS",
         "source_type": "rss",
         "url": "https://example.com/news",
-        "published_at": None,
+        "published_at": "2026-09-18T23:00:00Z",
         "fetched_at": "2026-09-19T00:00:00Z",
         "snapshot_id": "snapshot-1",
         "content": "",
@@ -254,29 +349,17 @@ def test_initial_evidence_supports_direct_brief_and_search_matches_credentials(
     request = HarnessRequest(
         "u", "r", "t", {"topics": ["AI"]}, {"tools": enabled},
         tmp_path / "rss", workspace, model, evidence=records, tavily_api_key=api_key,
+        fixed_at="2026-09-19T00:00:00Z",
     )
     result = HarnessRunner(checkpointer=InMemorySaver()).run(request)
     assert result.usage["modelCalls"] == 1 and result.usage["toolCalls"] == 0
     assert ("web_search" in model.bound_tools) == search_available
     initial = next(message for message in model.received[0] if isinstance(message, HumanMessage))
-    entry = json.loads(initial.content.split("\n", 1)[1])["evidence_index"][0]
-    assert entry["summary"] == item["summary"]
-    assert entry["source"] == item["source"] and entry["snapshot_id"] == item["snapshot_id"]
-    assert entry["fetched_at"] == item["fetched_at"] and entry["published_at"] is None
-    assert entry["file"] == "/workspace/inputs/evidence.jsonl" and entry["line"] == 2
-    assert not entry["summary_truncated"] and not entry["has_content"]
-    assert result.items[0]["publishedAt"] is None
+    payload = json.loads(initial.content.split("\n", 1)[1])
+    assert "evidence_index" not in payload
+    assert item["title"] not in initial.content and item["summary"] not in initial.content
+    assert result.items[0]["publishedAt"] == "2026-09-18T23:00:00Z"
     assert request.config["tools"] == enabled
-
-
-def test_evidence_index_marks_extra_body_and_truncated_summary_without_false_file_locations(tmp_path):
-    from zhigenews.harness.runner import evidence_index
-
-    entry = evidence_index({"search-1": {
-        "id": "search-1", "summary": "x" * 800, "content": "Full source text",
-    }}, tmp_path)[0]
-    assert len(entry["summary"]) == 500 and entry["summary_truncated"] and entry["has_content"]
-    assert "file" not in entry and "line" not in entry
 
 
 @pytest.mark.parametrize(
@@ -448,6 +531,9 @@ def test_subagent_real_loop_shares_total_budget_and_thread(tmp_path):
         tmp_path / "rss",
         tmp_path / "run",
         model,
+        evidence=[{"id": "private-record", "title": "Private child headline"}],
+        news_roots={},
+        fixed_at="2026-09-19T00:00:00Z",
     )
     events = []
     result = HarnessRunner(checkpointer=InMemorySaver()).run(request, events.append)
@@ -455,6 +541,12 @@ def test_subagent_real_loop_shares_total_budget_and_thread(tmp_path):
     child = next(e for e in events if e["type"] == "subagent_started")
     assert child["childRunId"] != "parent"
     assert any(e["type"] == "harness_completed" and e["runId"] == child["childRunId"] for e in events)
+    for call in model.received:
+        initial = next(message for message in call if isinstance(message, HumanMessage))
+        payload = json.loads(initial.content.split("\n", 1)[1])
+        assert payload["windowEnd"] == "2026-09-19T00:00:00+00:00"
+        assert "/news" in payload["directories"] and "/rss" not in payload["directories"]
+        assert "Private child headline" not in initial.content and "evidence_index" not in payload
 
 
 def test_interrupted_child_resumes_its_pending_write(tmp_path):

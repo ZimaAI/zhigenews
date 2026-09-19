@@ -2,7 +2,7 @@
 
 Linux uses directory descriptors and O_NOFOLLOW throughout each operation. On
 Windows all reparse points are rejected; Linux remains the deployment boundary.
-Only this service writes persistent run files; bash sees read-only mounts.
+CAS protects file-tool writes; bash may also write the current workspace.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import stat
 import tempfile
 import time
@@ -25,18 +26,38 @@ def _hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def authorized_news_roots(news_roots: dict[str, Path]) -> dict[str, Path]:
+    roots = {}
+    for source_id, path in news_roots.items():
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", source_id):
+            raise HarnessError("INVALID_PATH", "新闻来源标识不可用作目录名称。")
+        root = Path(path).resolve(strict=True)
+        if not root.is_dir():
+            raise HarnessError("INVALID_PATH", "新闻来源目录不存在。")
+        roots[source_id] = root
+    return roots
+
+
 class FileService:
     def __init__(
-        self, rss_root: Path, workspace_root: Path, actor: str = "main", *, output_bytes: int = 16384
+        self,
+        rss_root: Path,
+        workspace_root: Path,
+        actor: str = "main",
+        *,
+        output_bytes: int = 16384,
+        news_roots: dict[str, Path] | None = None,
     ):
-        self.roots = {
-            "rss": Path(rss_root).resolve(strict=True),
-            "workspace": Path(workspace_root).resolve(strict=True),
-        }
+        self.roots = {"workspace": Path(workspace_root).resolve(strict=True)}
+        self.news_roots = authorized_news_roots(news_roots) if news_roots is not None else None
+        if self.news_roots is None:
+            self.roots["rss"] = Path(rss_root).resolve(strict=True)
+        else:
+            self.roots.update({f"news/{source}": root for source, root in self.news_roots.items()})
         self.actor = actor
         self.output_bytes = output_bytes
         self.metadata = self.roots["workspace"].parent / ("." + self.roots["workspace"].name + ".harness")
-        self.metadata.mkdir(exist_ok=True)
+        self.metadata.mkdir(mode=0o700, exist_ok=True)
         self.lock = FileLock(str(self.metadata / "files.lock"))
         self.ledger_file = self.metadata / "files.json"
 
@@ -48,16 +69,17 @@ class FileService:
             or virtual.startswith("//")
             or any(x in virtual for x in ("\\", "\x00", ":", "%", "~"))
         ):
-            raise HarnessError("INVALID_PATH", "仅支持 /rss 和 /workspace 的 POSIX 虚拟路径。")
+            raise HarnessError("INVALID_PATH", "仅支持授权新闻目录和 /workspace 的 POSIX 虚拟路径。")
         raw = virtual.split("/")
         if any(p in ("..", ".") for p in raw):
             raise HarnessError("INVALID_PATH", "路径不得包含父目录或相对目录段。")
         parts = PurePosixPath(virtual).parts[1:]
-        if not parts or parts[0] not in self.roots:
+        mount = "/".join(parts[:2]) if parts and parts[0] == "news" else parts[0] if parts else ""
+        if mount not in self.roots:
             raise HarnessError("INVALID_PATH", "路径不属于本次运行的授权目录。")
-        if write and (parts[0] != "workspace" or len(parts) < 3 or parts[1] != "output"):
-            raise HarnessError("PERMISSION_DENIED", "只有 /workspace/output 下的文件可写。")
-        root, rel = self.roots[parts[0]], parts[1:]
+        if write and (parts[0] != "workspace" or len(parts) < 2):
+            raise HarnessError("PERMISSION_DENIED", "只有本次 /workspace 下的文件可写。")
+        root, rel = self.roots[mount], parts[2:] if parts[0] == "news" else parts[1:]
         candidate = root
         for part in rel:
             candidate = candidate / part
@@ -94,12 +116,20 @@ class FileService:
             yield None, str(parent / rel[-1])
 
     def _open(self, name: str, flags: int, parent_fd: int | None) -> int:
-        # The unprivileged read-only sandbox must be able to read this run's output.
-        # Authorization is the isolated mount, not the host file owner identity.
-        fd = os.open(name, flags | getattr(os, "O_NOFOLLOW", 0), 0o644, dir_fd=parent_fd)
-        if not stat.S_ISREG(os.fstat(fd).st_mode):
+        # A root service writes for the unprivileged workspace owner. Non-root
+        # services run the sandbox as their own UID instead.
+        fd = os.open(
+            name,
+            flags | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0),
+            0o644,
+            dir_fd=parent_fd,
+        )
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
             os.close(fd)
-            raise HarnessError("INVALID_PATH", "只允许普通文本文件。")
+            raise HarnessError("INVALID_PATH", "只允许无硬链接的普通文本文件。")
+        if flags & os.O_CREAT and os.name == "posix" and os.getuid() == 0:
+            os.fchown(fd, 65534, 65534)
         return fd
 
     def _ledger(self) -> dict:
@@ -300,9 +330,24 @@ class FileService:
                 raise HarnessError("INVALID_PATH", "文件类型或路径不可访问。") from None
 
     def list_dir(self, path: str = "/workspace", offset: int = 0, limit: int = 50) -> dict:
-        root, rel, virtual = self._parts(path)
         if offset < 0 or limit < 1:
             raise HarnessError("INVALID_RANGE", "分页参数无效。")
+        if self.news_roots is not None and path.rstrip("/") == "/news":
+            sources, entries, used, cursor = sorted(self.news_roots), [], 512, offset
+            for source in sources[offset : offset + min(limit, 200)]:
+                item = {"name": source, "path": f"/news/{source}", "type": "directory"}
+                used += len(json.dumps(item, ensure_ascii=False).encode())
+                if used > self.output_bytes:
+                    break
+                entries.append(item)
+                cursor += 1
+            return {
+                "ok": True,
+                "entries": entries,
+                "truncated": cursor < len(sources),
+                "nextOffset": cursor if cursor < len(sources) else None,
+            }
+        root, rel, virtual = self._parts(path)
         entries, used, directory_fd = [], 512, None
         try:
             if os.name == "posix":
@@ -353,13 +398,22 @@ class FileService:
     def search_content(self, query: str, path: str = "/workspace", limit: int = 20) -> dict:
         if not query or len(query) > 500:
             raise HarnessError("INVALID_QUERY", "搜索词须为 1–500 字。")
-        root, rel, virtual = self._parts(path)
-        target = root.joinpath(*rel)
-        if not target.exists():
-            raise HarnessError("FILE_NOT_FOUND", "搜索目录不存在。")
+        if self.news_roots is not None and path.rstrip("/") == "/news":
+            targets = [(root, root, f"/news/{source}") for source, root in sorted(self.news_roots.items())]
+        else:
+            root, rel, virtual = self._parts(path)
+            target = root.joinpath(*rel)
+            if not target.exists():
+                raise HarnessError("FILE_NOT_FOUND", "搜索目录不存在。")
+            targets = [(root, target, virtual)]
         matches, used, count, truncated = [], 512, 0, False
         started = time.monotonic()
-        for directory, dirs, files in os.walk(target, followlinks=False):
+        walks = (
+            (root, target, virtual, directory, dirs, files)
+            for root, target, virtual in targets
+            for directory, dirs, files in os.walk(target, followlinks=False)
+        )
+        for root, target, virtual, directory, dirs, files in walks:
             dirs[:] = sorted(d for d in dirs if not Path(directory, d).is_symlink())
             for filename in sorted(files):
                 count += 1

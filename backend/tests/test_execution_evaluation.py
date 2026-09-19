@@ -216,7 +216,7 @@ def test_evaluation_executes_frozen_case_with_real_agent_and_persists_unknown_ju
         }
     model = ScriptedModel(
         responses=[
-            ai_call("read_file", {"path": "/workspace/inputs/evidence.jsonl"}, "synthetic-evaluation-read"),
+            ai_call("read_file", {"path": "/news/fixed/records.jsonl"}, "synthetic-evaluation-read"),
             final_response(),
         ]
     )
@@ -244,9 +244,11 @@ def test_evaluation_executes_frozen_case_with_real_agent_and_persists_unknown_ju
     assert json.loads((case.workspace / "inputs" / "preferences.json").read_text("utf-8")) == case.preferences
     actual_evidence = [
         json.loads(line)
-        for line in (case.workspace / "inputs" / "evidence.jsonl").read_text("utf-8").splitlines()
+        for line in (case.workspace.parent / "news" / "records.jsonl").read_text("utf-8").splitlines()
     ]
     assert actual_evidence == case.frozen["sources"][case.snapshot_id]
+    assert not (case.workspace / "inputs" / "evidence.jsonl").exists()
+    assert "evidence_index" not in str(model.received[0])
     artifact = json.loads((case.workspace / "output" / "brief.json").read_text("utf-8"))
     assert artifact["items"][0]["snapshotId"] == case.snapshot_id
     with mysql_persistence(get_settings().database_url) as saver:

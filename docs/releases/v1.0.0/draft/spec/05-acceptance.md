@@ -24,11 +24,11 @@
 | AC-BE-002 | REQ-AUTH-001 | backend | 首次无Cookie请求由服务器建立匿名账号并签发HttpOnly Cookie；生产Secure/SameSite=Lax，服务器只存token哈希且执行过期/撤销；同Cookie幂等恢复，封禁403不换号。匿名全部用户功能可用但管理接口403；跨用户简报/进度404，CSRF跨源写请求拒绝。 |
 | AC-BE-003 | REQ-PREF-001, REQ-BRIEF-001 | backend | 偏好仅接收话题、背景、关键词及并发版本；空话题和空关键词不能一起保存，并发冲突返回 409；保存与首次完成标记原子持久化；无匹配不凑条数，未知发布时间不冒充新新闻。 |
 | AC-BE-004 | REQ-SRC-001 | backend | 至少两个 NewsNow 源按各自上游周期调度；本地不快于上游；重复调度不并发拉取同源；缓存年龄及失败可追溯。 |
-| AC-BE-005 | REQ-SRC-002 | backend | RSS 条件请求/304、超时、坏 XML 与退避有可重复样例；原始文件与元数据按源/日期/快照落盘；失败不覆写有效快照。 |
+| AC-BE-005 | REQ-SRC-002 | backend | RSS 条件请求/304、超时、坏 XML 与退避有可重复样例；原始文件与元数据按源/配置身份/日期/快照落盘；失败不覆写有效快照。每次采集结束维护发布时间索引，未知/未来/过期排除，窗口内已退出上游列表的新闻继续保留并去重。 |
 | AC-BE-006 | REQ-SRC-003, REQ-TOOL-001, REQ-FS-003 | backend | 六个必需工具可实际调用；Tavily 保留来源与查询并限制结果/调用/超时；list/search/bash 输出有上限与截断标志，read 支持行范围。 |
-| AC-BE-007 | REQ-FS-001 | backend | 合法虚拟挂载可读取；`../`、宿主绝对路径、盘符/UNC、符号链接/重解析点及路径替换后越界均拒绝；RSS 只读且其他用户根不可见。 |
+| AC-BE-007 | REQ-FS-001 | backend | 合法虚拟挂载可读取；`../`、宿主绝对路径、盘符/UNC、符号链接/重解析点及路径替换后越界均拒绝；授权新闻只读、整个本次工作区可写且其他运行不可见。 |
 | AC-BE-008 | REQ-FS-002 | backend | 读片段仍记录全文件 hash；并发变更后写返回 FILE_CHANGED；重读后可写；两个并发覆盖仅一个成功；新建排他且合法父目录必需。 |
-| AC-BE-009 | REQ-FS-004 | backend | bash 在隔离环境运行，无宿主凭据/他人目录/网络；持久挂载写入失败，CAS write_file 合法写入成功；无隔离环境时不能回退宿主 shell。 |
+| AC-BE-009 | REQ-FS-004 | backend | bash 在真实 Linux 隔离环境运行，无宿主凭据/他人目录/网络；新闻挂载写入失败，本次工作区写入实际落盘；write_file 保留 CAS 检查，bash 直接写入不经 CAS；无隔离环境时不能回退宿主 shell。 |
 | AC-BE-010 | REQ-AGENT-002, REQ-MEM-001 | backend | Agent 能按工具结果继续选择行动且受总预算限制；MySQL checkpoint 经进程重启可恢复；子任务共享预算/取消并隔离 thread；保留线程摘要，不保存或注入跨会话长期记忆。 |
 | AC-BE-011 | REQ-MSG-001 | backend | 多工具错序、缺失、孤儿、重复及中断日志经过修复后每个 tool_call 配对；user/AI 相对顺序保持，原始 seq 不改；重复修复幂等且不重做副作用。 |
 | AC-BE-012 | REQ-SUM-001 | backend | 中间件继承 SummarizationMiddleware，消息/token/比例均可触发；摘要包含旧摘要，独立字段保存；最新用户原文保留，另一个渲染器注入摘要；总预算计入摘要/工具/schema/输出预留。 |

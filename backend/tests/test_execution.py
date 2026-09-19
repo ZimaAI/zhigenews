@@ -7,13 +7,14 @@ provider, Tavily, news quality, or real-model evaluation scores.
 import json
 import shutil
 from concurrent.futures import ThreadPoolExecutor
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from threading import Event
 from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from httpx import Request
+from httpx import Client, MockTransport, Request, Response
+from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_openai.chat_models.base import OpenAITimeoutError
 from openai import APITimeoutError
 from sqlalchemy import delete, select
@@ -35,6 +36,7 @@ from zhigenews.db import (
     utcnow,
 )
 from zhigenews.harness import mysql_persistence
+from zhigenews.ingestion import fetch_source
 from zhigenews.models import tool_model_options
 from zhigenews.security import encrypt
 from zhigenews.settings import get_settings
@@ -44,7 +46,7 @@ pytestmark = pytest.mark.mysql
 FIXED_AT = "2026-01-02T01:00:00Z"
 
 
-def final_response(*, empty=False):
+def final_response(*, empty=False, evidence_id="synthetic-evidence-1"):
     return ai_call(
         "BriefOutput",
         {
@@ -53,7 +55,7 @@ def final_response(*, empty=False):
             if empty
             else [
                 {
-                    "evidence_id": "synthetic-evidence-1",
+                    "evidence_id": evidence_id,
                     "summary": "Synthetic source-backed summary",
                     "reason": "Matches the explicit Agent topic",
                     "topic": "Agent",
@@ -203,8 +205,8 @@ def test_real_harness_saves_artifacts_then_publication_confirms_completion(execu
         monkeypatch,
         ScriptedModel(
             responses=[
-                ai_call("list_dir", {"path": "/workspace/inputs"}, "synthetic-list"),
-                ai_call("read_file", {"path": "/workspace/inputs/evidence.jsonl"}, "synthetic-read"),
+                ai_call("list_dir", {"path": "/news/fixed"}, "synthetic-list"),
+                ai_call("read_file", {"path": "/news/fixed/records.jsonl"}, "synthetic-read"),
                 final_response(),
             ]
         ),
@@ -231,6 +233,74 @@ def test_real_harness_saves_artifacts_then_publication_confirms_completion(execu
     validate(schema("Brief"), public_brief(final.briefs[0]), output=True)
     publish_delivery(delivery.id)
     assert rows(case).deliveries[0].attempts == 1
+
+
+def test_new_run_discovers_collected_news_without_preloading_and_uses_actual_start(
+    execution_case, monkeypatch, tmp_path,
+):
+    case = execution_case
+    started = datetime.now(UTC).replace(microsecond=0)
+    published = started - timedelta(hours=1)
+    source = dict(
+        id="exsrc_" + case.run_id[-10:], name="Synthetic discovery RSS",
+        kind="rss", source_id="", url="https://fixture.invalid/feed", configured_interval_seconds=300,
+    )
+    body = (
+        '<rss version="2.0"><channel><title>Synthetic feed</title><item>'
+        '<guid>agent-discovery</guid><title>Agent source discovery</title>'
+        '<link>https://example.com/agent-discovery</link>'
+        '<description>Source text only available through news files</description>'
+        f'<pubDate>{published.strftime("%a, %d %b %Y %H:%M:%S +0000")}</pubDate>'
+        '</item></channel></rss>'
+    ).encode()
+    with Client(transport=MockTransport(lambda request: Response(200, content=body))) as client:
+        collected = fetch_source(source, tmp_path, client=client, now=started)
+        disabled = {**source, "id": source["id"] + "_disabled", "name": "Synthetic disabled RSS"}
+        fetch_source(disabled, tmp_path, client=client, now=started)
+    item = collected["items"][0]
+    with transaction() as session:
+        session.add(Resource(
+            id=source["id"], owner_id=case.user_id, kind="source",
+            data={"id": source["id"], "name": source["name"], "kind": "rss", "sourceId": "",
+                  "url": source["url"], "status": "healthy", "snapshotId": item["snapshot_id"]},
+        ))
+        session.add(Resource(
+            id=item["snapshot_id"], owner_id=case.user_id, kind="snapshot",
+            data=collected["snapshot"], private={"items": collected["items"]},
+        ))
+        session.add(Resource(
+            id=disabled["id"], owner_id=case.user_id, kind="source",
+            data={"id": disabled["id"], "name": disabled["name"], "kind": "rss", "sourceId": "",
+                  "url": disabled["url"], "status": "disabled"},
+        ))
+        run = session.get(Run, case.run_id)
+        run.private = {"models": run.private["models"]}
+        run.created_at = (started - timedelta(days=3)).replace(tzinfo=None)
+    settings = get_settings().model_copy(update={"data_dir": tmp_path})
+    monkeypatch.setattr(execution, "get_settings", lambda: settings)
+    monkeypatch.setattr(execution, "utcnow", lambda: started.replace(tzinfo=None))
+    before = {p.relative_to(tmp_path) for p in tmp_path.rglob("*") if p.is_file()}
+    model = patch_model(monkeypatch, ScriptedModel(responses=[
+        ai_call("list_dir", {"path": "/news"}, "discover-sources"),
+        ai_call("read_file", {"path": f"/news/{source['id']}/index.json"}, "discover-source"),
+        final_response(evidence_id=item["evidence_id"]),
+    ]))
+    execution.execute_run(case.run_id)
+    state = rows(case)
+    assert state.briefs and len(state.briefs[0].data["items"]) == 1, [e.data for e in state.events]
+    assert state.briefs[0].data["items"][0]["url"] == item["url"]
+    initial = next(m for m in model.received[0] if isinstance(m, HumanMessage))
+    payload = json.loads(initial.content.split("\n", 1)[1])
+    assert payload["fixedAt"] == started.isoformat()
+    assert "evidence_index" not in payload and item["title"] not in initial.content
+    assert "evidence" not in state.run.private
+    listing = next(m for m in model.received[1] if isinstance(m, ToolMessage))
+    assert source["id"] in listing.content and disabled["id"] not in listing.content
+    assert any(isinstance(m, ToolMessage) and item["title"] in m.content for m in model.received[2])
+    after = {p.relative_to(tmp_path) for p in tmp_path.rglob("*") if p.is_file() and "runs" not in p.parts}
+    assert after == before
+    workspace = tmp_path / "runs" / case.user_id / case.run_id / "workspace"
+    assert not (workspace / "inputs" / "evidence.jsonl").exists()
 
 
 def test_no_match_remains_empty_instead_of_fabricating_news(execution_case, monkeypatch):

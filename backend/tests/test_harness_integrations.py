@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import uuid
+from pathlib import Path
 
 import httpx
 import pytest
@@ -14,7 +15,7 @@ from typing_extensions import TypedDict
 
 from zhigenews.harness.errors import HarnessError
 from zhigenews.harness.persistence import mysql_persistence
-from zhigenews.harness.sandbox import DockerSandbox
+from zhigenews.harness.sandbox import SANDBOX_IMAGE, DockerSandbox
 from zhigenews.harness.search import TavilySearch
 
 
@@ -111,19 +112,37 @@ def test_mysql_actual_graph_interrupt_resume():
     os.environ.get("HARNESS_TEST_DOCKER") != "1",
     reason="requires actual Docker Linux daemon and sandbox image",
 )
-def test_real_sandbox_readonly_networkless_and_output(tmp_path):
+def test_real_sandbox_news_readonly_workspace_writable_and_networkless(tmp_path):
     rss, workspace = tmp_path / "rss", tmp_path / "workspace"
-    rss.mkdir()
+    (rss / "enabled" / "snapshots").mkdir(parents=True)
+    (rss / "disabled").mkdir()
     (workspace / "output").mkdir(parents=True)
-    (rss / "fixture").write_text("authorized synthetic content")
-    sandbox = DockerSandbox(rss, workspace)
+    (workspace / "inputs").mkdir()
+    (tmp_path / "another-run").mkdir()
+    (tmp_path / "another-run" / "secret").write_text("another run")
+    (rss / "enabled" / "fixture").write_text("authorized synthetic content")
+    sandbox = DockerSandbox(rss, workspace, news_roots={"enabled": rss / "enabled"})
     result = sandbox.run(
-        'cat /rss/fixture; id -u; test ! -e /var/run/docker.sock; test -z "$OPENAI_API_KEY"; test ! -w /workspace/output',
+        'set -e; cat /news/enabled/fixture; test "$(id -u)" -ne 0; '
+        'test ! -e /var/run/docker.sock; test -z "$OPENAI_API_KEY"; '
+        "test ! -e /news/disabled; test ! -e /rss; test ! -e /another-run; "
+        "test ! -e /.workspace.harness; "
+        "echo draft > /workspace/draft; echo input > /workspace/inputs/note; "
+        "mkdir /workspace/notes; echo output > /workspace/output/file",
         timeout=20,
     )
-    assert result["ok"] and "65534" in result["output"]
-    assert not sandbox.run("echo bypass > /workspace/output/file")["ok"]
-    assert not (workspace / "output" / "file").exists()
+    assert result["ok"], result["output"]
+    assert (workspace / "draft").read_text().strip() == "draft"
+    assert (workspace / "inputs" / "note").read_text().strip() == "input"
+    assert (workspace / "output" / "file").read_text().strip() == "output"
+    assert sandbox.run("echo nested > note", cwd="/workspace/notes")["ok"]
+    assert sandbox.run("pwd", cwd="/news/enabled/snapshots")["ok"]
+    for command in (
+        "echo bypass > /news/enabled/fixture",
+        "touch /news/enabled/new",
+        "rm /news/enabled/fixture",
+    ):
+        assert not sandbox.run(command)["ok"]
     result = sandbox.run(
         "python -c 'import socket; socket.create_connection((\"1.1.1.1\", 80), 1)'", timeout=5
     )
@@ -132,3 +151,64 @@ def test_real_sandbox_readonly_networkless_and_output(tmp_path):
     assert result["truncated"] and len(result["output"].encode()) <= 16384
     result = sandbox.run("sleep 10", timeout=1)
     assert result["timeout"]
+
+
+@pytest.mark.skipif(
+    os.environ.get("HARNESS_TEST_DOCKER") != "1",
+    reason="requires actual Linux filesystem permissions for collected news",
+)
+def test_linux_collected_news_is_readable_by_nonroot_sandbox_user():
+    backend = Path(__file__).resolve().parents[1]
+    dependencies = Path(httpx.__file__).resolve().parent.parent
+    script = r"""
+import sys, types, pathlib, subprocess
+from datetime import UTC, datetime
+sys.path.insert(0, '/deps')
+module=types.ModuleType('zhigenews'); module.__path__=['/code/src/zhigenews']; sys.modules['zhigenews']=module
+import httpx
+from zhigenews.ingestion import fetch_source, source_news_directory
+storage=pathlib.Path('/news')
+source={'id':'synthetic-source','kind':'rss','name':'Synthetic','url':'https://example.test/feed.xml'}
+raw=b'<rss version="2.0"><channel><title>Synthetic feed</title><item><guid>one</guid><title>Synthetic collected news</title><link>https://example.test/article</link><pubDate>Fri, 18 Sep 2026 12:00:00 GMT</pubDate></item></channel></rss>'
+with httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, content=raw))) as client:
+    result=fetch_source(source, storage, client=client, now=datetime(2026,9,18,16,tzinfo=UTC), jitter_ratio=0)
+assert result['attempt']['outcome']=='published', result
+news_root=source_news_directory(result['source'], storage)
+assert news_root.stat().st_uid==0 and news_root.stat().st_mode & 0o777==0o755
+paths=[news_root/'index.json', storage/result['snapshot']['parsed_path'], storage/result['snapshot']['raw_path']]
+assert all(path.stat().st_uid==0 for path in paths)
+read=subprocess.run(
+    [sys.executable,'-c',"from pathlib import Path; import sys; [print(Path(p).read_text()) for p in sys.argv[1:]]", *map(str,paths)],
+    user=65534, group=65534, extra_groups=(), capture_output=True, text=True,
+)
+assert read.returncode==0, read.stderr
+assert read.stdout.count('Synthetic collected news')>=3, read.stdout
+print('Root-collected index, parsed news and raw source readable by sandbox UID passed')
+"""
+    result = subprocess.run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "--network",
+            "none",
+            "--read-only",
+            "--tmpfs",
+            "/tmp:rw,size=32m",
+            "--tmpfs",
+            "/news:rw,size=32m,mode=755",
+            "--mount",
+            f"type=bind,src={backend},dst=/code,readonly",
+            "--mount",
+            f"type=bind,src={dependencies},dst=/deps,readonly",
+            SANDBOX_IMAGE,
+            "python",
+            "-c",
+            script,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "passed" in result.stdout

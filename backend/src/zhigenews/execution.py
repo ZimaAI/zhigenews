@@ -1,5 +1,6 @@
 """Worker orchestration around the autonomous Harness; no HTTP dependencies."""
 
+import json
 import threading
 from copy import deepcopy
 from datetime import UTC, timedelta
@@ -25,6 +26,7 @@ from .db import (
 )
 from .evaluation import evaluate_record
 from .harness import HarnessRequest, HarnessRunner, RunCancelled, mysql_persistence
+from .ingestion.service import resolve_source_evidence, source_news_directory
 from .models import build_model
 from .security import canonical, decrypt, redact
 from .settings import get_settings
@@ -163,42 +165,76 @@ class LeaseHeartbeat:
 def bind_inputs(run_id, token):
     with transaction() as session:
         run = session.scalar(select(Run).where(Run.id == run_id).with_for_update())
+        if run.lease_token != token or run.cancel_requested:
+            raise RunCancelled()
         private = deepcopy(run.private)
-        if "evidence" not in private:
-            evidence, missing, snapshots = [], [], []
+        # Already-bound pre-upgrade runs keep their frozen evidence for recovery.
+        # New runs bind only source authorization, never snapshot items or an index.
+        if "newsSources" not in private and "evidence" not in private:
+            sources, missing = [], []
             for source in session.scalars(select(Resource).where(Resource.kind == "source")):
                 if source.data["status"] == "disabled":
                     continue
-                sid = source.data.get("snapshotId")
-                snapshot = session.get(Resource, sid) if sid else None
-                if snapshot:
-                    snapshots.append(sid)
-                    evidence.extend(snapshot.private.get("items", []))
-                if not snapshot or source.data["status"] == "failed":
+                data = source.data
+                descriptor = dict(
+                    id=source.id, name=data["name"], kind=data["kind"],
+                    source_id=data["sourceId"], url=data["url"],
+                )
+                sources.append(descriptor)
+                directory = source_news_directory(descriptor, get_settings().data_dir)
+                if not (directory / "index.json").is_file() or data["status"] == "failed":
                     missing.append(source.data["name"])
-            private.update(
-                evidence=evidence, snapshotIds=snapshots, missingSources=missing, fixedAt=iso(run.created_at)
-            )
+            private.update(newsSources=sources, missingSources=missing)
             run.private = private
         return deepcopy(run.preferences), deepcopy(run.config), private, run.user_id
 
 
-def materialize_inputs(workspace, rss, evidence, preferences):
+def materialize_inputs(workspace, preferences):
     workspace.mkdir(parents=True, exist_ok=True)
-    rss.mkdir(parents=True, exist_ok=True)
     (workspace / "inputs").mkdir(exist_ok=True)
-    for folder, name, content in [
-        (workspace / "inputs", "preferences.json", canonical(preferences)),
-        (workspace / "inputs", "evidence.jsonl", "\n".join(canonical(e) for e in evidence)),
-        (
-            rss,
-            "entries.jsonl",
-            "\n".join(canonical(e) for e in evidence if e.get("source_type", e.get("sourceType")) == "rss"),
-        ),
-    ]:
-        file = folder / name
+    file = workspace / "inputs" / "preferences.json"
+    if not file.exists():
+        file.write_text(canonical(preferences), encoding="utf-8")
+
+
+def materialize_fixed_news(directory, evidence):
+    """Adapt already-frozen evaluation/legacy inputs to the read-only news view."""
+    directory.mkdir(parents=True, exist_ok=True)
+    index = []
+    for line, item in enumerate(evidence, 1):
+        index.append({
+            "evidence_id": item.get("evidence_id") or item["id"],
+            "title": item.get("title"), "source": item.get("source"), "url": item.get("url"),
+            "published_at": item.get("published_at", item.get("publishedAt")),
+            "file": "records.jsonl", "line": line,
+        })
+    for name, content in (
+        ("records.jsonl", "\n".join(canonical(item) for item in evidence)),
+        ("index.json", json.dumps({"items": index}, ensure_ascii=False, indent=2)),
+    ):
+        file = directory / name
         if not file.exists():
             file.write_text(content, encoding="utf-8")
+    return {"fixed": directory}
+
+
+def source_access(sources, storage):
+    """Map authorized sources without reading or rebuilding their news indexes."""
+    roots = {}
+    for source in sources:
+        directory = source_news_directory(source, storage)
+        if directory.is_dir():
+            roots[source["id"]] = directory
+
+    def resolve(evidence_id):
+        for source in sources:
+            if source["id"] in roots:
+                item = resolve_source_evidence(source, storage, evidence_id)
+                if item is not None:
+                    return item
+        return None
+
+    return roots, resolve
 
 
 def execute_run(run_id):
@@ -230,8 +266,10 @@ def execute_run(run_id):
                     add_outbox(session, "delivery", delivery.id)
             return
         resume = bool(run.private.get("harnessStarted"))
-        run.lease_token, run.lease_until = token, utcnow() + timedelta(seconds=90)
-        run.status, run.updated_at = "running", utcnow()
+        started_at = utcnow()
+        run.lease_token, run.lease_until = token, started_at + timedelta(seconds=90)
+        run.status, run.updated_at = "running", started_at
+        run.private = {**run.private, "fixedAt": run.private.get("fixedAt") or iso(started_at)}
 
     def cancelled():
         with transaction() as session:
@@ -243,7 +281,12 @@ def execute_run(run_id):
             preferences, config, private, user_id = bind_inputs(run_id, token)
             base = get_settings().data_dir.resolve() / "runs" / user_id / run_id
             workspace, rss = base / "workspace", base / "rss"
-            materialize_inputs(workspace, rss, private["evidence"], preferences)
+            materialize_inputs(workspace, preferences)
+            if "newsSources" in private:
+                news_roots, resolve_evidence = source_access(private["newsSources"], get_settings().data_dir)
+            else:
+                news_roots = materialize_fixed_news(base / "news", private["evidence"])
+                resolve_evidence = None
             models = private["models"]
             config = {
                 **config,
@@ -261,7 +304,9 @@ def execute_run(run_id):
                 config=config,
                 rss_root=rss,
                 workspace_root=workspace,
-                evidence=private["evidence"],
+                evidence=private.get("evidence", []),
+                news_roots=news_roots,
+                resolve_evidence=resolve_evidence,
                 model=model_from(models["modelId"], max_seconds=config["maxSeconds"]),
                 summary_model=model_from(models["summaryModelId"], max_seconds=config["maxSeconds"]),
                 tavily_api_key=get_settings().tavily_api_key,
@@ -381,7 +426,8 @@ def execute_evaluation(evaluation_id):
         case_run = evaluation_id + "-" + case["id"]
         root = get_settings().data_dir.resolve() / "evaluations" / evaluation_id / case["id"]
         workspace, rss = root / "workspace", root / "rss"
-        materialize_inputs(workspace, rss, case["evidence"], case["preferenceSnapshot"])
+        materialize_inputs(workspace, case["preferenceSnapshot"])
+        news_roots = materialize_fixed_news(root / "news", case["evidence"])
         config = {
             **cfg,
             "tools": [t for t in cfg["tools"] if t not in ("web_search", "delegate_research")],
@@ -400,6 +446,7 @@ def execute_evaluation(evaluation_id):
             rss_root=rss,
             workspace_root=workspace,
             evidence=case["evidence"],
+            news_roots=news_roots,
             model=model_from(private["models"]["modelId"]),
             summary_model=model_from(private["models"]["summaryModelId"]),
             sandbox_image=get_settings().sandbox_image,

@@ -23,7 +23,7 @@
 | Source / SourceSnapshot | Source 稳定 ID；一个源有多次 Fetch 和不可变 Snapshot | NewsNow 与 RSS 分开；周期单位秒；成功发布新快照才能更新 lastSuccess；坏响应不覆盖有效快照；对应 Source |
 | NewsEvidence / BriefItem | 条目带原 URL、来源及引用；BriefItem 归属某一期版本 | 来源发布时间可空，不能拿抓取/榜单时间替代；原文证据与 Agent 推荐理由分开；不存储已读/未读状态；对应 NewsItem/Citation |
 | AgentConfigRevision / ModelEndpoint | 配置草稿发布成不可变版本并引用模型 | 模型 ID、端点、能力、密钥引用分离；API key 只写/加密保存；新运行绑定快照；对应 AgentConfig/ModelConfig |
-| AgentRun / Subtask | run 归属用户与 thread；子 run 归属父 run | 绑定偏好/配置/来源快照；预算包括子任务；运行取消独立于未来计划；对应 AgentRun/Subtask |
+| AgentRun / Subtask | run 归属用户与 thread；子 run 归属父 run | 绑定偏好/配置、来源授权与固定新闻窗口，引用按需追溯不可变快照；预算包括子任务；运行取消独立于未来计划；对应 AgentRun/Subtask |
 | MessageJournal / Summary | `(threadId,messageSeq)` 单调唯一；调用实例关联 toolCallId | 原始日志保留，修复重建模型视图不重新编号；摘要另存覆盖范围与版本；最新用户原文不压缩 |
 | BriefRevision | 简报归属用户与 run；日期内可有多个 version | 内容一经发布不可覆盖，引用及偏好快照可追溯；部分完成仍说明缺失来源；内部对应 AdminBrief；公开 Brief 不含 runId/偏好技术快照 |
 | DeliveryAttempt | 归属精确 briefId/版本与渠道 | 生成完成不意味着站内发布成功；channel 固定 in_app；管理端重试复用同一简报并增加尝试；对应 Delivery |
@@ -71,7 +71,9 @@ GenerationProgress 的状态沿用运行终态语义，但不包含runId、模�
 
 MySQL 唯一约束至少覆盖偏好版本、配置版本、每日业务键、幂等键、thread 消息序号和 run 事件序号；短事务登记 run/outbox，网络与模型调用不持有事务锁。不可变来源快照在关联运行可回放期限内保留。
 
-Agent 只见 `/rss` 的本次只读快照和 `/workspace` 的本次运行目录；inputs 只读，output 可写。文件服务拒绝父路径、宿主路径及解析后越界访问；read 保存全文件 hash，write 在受控排他区间比较最新 hash 并原子替换。创建必须显式且父目录合法；冲突要求重新读取。bash 的持久挂载只读，持久写回走同一 CAS 服务。
+Agent 只见 `/news/<source_id>` 的授权来源只读目录和 `/workspace` 的本次运行目录；文件工具与 bash 均可读写整个本次工作区。文件服务拒绝父路径、宿主路径及解析后越界访问；read 保存全文件 hash，write 在受控排他区间比较最新 hash 并原子替换。创建必须显式且父目录合法；冲突要求重新读取。CAS 只约束文件工具，bash 的直接工作区写入不受该检查约束。
+
+来源新闻索引由采集端在每次实际采集结束后维护，累计已采集且发布时间在最近 24 小时内的新闻；退出上游列表仍保留到过期，发布时间未知不入索引。新运行只固定来源授权与实际开始时刻，不预加载新闻；Agent 自主检索，最终按选中引用解析可信记录，发布时间必须落在运行开始时刻向前 24 小时的闭区间内。
 
 ## 正式 DTO 与固定评估输入
 

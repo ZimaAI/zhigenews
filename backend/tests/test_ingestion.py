@@ -146,6 +146,8 @@ def test_timeout_exponential_backoff_and_retry_after(tmp_path):
 
 
 def test_newsnow_upstream_interval_and_updated_time_is_not_news_time(tmp_path):
+    from zhigenews.ingestion import read_source_index, source_news_directory
+
     source = {**default_sources()[1], "configured_interval_seconds": 1}
     payload = {
         "id": "solidot",
@@ -156,6 +158,8 @@ def test_newsnow_upstream_interval_and_updated_time_is_not_news_time(tmp_path):
     first = call(source, tmp_path, httpx.Response(200, json=payload))
     assert first["source"]["effective_interval_seconds"] == 3600
     assert first["items"][0]["published_at"] is None
+    assert read_source_index(source, tmp_path)["items"] == []
+    assert source_news_directory({**source, "url": ""}, tmp_path) == source_news_directory(source, tmp_path)
     assert first["attempt"]["upstream_status"] == "cache"
     payload.update({"status": "success", "updatedTime": 1789747200000})
     second = call(first["source"], tmp_path, httpx.Response(200, json=payload), now=NOW + timedelta(hours=1))
@@ -165,7 +169,7 @@ def test_newsnow_upstream_interval_and_updated_time_is_not_news_time(tmp_path):
 
 
 def test_snapshot_publication_failure_does_not_replace_latest(tmp_path, monkeypatch):
-    from zhigenews.ingestion import service
+    from zhigenews.ingestion import read_latest_snapshot, service
 
     first = call(rss_source(), tmp_path, httpx.Response(200, content=RSS))
     original = service._atomic_write
@@ -182,7 +186,7 @@ def test_snapshot_publication_failure_does_not_replace_latest(tmp_path, monkeypa
             tmp_path,
             httpx.Response(200, content=RSS.replace(b"Synthetic item", b"Changed item")),
         )
-    latest = json.loads((tmp_path / "rss/source-rss/latest.json").read_text())
+    latest = read_latest_snapshot(rss_source(), tmp_path)
     assert latest == first["snapshot"]
 
 
@@ -225,3 +229,161 @@ def test_recoverable_xml_warning_keeps_parseable_items(tmp_path):
     assert result["source"]["status"] == "healthy"
     assert result["attempt"]["parse_warning"] is not None
     assert len(result["items"]) == 2
+
+
+def test_source_news_index_contains_only_published_news_in_24_hour_window(tmp_path):
+    from zhigenews.ingestion import read_source_index, source_news_directory
+
+    dates = {
+        "recent": "Fri, 18 Sep 2026 12:00:00 GMT",
+        "boundary": "Thu, 17 Sep 2026 16:00:00 GMT",
+        "old": "Thu, 17 Sep 2026 15:59:59 GMT",
+        "future": "Fri, 18 Sep 2026 16:00:01 GMT",
+        "timezone": "Sat, 19 Sep 2026 00:00:00 +0800",
+        "missing": None,
+        "invalid": "not a publication time",
+        "unqualified": "Fri, 18 Sep 2026 12:00:00",
+    }
+    items = "".join(
+        f"<item><guid>{name}</guid><title>{name}</title><link>https://example.test/{name}</link>"
+        + (f"<pubDate>{date}</pubDate>" if date else "") + "</item>"
+        for name, date in dates.items()
+    )
+    feed = f'<rss version="2.0"><channel><title>Synthetic</title>{items}</channel></rss>'.encode()
+    result = call(rss_source(), tmp_path, httpx.Response(200, content=feed))
+    index = read_source_index(rss_source(), tmp_path)
+    assert {entry["title"] for entry in index["items"]} == {"recent", "boundary", "timezone"}
+    assert index["maintained_at"] == "2026-09-18T16:00:00Z"
+    root = source_news_directory(rss_source(), tmp_path)
+    for entry in index["items"]:
+        lines = (root / entry["file"]).read_text(encoding="utf-8").splitlines()
+        evidence = json.loads(lines[entry["line"] - 1])
+        assert evidence["evidence_id"] == entry["evidence_id"]
+        assert evidence["title"] == entry["title"]
+    assert len(load_snapshot_items(result["snapshot"], tmp_path)) == 8
+
+
+def test_source_index_retains_rotated_news_and_resolves_immutable_evidence(tmp_path):
+    from zhigenews.ingestion import read_source_index, resolve_source_evidence
+
+    first = call(rss_source(), tmp_path, httpx.Response(200, content=RSS))
+    original = read_source_index(rss_source(), tmp_path)["items"][0]
+    rotated = RSS.replace(b"<guid>one</guid>", b"<guid>next</guid>").replace(
+        b"https://example.test/article", b"https://example.test/next"
+    ).replace(b"Synthetic item", b"New story")
+    second = call(first["source"], tmp_path, httpx.Response(200, content=rotated), now=NOW + timedelta(hours=1))
+    entries = read_source_index(rss_source(), tmp_path)["items"]
+    assert {entry["title"] for entry in entries} == {"Synthetic item", "New story"}
+    assert resolve_source_evidence(rss_source(), tmp_path, original["evidence_id"]) == first["items"][0]
+    third = call(second["source"], tmp_path, httpx.Response(200, content=RSS), now=NOW + timedelta(hours=2))
+    entries = read_source_index(rss_source(), tmp_path)["items"]
+    assert len(entries) == 2
+    current = next(entry for entry in entries if entry["title"] == "Synthetic item")
+    assert resolve_source_evidence(rss_source(), tmp_path, current["evidence_id"]) == third["items"][0]
+    assert resolve_source_evidence(rss_source(), tmp_path, "invented") is None
+    assert resolve_source_evidence(rss_source(), tmp_path, "../outside:missing") is None
+    # Older references remain usable even after the live index advances.
+    assert resolve_source_evidence(rss_source(), tmp_path, original["evidence_id"]) == first["items"][0]
+
+
+def test_source_configuration_change_has_an_isolated_news_directory(tmp_path):
+    from zhigenews.ingestion import read_source_index, resolve_source_evidence, source_news_directory
+
+    first = call(rss_source(), tmp_path, httpx.Response(200, content=RSS, headers={"etag": '"first"'}))
+    changed = {**first["source"], "url": "https://example.test/another-feed.xml"}
+    assert source_news_directory(changed, tmp_path) != source_news_directory(rss_source(), tmp_path)
+    assert read_source_index(changed, tmp_path) is None
+    assert resolve_source_evidence(changed, tmp_path, first["items"][0]["evidence_id"]) is None
+
+    def replacement(request):
+        assert "If-None-Match" not in request.headers
+        return httpx.Response(200, content=RSS.replace(b"Synthetic item", b"Replacement source"))
+
+    with httpx.Client(transport=httpx.MockTransport(replacement)) as client:
+        fetch_source(changed, tmp_path, client=client, now=NOW, jitter_ratio=0)
+    assert [entry["title"] for entry in read_source_index(changed, tmp_path)["items"]] == ["Replacement source"]
+    assert [entry["title"] for entry in read_source_index(rss_source(), tmp_path)["items"]] == ["Synthetic item"]
+
+
+@pytest.mark.parametrize("response", [httpx.Response(304), httpx.Response(200, content=RSS), httpx.Response(503)])
+def test_source_index_maintenance_requires_current_collection_lease(tmp_path, response):
+    from zhigenews.ingestion import read_source_index
+    from zhigenews.ingestion.service import IngestionError
+
+    first = call(rss_source(), tmp_path, httpx.Response(200, content=RSS))
+    index = read_source_index(rss_source(), tmp_path)
+
+    def lease_lost():
+        raise IngestionError("LEASE_LOST", "Synthetic lease replacement")
+
+    result = call(
+        first["source"], tmp_path, response,
+        now=NOW + timedelta(hours=22), before_publish=lease_lost,
+    )
+    assert result["attempt"]["error_type"] == "LEASE_LOST"
+    assert read_source_index(rss_source(), tmp_path) == index
+    # The current owner still prunes expired entries on every attempt outcome.
+    call(first["source"], tmp_path, response, now=NOW + timedelta(hours=22))
+    maintained = read_source_index(rss_source(), tmp_path)
+    assert maintained["items"] == []
+    assert maintained["maintained_at"] == "2026-09-19T14:00:00Z"
+    assert load_snapshot_items(first["snapshot"], tmp_path) == first["items"]
+
+
+def test_index_publication_failure_keeps_previous_discovery_and_latest_snapshot(tmp_path, monkeypatch):
+    import os
+    from pathlib import Path
+
+    from zhigenews.ingestion import read_latest_snapshot, read_source_index, resolve_source_evidence
+
+    first = call(rss_source(), tmp_path, httpx.Response(200, content=RSS))
+    index = read_source_index(rss_source(), tmp_path)
+    replace = os.replace
+
+    def unavailable_index(source, target):
+        if Path(target).name == "index.json":
+            raise OSError("Synthetic interrupted index publication")
+        return replace(source, target)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "replace", unavailable_index)
+        with pytest.raises(OSError, match="interrupted index publication"):
+            call(
+                first["source"], tmp_path,
+                httpx.Response(200, content=RSS.replace(b"Synthetic item", b"Revised story")),
+            )
+    assert read_source_index(rss_source(), tmp_path) == index
+    assert read_latest_snapshot(rss_source(), tmp_path) == first["snapshot"]
+    assert resolve_source_evidence(rss_source(), tmp_path, index["items"][0]["evidence_id"]) == first["items"][0]
+    recovered = call(
+        first["source"], tmp_path,
+        httpx.Response(200, content=RSS.replace(b"Synthetic item", b"Revised story")),
+    )
+    assert read_source_index(rss_source(), tmp_path)["items"][0]["title"] == "Revised story"
+    assert read_latest_snapshot(rss_source(), tmp_path) == recovered["snapshot"]
+
+
+@pytest.mark.parametrize("status", [200, 304, 503])
+def test_source_index_window_uses_collection_completion_time(tmp_path, monkeypatch, status):
+    from zhigenews.ingestion import read_source_index, service
+
+    feed = RSS.replace(b"Fri, 18 Sep 2026 12:00:00 GMT", b"Thu, 17 Sep 2026 16:00:01 GMT")
+    first = call(rss_source(), tmp_path, httpx.Response(200, content=feed))
+
+    class Clock(datetime):
+        current = NOW
+
+        @classmethod
+        def now(cls, tz=None):
+            return cls.current.astimezone(tz)
+
+    def slow_response(request):
+        Clock.current = NOW + timedelta(seconds=2)
+        return httpx.Response(status, content=feed.replace(b"Synthetic item", b"Changed item"))
+
+    monkeypatch.setattr(service, "datetime", Clock)
+    with httpx.Client(transport=httpx.MockTransport(slow_response)) as client:
+        fetch_source(first["source"], tmp_path, client=client, jitter_ratio=0)
+    index = read_source_index(rss_source(), tmp_path)
+    assert index["maintained_at"] == "2026-09-18T16:00:02Z"
+    assert index["items"] == []

@@ -96,24 +96,24 @@ MySQL durable checkpointer 优先评估社区 `langgraph-checkpoint-mysql`，外
 
 ```text
 data/
-  feeds/rss/<source_id>/YYYY/MM/DD/<snapshot_id>/
-    raw.xml                 # 原始响应，不给模型整份无上限塞入
-    metadata.json           # URL、响应时间、ETag、类型、哈希、校验状态
-    entries.jsonl           # 规范化条目与原始引用
-  feeds/newsnow/<source_id>/YYYY/MM/DD/<snapshot_id>/
-    raw.json
-    metadata.json
-    entries.jsonl
+  <rss|newsnow>/<source_id>/configs/<source_identity>/
+    index.json              # 采集后维护的最近24小时索引，跨快照累计去重
+    latest.json             # 最新采集快照元信息
+    raw/YYYY/MM/DD/<snapshot_id>.<xml|json>
+    parsed/YYYY/MM/DD/<snapshot_id>.jsonl
+    manifests/<snapshot_id>.json
   runs/<user_id>/<run_id>/
-    inputs/newsnow/          # 本次固定快照，Agent 只读
-    inputs/source-manifest.json
-    output/brief.md
-    output/brief.json
+    workspace/inputs/preferences.json
+    workspace/output/brief.md
+    workspace/output/brief.json
+    .workspace.harness/     # 检查点辅助记录，不挂载给 Agent
 ```
 
 存储标识全部由服务端生成，不采用用户输入的 URL/标题作为路径。采集先写临时文件、校验、计算哈希、再原子发布；清单记录内容时间和本地抓取时间。坏 XML/HTML 响应进入失败记录，不作为正常 RSS 给 Agent 读取。
 
-Agent 可见 `/rss/` 为本次运行获准的 RSS 快照虚拟树，不包含任意宿主历史文件；`/workspace/` 映射当前用户当前运行目录，其 `inputs/` 子树只读，`output/` 可写。不存在的路径报明确错误。运行固定的来源快照在运行/可重放保留期内不得被清理。
+Agent 通过 `/news/<source_id>/` 读取本次运行获准的启用来源目录，RSS 与 NewsNow 均为只读；来源配置身份隔离，修改 URL 或来源身份不会暴露旧配置文件。`/workspace/` 映射当前运行工作目录，文件工具与 bash 均可读写整个目录。不存在的路径报明确错误；其他运行工作目录、凭据及 Harness 元信息不挂载。
+
+每次实际采集结束（含失败、304、内容不变）维护来源新闻索引，按真实发布时间保留最近 24 小时内已采集新闻；缺失/无效发布时间及未来新闻不进入索引，退出上游最新列表不删除仍在窗口内的条目。索引原子替换，过期记录剔除不删除历史正文。两次维护之间允许暂留过期项。旧数据在后续采集时补建索引，Agent 启动不补建。
 
 NewsNow `interval` 元数据按 source ID 导入并保存来源提交与单位；有效周期不能低于上游源周期，管理员可调慢。全局 TTL、客户端 interval、本地请求时间、原始 `updatedTime` 和本地检测到内容变化的时间分别记录。真正上游刷新时间默认 unknown/可空，只有额外可信证据时填写；不能从 `updatedTime` 或本地内容变化推断真实上游抓取时间。
 
@@ -123,9 +123,9 @@ RSS 以配置周期为起点，遵守 ETag/Last-Modified、304、缓存头/可�
 
 组装时从不可变配置快照构建模型、工具集合、系统提示词、middleware、state_schema、context_schema 和 checkpointer。以 `create_agent` 的模型/工具循环作为实际执行引擎；外层 worker 负责入队、恢复、取消与最终结果持久化，不用固定 DAG 替代自主循环。
 
-运行 state 保存 messages、summary、summary_revision、子任务状态、预算用量、文件读取版本和产物引用。runtime context 注入 user_id、run_id、thread_id、配置/偏好快照、授权挂载、取消令牌和适配器；秘密不作为可序列化 state/message 写入检查点。
+运行 state 保存 messages、summary、summary_revision、子任务状态、预算用量、文件读取版本和产物引用。runtime context 注入 user_id、run_id、thread_id、配置/偏好快照、授权挂载、取消令牌和适配器；秘密不作为可序列化 state/message 写入检查点。新运行只绑定来源授权和实际开始时刻，不加载全量新闻或构建运行 Evidence 索引；提示词只提供偏好、带时区日期、固定 24 小时窗口与目录说明。Agent 自主读取实时来源索引及所需内容，恢复时沿用固定窗口。
 
-Agent 输出结构化简报和 Markdown。服务端在发布前校验条目数、有效证据 ID/URL、话题和关键词相关性与工作区归属。只写出一个文件不等于简报已发布。站内发布由应用层完成，Agent 本身没有任意收件人发送工具。用户偏好只含话题/背景/关键词；24 小时、10 条、全部来源等当前原型参数属于系统内部默认值。
+Agent 输出结构化简报和 Markdown。服务端按选中的证据 ID 从授权来源不可变记录中按需解析，核验 URL、发布时间、话题和关键词相关性与工作区归属；缺失/无效发布时间及固定 24 小时闭区间之外的条目不发布。工作区中的副本不是可信证据。只写出一个文件不等于简报已发布，站内发布仍由应用层完成。用户偏好只含话题/背景/关键词；24 小时、最多 10 条、启用来源范围由系统管理。
 
 子 Agent 通过受控 `delegate_research` 额外工具委派检索/主题核对；共享父级预算，限制并发/深度，拥有独立 thread 和受限子工作区，默认不递归委派。结果只返回有界摘要及证据引用，不把全部子消息拼回父上下文。
 
@@ -153,7 +153,7 @@ Agent 输出结构化简报和 Markdown。服务端在发布前校验条目数�
 
 read 返回带行号的有界文本、完整文件 hash、总行数/大小与截断/下一页；哈希来自同一次稳定内容读取，不是仅所选行的 hash。write 覆盖时要求该 actor 最近读到的 hash，在同一受控文件服务的排他区间内检查最新 hash 并原子替换；新建用排他创建并要求合法父目录。并发调用同一路径串行化，冲突返回 `FILE_CHANGED`。
 
-bash 每次运行在最小 Linux 容器环境：无模型/数据库凭据、无宿主家目录或 Docker socket、非 root、只读根文件系统、移除 capabilities、资源/进程数/输出/超时上限、默认无网络。`/rss` 和 `/workspace` 是只读视图，可写 `/tmp` 仅属当前沙箱且临时；持久写回必须走文件工具 CAS。这样 `bash > /workspace/output/brief.md` 明确失败，`write_file` 可以合法生成同一文件。这个差异要写入工具说明。
+bash 每次运行在最小 Linux 容器环境：无模型/数据库凭据、无宿主家目录或 Docker socket、非 root、只读根文件系统、移除 capabilities、资源/进程数/输出/超时上限、默认无网络。每个授权 `/news/<source_id>` 单独只读挂载，`/workspace` 读写挂载；可写 `/tmp` 仅属当前命令容器且临时。write_file 保留读版本与 CAS 覆盖检查；bash 可直接写工作区，不经过 CAS，不能宣称所有持久写入都受到该检查保护。
 
 容器运行时自带的 `/bin` 等不是用户宿主数据根，shell 环境仅保留执行必需的运行时文件。无容器时 `bash` 不退回宿主 subprocess；该能力应显示不可用，必须在正式验收环境恢复并通过测试，不能当作永久省略需求。
 
@@ -172,7 +172,7 @@ bash 每次运行在最小 Linux 容器环境：无模型/数据库凭据、无�
 这些是实现验收重点，不是本轮通过报告：
 
 - 同源不同 interval、重复调度、304、坏 XML、过期缓存、部分失败与时区边界。
-- 跨用户资源拒绝、目录穿越、编码/盘符/UNC、符号链接、路径替换竞态、CAS 双写冲突、bash 写回绕过。
+- 跨用户资源拒绝、目录穿越、编码/盘符/UNC、符号链接、路径替换竞态、文件工具 CAS 冲突、bash 新闻只读与本次工作区实际写入。
 - 多工具并行结果错序/缺失/孤儿/重复、中断重启、消息修复幂等；最新用户原文保留、旧摘要并入、压缩后工具配对和 token 总预算。
 - MySQL checkpoint 重启恢复、线程归属、子任务预算与取消；工具与模型超时且不重复外部副作用。
 - 引用与偏好校验、生成和投递分离、队列重投、站内发布不冒充已读、SSE 断线回放。

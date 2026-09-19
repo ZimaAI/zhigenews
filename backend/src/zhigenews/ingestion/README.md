@@ -18,13 +18,44 @@ interval is the maximum of it, the pinned NewsNow source interval, and RSS
 causes earlier polling. `default_sources()` provides two NewsNow sources with
 different intervals and the China News immediate feed as unverified sources.
 
-Snapshot files live under `{kind}/{source_db_id}/raw/YYYY/MM/DD/{uuid}` and
-`parsed/YYYY/MM/DD/{uuid}.jsonl`. A manifest is published only after complete
-raw and parsed files; the `latest.json` pointer is atomically replaced last.
-`read_latest_snapshot` and `load_snapshot_items` read those immutable files.
-A run must bind its input to specific snapshot IDs, not follow `latest.json`
-during execution. Failure, RSS 304 and identical content retain the old
-snapshot and its original timestamp; the attempt records the new check time.
+Each source configuration has a separate root at
+`{kind}/{source_db_id}/configs/{identity_hash}/`. The identity uses the
+normalized source kind, URL and NewsNow source ID. `source_news_directory`
+computes that root without reading articles, so a run can authorize only
+enabled configurations. Changing a source URL cannot expose earlier
+configuration files through the new root.
+
+Snapshot files live beneath this root in `raw/YYYY/MM/DD/{uuid}` and
+`parsed/YYYY/MM/DD/{uuid}.jsonl`; `manifests/{uuid}.json` describes them.
+The pretty-printed `index.json` is atomically replaced only after all evidence
+files are complete, followed by the `latest.json` pointer. Readers never see
+partial index JSON or an index referring to an unfinished evidence file.
+`read_latest_snapshot` and `load_snapshot_items` read immutable snapshots.
+Failure, RSS 304 and identical content retain the old snapshot and its
+original timestamp; the attempt records the new check time.
+
+Every actual collection attempt maintains `index.json`, including HTTP
+failure, RSS 304 and unchanged content. Only news with an explicit publication
+time within the inclusive preceding 24-hour window is indexed; unknown,
+invalid and future publication times are excluded. The index accumulates
+news by stable item ID, retaining stories that rotate out of the upstream
+feed until expiry. Pruning the index never deletes historical evidence.
+Lease loss prevents index publication as well as snapshot publication.
+
+`index.json` records `source_id`, `request_url`, `maintained_at`, `window_start`,
+`window_end` and `items`. Each item contains `id`, `evidence_id`, `source_id`,
+`title`, `url`, `published_at`, a `file` path relative to the authorized root,
+and its one-based `line`. Bodies remain in the immutable parsed JSONL files.
+`read_source_index` reads this file and does not build it. Agent runs discover
+news through the live index, apply their fixed run window, and validate only
+selected citations using `resolve_source_evidence(source, storage, evidence_id)`.
+That resolver reads the identified immutable manifest and article, so a
+citation remains resolvable when its index entry expires or is superseded.
+
+Existing installations acquire the new configuration directory and index on
+their next collection attempt. If this directory lacks a valid snapshot,
+stored conditional HTTP validators are cleared to obtain a complete feed.
+Agent startup never creates an index or presents old storage as ready.
 
 Normalized evidence includes `id`, `evidence_id`, `external_id`, `source_id`,
 `source`, `source_type`, `title`, `url`, `summary`, `content`, `published_at`,

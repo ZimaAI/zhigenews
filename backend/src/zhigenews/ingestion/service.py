@@ -82,7 +82,13 @@ def _source_dir(source: dict, storage: Path) -> Path:
         raise IngestionError("INVALID_SOURCE_ID", "Source ID must be a system-generated safe identifier")
     if source.get("kind") not in {"rss", "newsnow"}:
         raise IngestionError("INVALID_SOURCE_KIND", "Source kind must be rss or newsnow")
-    return _path(storage, f"{source['kind']}/{source['id']}")
+    normalized = _normalize_source(source)
+    identity = _hash(_json_bytes({
+        "kind": normalized["kind"],
+        "url": normalized["url"],
+        "source_id": normalized.get("source_id", ""),
+    }))
+    return _path(storage, f"{source['kind']}/{source['id']}/configs/{identity}")
 
 
 def _atomic_write(path: Path, raw: bytes) -> None:
@@ -93,6 +99,12 @@ def _atomic_write(path: Path, raw: bytes) -> None:
         with os.fdopen(fd, "wb") as handle:
             handle.write(raw)
             handle.flush()
+            # These files contain public news; the read-only sandbox runs as
+            # a different UID from the collecting worker. mkstemp starts 0600.
+            if hasattr(os, "fchmod"):
+                os.fchmod(handle.fileno(), 0o644)
+            else:
+                os.chmod(temporary, 0o644)
             os.fsync(handle.fileno())
         os.replace(temporary, path)
     finally:
@@ -117,6 +129,75 @@ def load_snapshot_items(snapshot: dict | None, storage: Path) -> list[dict]:
         for line in _path(storage, snapshot["parsed_path"]).read_text(encoding="utf-8").splitlines()
         if line
     ]
+
+
+def source_news_directory(source: dict, storage: Path) -> Path:
+    """Return the source's authorized news directory without reading news."""
+    return _source_dir(_normalize_source(source), Path(storage))
+
+
+def read_source_index(source: dict, storage: Path) -> dict | None:
+    """Read the ingestion-maintained discovery index; never build it here."""
+    path = source_news_directory(source, storage) / "index.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
+def resolve_source_evidence(source: dict, storage: Path, evidence_id: str) -> dict | None:
+    """Resolve a selected immutable citation without loading the discovery index."""
+    if not re.fullmatch(r"[0-9a-f]{32}:[0-9a-f]{32}", evidence_id):
+        return None
+    snapshot_id, item_id = evidence_id.split(":")
+    normalized = _normalize_source(source)
+    root = _source_dir(normalized, Path(storage))
+    manifest_path = root / "manifests" / f"{snapshot_id}.json"
+    if not manifest_path.exists():
+        return None
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("request_url") != normalized["url"] or manifest.get("source_id") != source["id"]:
+        return None
+    parsed = _path(storage, manifest["parsed_path"])
+    if not parsed.is_relative_to(root):
+        return None
+    with parsed.open(encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            item = json.loads(line)
+            if (item.get("id"), item.get("evidence_id"), item.get("source_id")) == (
+                item_id, evidence_id, source["id"]
+            ):
+                return item
+    return None
+
+
+def _maintain_source_index(source: dict, storage: Path, now: datetime, snapshot: dict | None) -> None:
+    root = _source_dir(source, storage)
+    cutoff = now - timedelta(hours=24)
+    prior = read_source_index(source, storage)
+    entries = {
+        item["id"]: item for item in (prior or {}).get("items", [])
+        if (published := _datetime(item.get("published_at"))) is not None and cutoff <= published <= now
+    }
+    for line, item in enumerate(load_snapshot_items(snapshot, storage), 1):
+        published = _datetime(item.get("published_at"))
+        if published is None or not cutoff <= published <= now:
+            continue
+        entries[item["id"]] = {
+            key: item[key]
+            for key in ("id", "evidence_id", "source_id", "title", "url", "published_at")
+        } | {
+            "file": _path(storage, snapshot["parsed_path"]).relative_to(root).as_posix(),
+            "line": line,
+        }
+    index = {
+        "source_id": source["id"],
+        "request_url": source["url"],
+        "maintained_at": _iso(now),
+        "window_start": _iso(cutoff),
+        "window_end": _iso(now),
+        "items": sorted(entries.values(), key=lambda item: (item["published_at"], item["id"]), reverse=True),
+    }
+    _atomic_write(root / "index.json", json.dumps(index, ensure_ascii=False, indent=2).encode("utf-8"))
 
 
 def _http_url(value: str) -> str:
@@ -283,9 +364,11 @@ def _publish(
     items: list[dict],
     metadata: dict,
     prior_items: list[dict],
+    before_publish=None,
+    fixed_now: datetime | None = None,
 ) -> dict:
     snapshot_id = uuid.uuid4().hex
-    base = f"{source['kind']}/{source['id']}"
+    base = _source_dir(source, storage).relative_to(storage.resolve()).as_posix()
     date = now.strftime("%Y/%m/%d")
     extension = "xml" if source["kind"] == "rss" else "json"
     prior = {item["id"]: item for item in prior_items}
@@ -316,7 +399,11 @@ def _publish(
         _path(storage, manifest["parsed_path"]), b"".join(_json_bytes(item) + b"\n" for item in items)
     )
     _atomic_write(_path(storage, manifest["manifest_path"]), _json_bytes(manifest))
-    # Publish only after every immutable file is complete.
+    # Publish discovery only after its immutable evidence files are complete.
+    if before_publish is not None:
+        before_publish()
+    _maintain_source_index(source, storage, fixed_now or datetime.now(UTC), manifest)
+    # Do not advance the latest pointer when index publication was interrupted.
     _atomic_write(_source_dir(source, storage) / "latest.json", _json_bytes(manifest))
     return manifest
 
@@ -365,12 +452,18 @@ def fetch_source(
     A failure returns the previous valid snapshot without replacing it.
     """
     storage = Path(storage)
+    fixed_now = now
     now = now or datetime.now(UTC)
     if now.tzinfo is None:
         raise ValueError("now must include a timezone")
     started = time.monotonic()
     state = _normalize_source(source)
     previous = read_latest_snapshot(state, storage)
+    if previous is None:
+        # A new configuration (or pre-index installation) must obtain a full
+        # response; validators from a different storage identity are unusable.
+        state.pop("etag", None)
+        state.pop("last_modified", None)
     items = load_snapshot_items(previous, storage)
     snapshot = previous
     if previous:
@@ -473,7 +566,9 @@ def fetch_source(
                             "upstream_revision": state.get("upstream_revision"),
                         }
                     )
-                    snapshot = _publish(state, storage, now, raw, parsed_items, metadata, items)
+                    snapshot = _publish(
+                        state, storage, now, raw, parsed_items, metadata, items, before_publish, fixed_now
+                    )
                     items = parsed_items
                     state["last_success_at"] = _iso(now)
                     state["last_changed_at"] = _iso(now)
@@ -510,6 +605,16 @@ def fetch_source(
     finally:
         if owned_client:
             client.close()
+    if attempt["outcome"] != "published" and attempt["error_type"] != "LEASE_LOST":
+        try:
+            if before_publish is not None:
+                before_publish()
+            _maintain_source_index(state, storage, fixed_now or datetime.now(UTC), snapshot)
+        except IngestionError as exc:
+            if exc.code != "LEASE_LOST":
+                raise
+            attempt.update({"outcome": "failed", "error_type": exc.code, "error": str(exc)})
+            state.update({"status": "failed", "error": str(exc)})
     delay += random.uniform(0, max(0, jitter_ratio)) * delay
     state.update(
         {

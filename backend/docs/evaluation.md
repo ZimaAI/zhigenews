@@ -21,7 +21,7 @@ result = evaluate_record(
 )
 ```
 
-`sources` 是 `{snapshot_id: [evidence_item, ...]}`，每条证据至少有 `url/source/title/publishedAt`；`publishedAt` 未知为 null。`generate_fixed_case(case)` 接收复制的完整用例，包含 `evidence/fixedAt/preferenceSnapshot`，返回 `{items: [...], cost: number | None}`。worker 为每个用例组装独立 Harness，输入只挂载这些固定来源，关闭 `web_search` 和任何实时来源刷新，以 `fixedAt` 判断时效；不得调用正式简报发布入口。
+`sources` 是 `{snapshot_id: [evidence_item, ...]}`，每条证据至少有 `url/source/title/publishedAt`；`publishedAt` 未知为 null。`generate_fixed_case(case)` 接收复制的完整用例，包含 `evidence/fixedAt/preferenceSnapshot`，返回 `{items: [...], cost: number | None}`。worker 为每个用例组装独立 Harness，将固定资料适配为只读 `/news/fixed/index.json` 和 `records.jsonl`，首条消息只带偏好、时间和目录说明，不嵌入证据列表。关闭 `web_search` 和任何实时来源刷新，以 `fixedAt` 向前 24 小时闭区间判断时效，未知/无效发布时间不进入结果；不得调用正式简报发布入口。评估仍保存完整固定数据供可信引用校验与裁判使用，不受实时索引更新影响。
 
 `judge_fixed_case(case, items)` 返回 `{relevance: 0..5, faithfulness: 0..5, cost: number | None}`。调用真实评估模型，并将完整偏好、固定证据、生成结果送入明确的评分提示；固定评分提示/模型修订需纳入 `scorerVersion`。未配置或调用失败会保留 null 和简短错误，不伪造0分。人工评分必须单独以 `method=human` 保存，不能写成LLM已评分。
 

@@ -58,9 +58,42 @@ def test_partial_read_hash_cas_and_exclusive_create(files):
     with pytest.raises(HarnessError):
         files.write_file("/rss/new.txt", "forbidden", create_new=True)
     with pytest.raises(HarnessError):
-        files.write_file("/workspace/inputs/new.txt", "forbidden", create_new=True)
-    with pytest.raises(HarnessError):
         files.write_file("/workspace/output/missing/new.txt", "bad", create_new=True)
+
+
+def test_entire_current_workspace_is_writable_with_cas(files):
+    for path in ("/workspace/draft.txt", "/workspace/inputs/notes.txt"):
+        files.write_file(path, "draft", create_new=True)
+        original = files.read_file(path)
+        files.write_file(path, "revised", original["sha256"])
+        assert files.read_file(path)["lines"] == [{"line": 1, "text": "revised"}]
+
+
+def test_news_mounts_expose_only_authorized_sources(files, tmp_path):
+    storage = tmp_path / "news-storage"
+    for source in ("rss-source", "newsnow-source", "disabled-source"):
+        (storage / source).mkdir(parents=True)
+        (storage / source / "index.md").write_text("synthetic AI news", "utf-8")
+    news = FileService(
+        storage,
+        files.roots["workspace"],
+        news_roots={source: storage / source for source in ("rss-source", "newsnow-source")},
+    )
+    assert [entry["name"] for entry in news.list_dir("/news")["entries"]] == ["newsnow-source", "rss-source"]
+    assert news.read_file("/news/rss-source/index.md")["lines"][0]["text"] == "synthetic AI news"
+    assert {match["path"] for match in news.search_content("AI", "/news")["matches"]} == {
+        "/news/rss-source/index.md",
+        "/news/newsnow-source/index.md",
+    }
+    for path in ("/news/disabled-source/index.md", "/rss/rss-source/index.md", "/workspace/../other/run"):
+        with pytest.raises(HarnessError):
+            news.read_file(path)
+    with pytest.raises(HarnessError) as exc:
+        news.write_file("/news/rss-source/new.md", "forbidden", create_new=True)
+    assert exc.value.code == "PERMISSION_DENIED"
+    empty = FileService(storage, files.roots["workspace"], news_roots={})
+    assert empty.list_dir("/news")["entries"] == []
+    assert empty.search_content("AI", "/news")["matches"] == []
 
 
 def test_two_actor_overwrites_only_one_succeeds(files):
@@ -112,6 +145,16 @@ def test_link_escape_rejected(files, tmp_path):
         files.read_file("/workspace/output/link/secret")
 
 
+def test_workspace_hardlink_cannot_expose_external_file(files, tmp_path):
+    external = tmp_path / "secret"
+    external.write_text("external secret", "utf-8")
+    os.link(external, files.roots["workspace"] / "hardlink")
+    with pytest.raises(HarnessError) as exc:
+        files.read_file("/workspace/hardlink")
+    assert exc.value.code == "INVALID_PATH"
+    assert files.search_content("external", "/workspace")["matches"] == []
+
+
 def test_write_recovers_receipt_after_interrupted_commit(files):
     original_save = files._save
     count = [0]
@@ -142,12 +185,13 @@ def test_linux_descriptor_path_swap_and_cas():
     backend = Path(__file__).resolve().parents[1]
     dependencies = Path(filelock.__file__).resolve().parent.parent
     script = r"""
-import sys, types, pathlib, tempfile, os
+import sys, types, pathlib, tempfile, os, subprocess, signal
 sys.path.insert(0, '/deps')
 for name, path in [('zhigenews','/code/src/zhigenews'), ('zhigenews.harness','/code/src/zhigenews/harness')]:
     module=types.ModuleType(name); module.__path__=[path]; sys.modules[name]=module
 from zhigenews.harness.files import FileService
 from zhigenews.harness.errors import HarnessError
+from zhigenews.harness.sandbox import DockerSandbox
 for operation in ('read', 'write', 'list'):
     with tempfile.TemporaryDirectory() as temp:
         base=pathlib.Path(temp); rss=base/'rss'; workspace=base/'workspace'; outside=base/'outside'
@@ -175,7 +219,31 @@ with tempfile.TemporaryDirectory() as temp:
     assert (root/'work'/'output'/'a').stat().st_mode & 0o004, 'sandbox UID cannot read output'
     version=files.read_file('/workspace/output/a')['sha256']; files.write_file('/workspace/output/a','two',version)
     assert files.read_file('/workspace/output/a')['lines'][0]['text']=='two'
-print('Linux O_NOFOLLOW path replacement and CAS passed')
+with tempfile.TemporaryDirectory() as temp:
+    root=pathlib.Path(temp); root.chmod(0o755)
+    rss=root/'rss'; rss.mkdir(); workspace=root/'work'; workspace.mkdir(mode=0o755)
+    (workspace/'inputs').mkdir(); (workspace/'inputs'/'initial').write_text('host-created')
+    files=FileService(rss, workspace); files.write_file('/workspace/draft','file-tool',create_new=True)
+    sandbox= DockerSandbox(rss, workspace, news_roots={})
+    result=subprocess.run(
+        [sys.executable, '-c', "from pathlib import Path; p=Path('.'); (p/'draft').write_text('bash'); (p/'inputs'/'initial').write_text('bash'); (p/'new').mkdir()"],
+        cwd=workspace, user=65534, group=65534, capture_output=True, text=True,
+    )
+    assert result.returncode==0, result.stderr
+    assert files.read_file('/workspace/draft')['lines'][0]['text']=='bash'
+    assert not (files.metadata.stat().st_mode & 0o077), 'metadata is private to the service'
+    os.mkfifo(workspace/'pipe')
+    def blocked(signum, frame):
+        raise AssertionError('file tool blocked opening a workspace pipe')
+    signal.signal(signal.SIGALRM, blocked); signal.alarm(2)
+    try:
+        files.read_file('/workspace/pipe')
+        raise AssertionError('file tool accepted a workspace pipe')
+    except HarnessError as exc:
+        assert exc.code=='INVALID_PATH'
+    finally:
+        signal.alarm(0)
+print('Linux O_NOFOLLOW path replacement, CAS and non-root workspace writes passed')
 """
     args = [
         "docker",

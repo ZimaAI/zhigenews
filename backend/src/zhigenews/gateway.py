@@ -21,6 +21,7 @@ from .errors import AppError
 from .models import ModelConfigurationError, build_model
 from .security import audit, authenticated, canonical, decrypt, digest, locked_bucket, policy
 from .settings import get_settings
+from .tracing import tracing_scope
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="知更 API", version="1.0.0", openapi_url="/openapi.json")
@@ -159,9 +160,11 @@ def model_test(request, ident):
                     },
                 },
             }
-            answer = model.bind_tools([tool], tool_choice="connection_probe").invoke(
-                "Call connection_probe with value ok."
-            )
+            with tracing_scope(metadata={"model_config_id": ident}, tags=["model-test"]):
+                answer = model.bind_tools([tool], tool_choice="connection_probe").invoke(
+                    "Call connection_probe with value ok.",
+                    config={"run_name": "zhigenews.model_test"},
+                )
             verified = any(
                 t["name"] == "connection_probe" and t["args"].get("value") == "ok" for t in answer.tool_calls
             )

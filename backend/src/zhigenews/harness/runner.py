@@ -24,6 +24,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import BaseModel, Field
 
+from ..tracing import tracing_scope
 from .errors import HarnessError
 from .files import FileService
 from .messages import MessageRepairMiddleware
@@ -505,6 +506,13 @@ class HarnessRunner:
         invoke_config = {
             "configurable": {"thread_id": thread_key},
             "recursion_limit": max(30, config.get("maxModelCalls", 20) * 8),
+            "run_name": "zhigenews.subagent" if context.depth else "zhigenews.agent",
+            "metadata": {
+                "run_id": request.run_id,
+                "agent_thread_id": request.thread_id,
+                "agent_depth": context.depth,
+                "resumed": resume,
+            },
         }
         message = HumanMessage(
             content=(request.instruction or "请按当前偏好生成可追溯的新闻简报。")
@@ -524,11 +532,12 @@ class HarnessRunner:
             additional_kwargs={"source": "real_user"},
         )
         context.emit("harness_started", resumed=resume, budget=budget.snapshot())
-        state = graph.invoke(
-            None if resume else {"messages": [message], "summary": "", "summary_revision": 0},
-            invoke_config,
-            context=context,
-        )
+        with tracing_scope():
+            state = graph.invoke(
+                None if resume else {"messages": [message], "summary": "", "summary_revision": 0},
+                invoke_config,
+                context=context,
+            )
         output = state.get("structured_response")
         if output is None:
             last_ai = next(

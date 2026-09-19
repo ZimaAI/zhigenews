@@ -83,6 +83,36 @@ DeepSeek 的思考模式使用自动工具选择，并在内部保留模型协�
 
 ## 验证
 
+### LangSmith 追踪
+
+正式 LangGraph Agent 已接入 LangSmith 自动追踪，主图名为 `zhigenews.agent`，子图名为 `zhigenews.subagent`。模型、工具及摘要调用保留父子层级；`run_id`、`agent_thread_id`、`resumed` 元数据可关联站内运行。管理员模型连接测试和评估裁判也会记录追踪。
+
+在现有 `backend/.env` 中设置以下字段，保留其他配置：
+
+```dotenv
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=<你的 LangSmith API key>
+LANGSMITH_PROJECT=my-first-agent
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+LANGSMITH_WORKSPACE_ID=
+```
+
+组织级 API key 需要填入对应 `LANGSMITH_WORKSPACE_ID`；其他区域或自托管服务使用对应 endpoint。密钥仅保存在后端。未填 key 时追踪不启动，设置 `LANGSMITH_TRACING=false` 可关闭。配置由后端 Settings 显式传入 SDK，本机运行无需额外手工导出环境变量；进程环境变量优先于 `.env`。
+
+执行 `uv sync --project backend --frozen`，重启本机 API，并执行以下命令更新容器 worker/beat；若 API 也在容器中运行，在最后一行追加 `api`：
+
+```powershell
+docker compose --profile app build api
+docker compose --profile app up -d --force-recreate worker beat
+uv run --project backend python -m zhigenews.cli environment
+```
+
+环境检查只显示配置状态与项目名，不输出 key。到管理员端测试模型，或在用户端生成一份简报，然后在 [LangSmith](https://smith.langchain.com/) 的 `my-first-agent` 项目查看新 trace。模型测试名为 `zhigenews.model_test`，评估裁判名为 `zhigenews.evaluation_judge`；评估运行附带 `evaluation_id`。
+
+启用后会上传提示词、新闻证据、可见模型输出和工具输入输出，便于排查运行过程；上传前移除结构化私有思考字段及已识别的密钥。模型内部协议重放与检查点保持原状。自动化测试使用离线模拟导出，不会向真实项目发送 synthetic 数据。接入与配置方式参见 [LangChain/LangGraph 追踪文档](https://docs.langchain.com/langsmith/trace-with-langchain) 和 [敏感数据过滤文档](https://docs.langchain.com/langsmith/mask-inputs-outputs)。
+
+### 自动化与外部依赖检查
+
 ```powershell
 $env:HARNESS_TEST_MYSQL_URL='mysql+pymysql://zhigenews:local-development@127.0.0.1:13316/zhigenews'
 $env:HARNESS_TEST_DOCKER='1'

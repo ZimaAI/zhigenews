@@ -26,6 +26,16 @@ from zhigenews.db import (
 from zhigenews.security import password_hash
 
 
+@pytest.fixture(autouse=True)
+def disable_external_tracing(monkeypatch):
+    """Synthetic regression runs must not be exported using developer credentials."""
+    from zhigenews import tracing
+
+    monkeypatch.setenv("LANGSMITH_TRACING", "false")
+    monkeypatch.setenv("LANGCHAIN_TRACING_V2", "false")
+    monkeypatch.setattr(tracing, "get_tracing_client", lambda: None)
+
+
 @dataclass
 class ApiSandbox:
     app: object

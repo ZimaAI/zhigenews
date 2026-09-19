@@ -7,6 +7,7 @@ from pathlib import Path
 from zhigenews.harness.search import TavilySearch
 from zhigenews.models import build_model
 from zhigenews.settings import get_settings
+from zhigenews.tracing import get_tracing_client, tracing_scope
 
 
 def main():
@@ -26,7 +27,10 @@ def main():
             )
             tool = {"type": "function", "function": {"name": "verify_connection", "description": "Check tool calling",
                     "parameters": {"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]}}}
-            result = model.bind_tools([tool], tool_choice="verify_connection").invoke("Call verify_connection with ok=true.")
+            with tracing_scope(tags=["live-probe"]):
+                result = model.bind_tools([tool], tool_choice="verify_connection").invoke(
+                    "Call verify_connection with ok=true.", config={"run_name": "zhigenews.live_model_probe"}
+                )
             passed = any(t["name"] == "verify_connection" and t["args"].get("ok") is True for t in result.tool_calls)
             checks.append({"id": "live-model", "status": "passed" if passed else "failed", "model": settings.openai_model,
                            "toolCalling": passed, "usage": result.usage_metadata})
@@ -45,6 +49,9 @@ def main():
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))
+    client = get_tracing_client()
+    if client is not None:
+        client.flush()
     return 0 if all(c["status"] == "passed" for c in checks) else 2
 
 

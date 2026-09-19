@@ -18,7 +18,7 @@ from filelock import FileLock, Timeout
 from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError
 
-from .application import CN, add_outbox, create_run, next_slot, public_brief
+from .application import CN, add_outbox, cancel_run, create_run, next_slot, public_brief
 from .contract import schema, validate
 from .db import Brief, Delivery, Outbox, Resource, Run, RunEvent, User, iso, transaction, uid, utcnow
 from .errors import AppError
@@ -143,13 +143,16 @@ def recover_runs(*, run_ids=None, evaluation_ids=None, now=None, limit=100):
     with transaction() as session:
         query = select(Run).where(
             Run.status.in_(("queued", "running", "cancelling")),
-            Run.lease_until.is_(None) | (Run.lease_until <= now),
+            Run.cancel_requested.is_(True) | Run.lease_until.is_(None) | (Run.lease_until <= now),
         )
         if run_ids is not None:
             query = query.where(Run.id.in_(run_ids))
         for run in session.scalars(
             query.order_by(Run.created_at).limit(limit).with_for_update(skip_locked=True)
         ):
+            if run.cancel_requested:
+                cancel_run(run, now=now)
+                continue
             if run.lease_until and run.lease_until > now:
                 continue
             last_queued = _date(run.private.get("lastRecoveryQueuedAt"))

@@ -140,6 +140,55 @@ def test_model_secrets_are_encrypted_replaceable_and_revocable(api_sandbox):
         assert not session.get(Resource, created["id"]).secret
 
 
+def test_model_thinking_setting_persists_and_requires_revalidation(api_sandbox):
+    admin = api_sandbox.admin()
+    body = {**model_body(api_sandbox), "thinkingEnabled": True}
+    created = assert_dto(admin.post(BASE + "/admin/models", json=body), "ModelConfig", 201)
+    api_sandbox.resource(created["id"])
+    assert created["thinkingEnabled"] is True
+    with transaction() as session:
+        record = session.get(Resource, created["id"])
+        assert record.data["thinkingEnabled"] is True
+        record.data = {**record.data, "verified": True}
+
+    # An older client can edit a name without disabling the saved thinking mode.
+    edit = {key: value for key, value in body.items() if key not in {"apiKey", "thinkingEnabled"}}
+    edit["name"] += " renamed"
+    result = assert_dto(admin.put(BASE + f"/admin/models/{created['id']}", json=edit), "ModelConfig")
+    assert result["thinkingEnabled"] is True
+    assert result["verified"] is True
+    listed = assert_dto(admin.get(BASE + "/admin/models?limit=100"), "ModelConfigPage")
+    assert next(item for item in listed["items"] if item["id"] == created["id"])["thinkingEnabled"] is True
+
+    edit["thinkingEnabled"] = False
+    result = assert_dto(admin.put(BASE + f"/admin/models/{created['id']}", json=edit), "ModelConfig")
+    assert result["thinkingEnabled"] is False
+    assert result["verified"] is False
+    with transaction() as session:
+        assert session.get(Resource, created["id"]).data["thinkingEnabled"] is False
+    edit["thinkingEnabled"] = "true"
+    assert admin.put(BASE + f"/admin/models/{created['id']}", json=edit).status_code == 400
+
+
+def test_model_thinking_defaults_false_for_new_and_legacy_records(api_sandbox):
+    admin = api_sandbox.admin()
+    body = model_body(api_sandbox)
+    created = assert_dto(admin.post(BASE + "/admin/models", json=body), "ModelConfig", 201)
+    api_sandbox.resource(created["id"])
+    assert created["thinkingEnabled"] is False
+    with transaction() as session:
+        record = session.get(Resource, created["id"])
+        record.data = {key: value for key, value in record.data.items() if key != "thinkingEnabled"}
+
+    listed = assert_dto(admin.get(BASE + "/admin/models?limit=100"), "ModelConfigPage")
+    assert next(item for item in listed["items"] if item["id"] == created["id"])["thinkingEnabled"] is False
+    result = assert_dto(admin.put(BASE + f"/admin/models/{created['id']}/enabled", json={"enabled": False}), "ModelConfig")
+    assert result["thinkingEnabled"] is False
+    edit = {key: value for key, value in body.items() if key != "apiKey"}
+    result = assert_dto(admin.put(BASE + f"/admin/models/{created['id']}", json=edit), "ModelConfig")
+    assert result["thinkingEnabled"] is False
+
+
 def test_published_config_cannot_be_overwritten(api_sandbox):
     admin = api_sandbox.admin()
     config = verified_config(api_sandbox)
@@ -181,6 +230,58 @@ def test_simultaneous_generation_replays_enqueue_only_one_run(api_sandbox):
     assert results[0]["id"] == results[1]["id"]
     with transaction() as session:
         assert len(list(session.scalars(select(Run).where(Run.user_id == user_id)))) == 1
+
+
+@pytest.mark.parametrize("admin", [False, True])
+@pytest.mark.parametrize(
+    ("status", "lease_seconds", "expected"),
+    [
+        ("queued", None, "cancelled"),
+        ("cancelling", None, "cancelled"),
+        ("running", -30, "cancelled"),
+        ("running", 90, "cancelled"),
+        ("completed", None, "completed"),
+    ],
+)
+def test_cancel_generation_without_worker(api_sandbox, admin, status, lease_seconds, expected):
+    verified_config(api_sandbox)
+    reader = api_sandbox.anonymous()
+    assert preferences(reader).status_code == 200
+    created = assert_dto(
+        reader.post(
+            BASE + "/me/briefs", json={"preferenceVersion": 1},
+            headers={"Idempotency-Key": api_sandbox.prefix + "-cancel"},
+        ),
+        "GenerationProgress", 202,
+    )
+    run_id = created["id"]
+    with transaction() as session:
+        run = session.get(Run, run_id)
+        run.status = status
+        run.cancel_requested = status == "cancelling"
+        if lease_seconds is not None:
+            run.lease_token = "synthetic-worker-lease"
+            run.lease_until = utcnow() + timedelta(seconds=lease_seconds)
+    client = api_sandbox.admin() if admin else reader
+    path = BASE + ("/admin/runs/" if admin else "/me/generations/") + run_id + "/cancel"
+    for _ in range(2):
+        result = assert_dto(client.post(path), "AgentRun" if admin else "GenerationProgress", 202)
+        assert result["status"] == expected
+    assert reader.get(BASE + "/me/generations/current").json()["status"] == expected
+    with transaction() as session:
+        run = session.get(Run, run_id)
+        assert run.cancel_requested == (status != "completed")
+        if expected == "cancelled":
+            assert run.lease_token is None and run.lease_until is None
+            assert run.remaining_seconds is None
+    if expected == "cancelled":
+        # A command delivered after cancellation must never start the model.
+        from zhigenews.execution import execute_run
+
+        execute_run(run_id)
+        with transaction() as session:
+            assert session.get(Run, run_id).status == "cancelled"
+            assert session.scalar(select(Brief).where(Brief.run_id == run_id)) is None
 
 
 def saturate_request_bucket(user_id):

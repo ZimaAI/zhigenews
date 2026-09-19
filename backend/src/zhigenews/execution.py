@@ -4,11 +4,10 @@ import threading
 from copy import deepcopy
 from datetime import UTC, timedelta
 
-from langchain_openai import ChatOpenAI
 from sqlalchemy import func, select
 from sqlalchemy.dialects.mysql import insert
 
-from .application import ACTIVE, CN, add_outbox, resource
+from .application import ACTIVE, CN, add_outbox, cancel_run, resource
 from .contract import schema, validate
 from .db import (
     Brief,
@@ -26,24 +25,25 @@ from .db import (
 )
 from .evaluation import evaluate_record
 from .harness import HarnessRequest, HarnessRunner, RunCancelled, UserMemory, mysql_persistence
+from .models import build_model
 from .security import canonical, decrypt, redact
 from .settings import get_settings
 
 
 def model_from(snapshot, *, max_seconds=60):
     data = snapshot["data"]
-    return ChatOpenAI(
-        model=data["modelId"],
-        base_url=data["endpoint"],
+    return build_model(
+        data,
         api_key=decrypt(snapshot["encryptedSecret"]),
-        timeout=min(60, max_seconds),
-        max_retries=0,
-        max_tokens=min(4096, max(256, data["contextWindow"] // 4)),
+        timeout=max_seconds,
+        max_tokens=output_reserve(snapshot),
     )
 
 
 def output_reserve(snapshot):
-    return min(4096, max(256, snapshot["data"]["contextWindow"] // 4))
+    # Completion limits include reasoning tokens on compatible reasoning models.
+    # Reserve room for both reasoning and the final brief, within the context window.
+    return min(16384, max(256, snapshot["data"]["contextWindow"] // 4))
 
 
 def append_event(session, run, event):
@@ -224,15 +224,14 @@ def execute_run(run_id):
         run = session.scalar(select(Run).where(Run.id == run_id).with_for_update())
         if not run or run.status not in ACTIVE:
             return
+        if run.cancel_requested:
+            cancel_run(run)
+            return
         if run.lease_until and run.lease_until > utcnow():
             return {
                 "status": "busy",
                 "retry_after": max(1, int((run.lease_until - utcnow()).total_seconds())),
             }
-        if run.cancel_requested:
-            run.status, run.remaining_seconds = "cancelled", None
-            run.updated_at = utcnow()
-            return
         existing = session.scalar(select(Brief).where(Brief.run_id == run_id))
         if existing:
             delivery = session.scalar(select(Delivery).where(Delivery.brief_id == existing.id))
@@ -359,19 +358,27 @@ def execute_run(run_id):
                 run.lease_until = utcnow() + timedelta(seconds=90)
                 run.updated_at = utcnow()
     except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
         with transaction() as session:
             run = session.scalar(select(Run).where(Run.id == run_id).with_for_update())
             if run.lease_token != token:
                 return
             run.status = "cancelled" if isinstance(exc, RunCancelled) or run.cancel_requested else "failed"
-            run.error = "" if run.status == "cancelled" else "生成未完成，请稍后重试或联系管理员"
+            run.error = "" if run.status == "cancelled" else {
+                "TIME_BUDGET": "生成时间已达上限，请缩小订阅范围或联系管理员调整运行预算",
+                "BUDGET_EXHAUSTED": "生成调用次数已达上限，请联系管理员调整运行预算",
+                "APITimeoutError": "模型响应超时，请稍后重试或联系管理员检查模型服务与运行时间上限",
+                "OpenAITimeoutError": "模型响应超时，请稍后重试或联系管理员检查模型服务与运行时间上限",
+                "MODEL_OUTPUT_INCOMPLETE": "模型返回的简报不完整，请重试或联系管理员检查模型输出限制",
+                "STRUCTURED_OUTPUT_MISSING": "模型未返回有效的简报格式，请联系管理员检查模型工具调用支持",
+            }.get(code, "生成未完成，请稍后重试或联系管理员")
             run.remaining_seconds, run.updated_at, run.lease_until = None, utcnow(), None
             append_event(
                 session,
                 run,
                 {
                     "type": "run_failed" if run.status == "failed" else "run_cancelled",
-                    "code": getattr(exc, "code", type(exc).__name__),
+                    "code": code,
                 },
             )
 

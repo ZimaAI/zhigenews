@@ -18,6 +18,7 @@ from .application import ACTIVE, Application, resource
 from .contract import CONTRACT, schema, validate
 from .db import Idempotency, Run, RunEvent, iso, transaction, utcnow
 from .errors import AppError
+from .models import ModelConfigurationError, build_model
 from .security import audit, authenticated, canonical, decrypt, digest, locked_bucket, policy
 from .settings import get_settings
 
@@ -139,15 +140,12 @@ def model_test(request, ident):
     verified, capabilities, message = False, [], "连接测试失败"
     if secret:
         try:
-            from langchain_openai import ChatOpenAI
-
-            model = ChatOpenAI(
-                model=data["modelId"],
-                base_url=data["endpoint"],
+            thinking_enabled = data.get("thinkingEnabled", False)
+            model = build_model(
+                data,
                 api_key=decrypt(secret),
-                timeout=25,
-                max_retries=0,
-                max_tokens=100,
+                timeout=120 if thinking_enabled else 25,
+                max_tokens=min(16384, max(256, data["contextWindow"] // 4)) if thinking_enabled else 100,
             )
             tool = {
                 "type": "function",
@@ -169,6 +167,8 @@ def model_test(request, ident):
             )
             capabilities = ["chat", "tool_calling"] if verified else ["chat"]
             message = "模型工具调用能力验证通过" if verified else "模型没有返回要求的工具调用"
+        except ModelConfigurationError as exc:
+            message = str(exc)
         except Exception:
             message = "模型请求失败，请检查端点、模型名称和凭据"
     else:

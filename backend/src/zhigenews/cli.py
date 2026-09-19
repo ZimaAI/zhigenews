@@ -67,6 +67,7 @@ def initialize():
                 enabled=True,
                 verified=False,
                 contextWindow=32768,
+                thinkingEnabled=False,
             )
             session.add(
                 Resource(id="initial-model", kind="model", data=model, secret=encrypt(s.openai_api_key))

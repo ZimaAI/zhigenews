@@ -71,6 +71,22 @@ def progress(run):
     )
 
 
+def cancel_run(run, *, now=None):
+    """End this task immediately and fence any worker still awaiting its model.
+
+    Callers hold the run row lock. An in-flight upstream request may still return,
+    but its cleared lease prevents further events or publication from that worker.
+    """
+    if run.status not in ACTIVE:
+        return
+    now = now or utcnow()
+    run.cancel_requested = True
+    run.remaining_seconds = None
+    run.updated_at = now
+    run.status, run.error = "cancelled", ""
+    run.lease_token = run.lease_until = None
+
+
 def public_brief(brief):
     keys = CONTRACT["components"]["schemas"]["Brief"]["properties"]
     return {k: v for k, v in brief.data.items() if k in keys}
@@ -333,10 +349,7 @@ class Application:
 
     def cancelGeneration(self):
         run = self.own_run()
-        if run.status in ACTIVE:
-            run.cancel_requested = True
-            run.status = "cancelling"
-            run.updated_at = utcnow()
+        cancel_run(run)
         return progress(run)
 
     def listBriefs(self):
@@ -440,7 +453,9 @@ class Application:
         return self.listing("source")
 
     def listModels(self):
-        return self.listing("model")
+        result = self.listing("model")
+        result["items"] = [{"thinkingEnabled": False, **item} for item in result["items"]]
+        return result
 
     def listConfigs(self):
         return self.listing("config")
@@ -525,8 +540,11 @@ class Application:
         body = deepcopy(self.body)
         key = body.pop("apiKey", None)
         old = row.data if row else {}
-        changed = key is not None or any(
-            body[k] != old.get(k) for k in ("endpoint", "modelId", "contextWindow")
+        body.setdefault("thinkingEnabled", old.get("thinkingEnabled", False))
+        changed = (
+            key is not None
+            or any(body[k] != old.get(k) for k in ("endpoint", "modelId", "contextWindow"))
+            or body["thinkingEnabled"] != old.get("thinkingEnabled", False)
         )
         data = {
             **body,
@@ -551,7 +569,7 @@ class Application:
 
     def setModelEnabled(self):
         row = resource(self.db, self.ident, "model", True)
-        row.data = {**row.data, "enabled": self.body["enabled"]}
+        row.data = {"thinkingEnabled": False, **row.data, "enabled": self.body["enabled"]}
         return row.data
 
     def revokeModelSecret(self):
@@ -720,10 +738,7 @@ class Application:
         run = self.db.scalar(select(Run).where(Run.id == self.ident).with_for_update())
         if not run:
             raise AppError("NOT_FOUND", "运行不存在", 404)
-        if run.status in ACTIVE:
-            run.cancel_requested = True
-            run.status = "cancelling"
-            run.updated_at = utcnow()
+        cancel_run(run)
         return run_view(self.db, run)
 
     def listAdminDeliveries(self):

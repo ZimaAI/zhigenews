@@ -11,8 +11,8 @@ function mockFetch(handler: (input: string, init: RequestInit) => Response | Pro
   return async (input, init) => handler(String(input), init || {});
 }
 
-test('generated metadata covers the exact accepted 53 operations and contract fingerprint', async () => {
-  const bytes = await readFile(new URL('../../../docs/releases/v1.0.0/implementation/backend/h001/contracts/openapi.json', import.meta.url));
+test('generated metadata covers the active backend operations and contract fingerprint', async () => {
+  const bytes = await readFile(new URL('../../../backend/src/zhigenews/contracts/openapi.json', import.meta.url));
   const contract = JSON.parse(bytes.toString());
   const operations = Object.entries(contract.paths).flatMap(([path, methods]) =>
     Object.entries(methods as Record<string, { operationId: string }>).map(([method, spec]) => ({ path, method, id: spec.operationId })));

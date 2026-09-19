@@ -82,6 +82,51 @@
       "dependsOn": "backend: prepare"
     },
     {
+      "label": "backend: image",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "compose",
+        "--profile",
+        "app",
+        "build",
+        "api"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "backend: workers",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "compose",
+        "--profile",
+        "app",
+        "up",
+        "-d",
+        "--wait",
+        "worker",
+        "beat"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "backend: api prepare",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "backend: prepare",
+        "backend: image",
+        "backend: workers"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "backend: lint",
       "type": "process",
       "command": "uv",

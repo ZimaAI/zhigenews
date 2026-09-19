@@ -1,6 +1,6 @@
 # Shared API client
 
-Generated DTOs and operation metadata come only from the accepted `v1.0.0/b003` backend handoff `h001/contracts/openapi.json`. Run `npm run generate:api` after deliberately selecting a new accepted contract in the generator; `npm run check:contract` detects drift. The generated header records the source SHA-256. TypeScript preserves field names, required/optional fields, nulls, enums and references; the server validates range, length and cross-field rules.
+Generated DTOs and operation metadata come from the active backend contract at `backend/src/zhigenews/contracts/openapi.json`. Run `npm run generate:api` after updating that contract; `npm run check:contract` detects drift. The generated header records the source SHA-256. The accepted `v1.0.0/b003` handoff remains an immutable historical record. TypeScript preserves field names, required/optional fields, nulls, enums and references; the server validates range, length and cross-field rules.
 
 ```ts
 import { api, ApiError, type Preferences, type GenerationProgress } from '@zhigenews/api-client'

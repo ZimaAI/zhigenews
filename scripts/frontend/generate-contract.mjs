@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-/** Generate frontend types from the accepted, immutable backend handoff. */
+/** Generate frontend types from the active backend API contract. */
 import { createHash } from 'node:crypto';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const source = 'docs/releases/v1.0.0/implementation/backend/h001/contracts/openapi.json';
+const source = 'backend/src/zhigenews/contracts/openapi.json';
 const target = resolve(root, 'packages/api-client/src/generated.ts');
 const raw = await readFile(resolve(root, source), 'utf8');
 const contract = JSON.parse(raw);

@@ -4,9 +4,8 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from langchain_openai import ChatOpenAI
-
 from zhigenews.harness.search import TavilySearch
+from zhigenews.models import build_model
 from zhigenews.settings import get_settings
 
 
@@ -20,8 +19,11 @@ def main():
         checks.append({"id": "live-model", "status": "blocked", "reason": "OPENAI_MODEL/OPENAI_API_KEY missing"})
     else:
         try:
-            model = ChatOpenAI(model=settings.openai_model, base_url=settings.openai_base_url,
-                               api_key=settings.openai_api_key, max_retries=0, timeout=30, max_tokens=100)
+            model = build_model(
+                {"modelId": settings.openai_model, "endpoint": settings.openai_base_url,
+                 "thinkingEnabled": False},
+                api_key=settings.openai_api_key, timeout=30, max_tokens=100,
+            )
             tool = {"type": "function", "function": {"name": "verify_connection", "description": "Check tool calling",
                     "parameters": {"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]}}}
             result = model.bind_tools([tool], tool_choice="verify_connection").invoke("Call verify_connection with ok=true.")

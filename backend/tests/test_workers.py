@@ -389,3 +389,27 @@ def test_recovery_routes_existing_brief_to_delivery_without_rerunning_model(sand
     with transaction() as session:
         commands = list(session.scalars(select(Outbox).where(Outbox.target_id.in_([run_id, delivery_id]))))
         assert len(commands) == 1 and commands[0].kind == "delivery"
+
+
+@pytest.mark.parametrize("lease_seconds", [None, -30, 90])
+def test_recovery_finishes_abandoned_cancellation_before_requeue(sandbox, lease_seconds):
+    _, run_id, brief_id, delivery_id = pending_brief(sandbox)
+    now = utcnow()
+    with transaction() as session:
+        run = session.get(Run, run_id)
+        run.status, run.cancel_requested = "cancelling", True
+        # Cancellation must not wait for the recovery requeue throttle either.
+        run.private = {**run.private, "lastRecoveryQueuedAt": iso(now)}
+        if lease_seconds is not None:
+            run.lease_token = "synthetic-abandoned-worker"
+            run.lease_until = now + timedelta(seconds=lease_seconds)
+    assert workers.recover_runs(run_ids=[run_id], evaluation_ids=[], now=now) == []
+    with transaction() as session:
+        run = session.get(Run, run_id)
+        assert run.status == "cancelled" and run.lease_token is None and run.lease_until is None
+        assert session.scalar(select(Outbox).where(Outbox.target_id.in_([run_id, delivery_id]))) is None
+    # Even a delayed publication command must respect the cancellation flag.
+    assert workers.publish_delivery(delivery_id)["status"] == "disabled"
+    with transaction() as session:
+        assert not session.get(Brief, brief_id).published
+        assert session.get(Run, run_id).status == "cancelled"

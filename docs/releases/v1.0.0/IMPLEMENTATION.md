@@ -19,6 +19,8 @@ npm ci
 npm run build
 ```
 
+生成简报需要 API、worker 和 beat 同时运行：API 创建持久任务，beat 投递任务，worker 执行生成及发布。若使用 VS Code 的 API 或全栈调试入口，准备任务会自动构建后端镜像并启动容器 worker/beat，再启动本机 API；详见[本机与调试启动步骤](../../../README.md#vs-code-启动与断点调试)。本机 API 和 Linux worker 共用数据库及队列，生成工作区保存在容器数据卷。
+
 分别在两个终端运行：
 
 ```powershell

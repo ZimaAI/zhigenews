@@ -15,7 +15,7 @@ npm run dev:admin
 
 用户端为 [127.0.0.1:5173](http://127.0.0.1:5173)，管理员端为 [127.0.0.1:5174](http://127.0.0.1:5174)。两端均代理真实后端18000端口；用户自动取得匿名Cookie，管理员使用`backend/.env`的账号密码独立登录。
 
-`npm run build`检查契约、类型并分别构建两个应用；也可单独执行`build:user`、`build:admin`。生产输出为`apps/user-web/dist`和`apps/admin-web/dist`，停止相应dev进程后用`npm run preview:user`/`preview:admin`在原端口预览。共享API客户端由h001契约生成，`npm run check:contract`检查一致性，`npm run test:api`验证传输及SSE恢复。
+`npm run build`检查契约、类型并分别构建两个应用；也可单独执行`build:user`、`build:admin`。生产输出为`apps/user-web/dist`和`apps/admin-web/dist`，停止相应dev进程后用`npm run preview:user`/`preview:admin`在原端口预览。共享API客户端由活动后端契约生成，`npm run check:contract`检查一致性，`npm run test:api`验证传输及SSE恢复；h001交接快照保持封存。
 
 完整启动、模型配置和用户验收步骤见 [实现与验收入口](docs/releases/v1.0.0/IMPLEMENTATION.md)。模型/Tavily密钥保留在后端，不放入VITE前端变量。
 
@@ -33,24 +33,28 @@ uv run --project backend alembic -c backend/alembic.ini upgrade head
 
 ```powershell
 uv run --project backend python -m zhigenews.cli init
+docker compose --profile app build api
+docker compose --profile app up -d --wait worker beat
 uv run --project backend uvicorn zhigenews.gateway:app --host 127.0.0.1 --port 18000
 ```
 
 数据库仅本机 `127.0.0.1:13316`，Redis `127.0.0.1:56386`。开发容器示例使用本地开发数据库密码；正式环境需设置自己的服务凭据。API为 `http://127.0.0.1:18000/api/v1`，健康探针 `/healthz`，契约 `/openapi.json`。
+
+本机 API 与容器 worker/beat 共用上述 MySQL 和 Redis。生成请求由 API 入库，beat 将持久任务投递到队列，worker 执行生成与发布；仅启动 API 无法完成简报。运行文件由 Linux worker 写入 `zhigenews_runtime` 卷，供 Docker 沙箱使用。修改后端代码后重新构建镜像并启动 worker/beat，确保执行器使用新代码。
 
 ## VS Code 启动与断点调试
 
 用 VS Code 打开仓库根目录，安装工作区推荐的 Python、Python Debugger、Vue - Official 扩展，并准备 Node.js 22.12+、Python 3.12、uv 与 Microsoft Edge。先启动 Docker Desktop 的 Linux engine，后端准备任务需要 MySQL/Redis。
 
 1. 首次使用先按上文配置 `backend/.env`，再通过「终端 → 运行任务」执行 `frontend: install`（根目录 `npm ci`）和 `backend: init`。后者会依次同步 Python 依赖、等待 MySQL/Redis 就绪、执行迁移并初始化数据库；已有 `.env` 不会被覆盖。前端依赖仅需首次安装或锁文件更新后重新安装，F5 不重复安装。
-2. 在「运行和调试」选择 **后端：API（18001）**，按 F5 启动，在 `backend/src/zhigenews/gateway.py` 的 `health()` 内设置断点，访问 `http://127.0.0.1:18001/healthz` 即可命中。启动后自动打开 `/docs`；Shift+F5 停止调试。调试端口使用 18001，避免与 Docker API 的 18000 冲突。为保持断点稳定，未启用自动重载，修改代码后重启调试。
+2. 在「运行和调试」选择 **后端：API（18001）**，按 F5 启动。准备任务会先同步依赖、启动 MySQL/Redis、执行迁移，再构建当前后端镜像并启动 Linux worker/beat，随后启动本机 API。在 `backend/src/zhigenews/gateway.py` 的 `health()` 内设置断点，访问 `http://127.0.0.1:18001/healthz` 即可命中。启动后自动打开 `/docs`；Shift+F5 停止调试。调试端口使用 18001，避免与 Docker API 的 18000 冲突。为保持断点稳定，未启用自动重载，修改代码后重启调试。
 3. 异步任务可分别启动 **Worker（本机 solo）** 和 **Beat（本机调度）**。先停止容器中的 worker/beat（`docker compose --profile app stop worker beat`），避免争抢相同队列或重复调度。本机进程共用根目录工作路径及 `.env`；Beat 状态保存在被忽略的 `backend/.venv/`。Windows 的 solo 入口供逐步调试，涉及 Docker 沙箱挂载的完整生成流程仍使用下方 Linux 容器栈。调试结束后可用 `docker compose --profile app up -d worker beat` 恢复容器任务服务。
 4. **后端：CLI** 支持选择 `environment`、`init`、`collect`、`tick` 并设置断点；后两项会执行真实工作。`backend: lint`、`backend: test` 可从任务菜单运行，测试所需服务与环境变量见「验证」章节。测试资源管理器也支持运行与调试 pytest；如曾选过其他 Python，执行「Python: Select Interpreter」选择 `backend/.venv`。
-5. 选择 **全栈：用户端 + API**、**全栈：管理员端 + API** 或 **全栈：双前端 + API**，按 F5 同时启动本机 API、正式前端 Vite 和 Edge 调试。用户端为 `http://127.0.0.1:5173`，管理员端为 `http://127.0.0.1:5174`；可以在 `apps/*/src` 的 Vue/TypeScript 与 `backend/src` 的 Python 中设置断点。API 首次准备可能晚于浏览器打开，待后端就绪后刷新页面。
+5. 选择 **全栈：用户端 + API**、**全栈：管理员端 + API** 或 **全栈：双前端 + API**，按 F5 同时启动本机 API、正式前端 Vite 和 Edge 调试，并通过 API 的准备任务启动 Linux worker/beat，支持实际生成简报。用户端为 `http://127.0.0.1:5173`，管理员端为 `http://127.0.0.1:5174`；可以在 `apps/*/src` 的 Vue/TypeScript 与 `backend/src` 的 Python 中设置断点。API 首次准备可能晚于浏览器打开，待后端就绪后刷新页面。
 6. **前端：用户端 / 管理员端（正式应用）** 可单独启动浏览器调试，需要另外启动 **后端：API（18001）**。前端调试任务通过进程变量 `ZHIGENEWS_API_TARGET=http://127.0.0.1:18001` 指定代理；普通 `npm run dev:*` 和 `preview:*` 仍默认连接 18000。断点也支持共享 `packages/` 源码。联合调试停止一个会话时会停止其余调试会话；Vite 后台任务需通过「终端 → 终止任务」停止。切换普通开发、调试或原型前先停止旧 Vite，避免端口占用或复用错误的代理目标。
 7. **原型：用户端 / 管理端（模拟数据）** 保留为独立入口，会自动安装原型 npm 依赖、启动 Vite 并打开 Edge。用户端为 5173，管理端为 5174；管理端同时启动用户端以提供模拟会话接口。原型没有接入正式后端，与正式前端不能同时占用相同端口。
 
-各后端调试入口都会先执行 `backend: prepare`（同步依赖、启动数据库与缓存、迁移），不会重复初始化管理员。调试结束后数据库与缓存继续运行。配置见 [.vscode/launch.json](.vscode/launch.json)、[.vscode/tasks.json](.vscode/tasks.json)；配置字段遵循 [VS Code Python 调试文档](https://code.visualstudio.com/docs/python/debugging)、[联合调试文档](https://code.visualstudio.com/docs/debugtest/debugging-configuration) 与 [浏览器调试文档](https://code.visualstudio.com/docs/nodejs/browser-debugging)。
+API 调试入口执行 `backend: api prepare`，包含基础准备、镜像构建和容器 worker/beat 启动；本机 Worker、Beat 和 CLI 调试入口仍只执行 `backend: prepare`（同步依赖、启动数据库与缓存、迁移），方便独立调试。准备任务不会重复初始化管理员。调试结束后数据库、缓存和容器 worker/beat 继续运行；停止后台任务可执行 `docker compose --profile app stop worker beat`。配置见 [.vscode/launch.json](.vscode/launch.json)、[.vscode/tasks.json](.vscode/tasks.json)；配置字段遵循 [VS Code Python 调试文档](https://code.visualstudio.com/docs/python/debugging)、[联合调试文档](https://code.visualstudio.com/docs/debugtest/debugging-configuration) 与 [浏览器调试文档](https://code.visualstudio.com/docs/nodejs/browser-debugging)。
 
 ## Linux API / worker / scheduler
 
@@ -63,13 +67,19 @@ docker compose --profile app up -d api worker beat
 
 服务使用同一 MySQL 与 Redis。单独的 beat 扫描持久计划与 outbox，Celery worker 执行采集、Agent、评估和发布。容器数据位于 `zhigenews_runtime` 卷；API/worker统一挂载到同一绝对路径，使可信worker启动的隔离bash容器能够只读绑定本次工作区。Docker socket仅供可信worker创建沙箱，绝不挂载进Agent沙箱。沙箱无网络、非root、只读根和持久挂载、资源/输出/超时受限；不可用时不回退宿主shell。
 
-本地原生调试和Linux容器使用各自的数据路径，不要混用同一运行的文件目录；正式闭环统一使用容器栈。`docker compose stop`保留数据；本项目不提供自动删除数据卷或无损数据库降级承诺。
+本机 API 可搭配 Linux worker/beat 完成生成，生成工作区统一使用容器数据路径。本机 solo Worker 仅用于逐步调试，不要与容器 worker 同时消费队列，或让两类 worker 接续同一运行的文件目录。`docker compose stop`保留数据；本项目不提供自动删除数据卷或无损数据库降级承诺。
 
 ## 配置与接口
 
 `POST /auth/anonymous`自动签发HttpOnly匿名Cookie，管理员使用独立登录Cookie。所有写请求发送 `X-Zhige-Request: 1`；有Origin时必须在ALLOWED_ORIGINS白名单。创建生成、采集、评估与发布重试发送稳定 `Idempotency-Key`（8–128字符），同键不同body返回409。429遵循Retry-After。
 
 CLI初始化的模型保留未验证、Agent配置保留草稿。管理员真实测试工具调用能力后发布配置，才能创建生成；密钥只写、加密保存、不回显。用户只看公开进度，完整事件/SSE只对管理员开放。`submitted`只表示站内发布，不表示已读。
+
+管理员在「模型配置」的新建或编辑弹窗中设置「开启深度思考」，新模型及旧配置默认关闭。切换后需重新测试模型能力，保存结果用于后续运行；已经启动的任务继续使用创建时冻结的配置。深度思考会消耗额外时间与输出 Token，可在 Agent 配置中调整运行时间上限。
+
+当前已适配 `deepseek-v4-flash`、`deepseek-v4-pro`、`deepseek-flash`、`MiniMax-M3`，以及 `gpt-5.1`、`gpt-5.2`、`gpt-5.4`、`gpt-5.5` 和对应日期快照。MiniMax 使用其 API 的 adaptive/disabled 模式，GPT 使用 medium/none；未适配的模型开启时，连接测试会明确提示，不能误报已启用。参见 [MiniMax 接口说明](https://platform.minimax.io/docs/api-reference/text-openai-api)。
+
+DeepSeek 的思考模式使用自动工具选择，并在内部保留模型协议要求的思考上下文，公开进度和管理员消息记录不展示私有思维链。最终简报仍须通过结构、引用与来源校验。参见 [DeepSeek 思考与工具调用说明](https://api-docs.deepseek.com/guides/thinking_mode/)。
 
 ## 验证
 

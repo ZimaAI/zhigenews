@@ -6,11 +6,16 @@ provider, Tavily, news quality, or real-model evaluation scores.
 
 import json
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from threading import Event
 from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from httpx import Request
+from langchain_openai.chat_models.base import OpenAITimeoutError
+from openai import APITimeoutError
 from sqlalchemy import delete, select
 from test_harness_runtime import ScriptedModel, ai_call
 
@@ -30,6 +35,7 @@ from zhigenews.db import (
     utcnow,
 )
 from zhigenews.harness import UserMemory, mysql_persistence
+from zhigenews.models import tool_model_options
 from zhigenews.security import encrypt
 from zhigenews.settings import get_settings
 from zhigenews.workers import publish_delivery
@@ -305,6 +311,46 @@ def test_model_failure_keeps_unknown_usage_and_redacts_public_failure(execution_
     assert "synthetic-provider-secret" not in str([event.data for event in snapshot.events])
 
 
+class TimeoutScriptedModel(ScriptedModel):
+    timeout_type: type[Exception] = APITimeoutError
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        raise self.timeout_type(request=Request("POST", "https://fixture.invalid/v1"))
+
+
+@pytest.mark.parametrize("timeout_type", [APITimeoutError, OpenAITimeoutError])
+def test_model_timeout_with_empty_provider_code_reports_failure(execution_case, monkeypatch, timeout_type):
+    patch_model(monkeypatch, TimeoutScriptedModel(responses=[final_response()], timeout_type=timeout_type))
+    execution.execute_run(execution_case.run_id)
+    snapshot = rows(execution_case)
+    assert snapshot.run.status == "failed" and snapshot.run.remaining_seconds is None
+    assert "超时" in snapshot.run.error
+    assert snapshot.events[-1].data["detail"] == timeout_type.__name__
+    assert not snapshot.briefs and not snapshot.deliveries
+
+
+@pytest.mark.parametrize(("context_window", "expected_output"), [(32000, 8000), (131072, 16384)])
+def test_model_uses_run_timeout_and_reasoning_output_budget(context_window, expected_output):
+    model = execution.model_from({
+        "data": {"modelId": "synthetic-model", "endpoint": "https://fixture.invalid/v1", "contextWindow": context_window},
+        "encryptedSecret": encrypt("synthetic-secret"),
+    }, max_seconds=180)
+    assert model.request_timeout == 180
+    assert model.max_retries == 0
+    assert model.max_tokens == expected_output
+
+
+def test_deepseek_v4_tool_calls_disable_incompatible_thinking_mode():
+    options = tool_model_options("deepseek-v4-flash")
+    assert options == {"extra_body": {"thinking": {"type": "disabled"}}}
+    model = execution.model_from({
+        "data": {"modelId": "deepseek-v4-flash", "endpoint": "https://fixture.invalid/v1", "contextWindow": 131072},
+        "encryptedSecret": encrypt("synthetic-secret"),
+    })
+    assert model.extra_body == options["extra_body"]
+    assert tool_model_options("other-reasoning-model") == {}
+
+
 def test_queued_cancellation_requires_no_model_and_preserves_daily_slot(execution_case, monkeypatch):
     model = patch_model(monkeypatch, ScriptedModel(responses=[final_response()]))
     with transaction() as session:
@@ -345,6 +391,46 @@ def test_cancellation_during_model_call_stops_before_publication(execution_case,
     snapshot = rows(execution_case)
     assert snapshot.run.status == "cancelled" and snapshot.run.percent != 100
     assert model.position == 1 and not snapshot.briefs and not snapshot.deliveries
+
+
+def test_cancel_api_finishes_before_blocked_model_returns_and_fences_its_result(
+    execution_case, api_sandbox, monkeypatch,
+):
+    case = execution_case
+    admin = api_sandbox.admin()
+    entered, release = Event(), Event()
+    original_generate = ScriptedModel._generate
+
+    def blocking_generate(self, messages, stop=None, run_manager=None, **kwargs):
+        entered.set()
+        assert release.wait(20), "test did not release the synthetic model response"
+        return original_generate(self, messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    monkeypatch.setattr(ScriptedModel, "_generate", blocking_generate)
+    model = patch_model(monkeypatch, ScriptedModel(responses=[final_response()]))
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pending = pool.submit(execution.execute_run, case.run_id)
+        try:
+            assert entered.wait(10), "worker did not enter the synthetic model request"
+            before = rows(case)
+            assert before.run.status == "running" and before.run.lease_token
+            response = admin.post(f"/api/v1/admin/runs/{case.run_id}/cancel")
+            assert response.status_code == 202, response.text
+            assert response.json()["status"] == "cancelled"
+            assert not pending.done(), "upstream response should still be blocked"
+            cancelled = rows(case)
+            assert cancelled.run.status == "cancelled" and cancelled.run.cancel_requested
+            assert cancelled.run.lease_token is None and cancelled.run.lease_until is None
+            assert not cancelled.briefs and not cancelled.deliveries
+        finally:
+            release.set()
+        pending.result(timeout=10)
+
+    after = rows(case)
+    assert model.position == 1
+    assert after.run.status == "cancelled" and after.run.brief_id is None
+    assert not after.briefs and not after.deliveries
+    assert [event.data for event in after.events] == [event.data for event in before.events]
 
 
 def test_existing_brief_replay_has_no_new_generation_and_preserves_journal(execution_case, monkeypatch):

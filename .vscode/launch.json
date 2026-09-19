@@ -21,7 +21,7 @@
       "envFile": "${workspaceFolder}/backend/.env",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "preLaunchTask": "backend: prepare",
+      "preLaunchTask": "backend: api prepare",
       "serverReadyAction": {
         "action": "openExternally",
         "pattern": "Uvicorn running on (http://\\S+)",

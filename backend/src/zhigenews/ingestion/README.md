@@ -15,8 +15,44 @@ imported rather than silently taking newer metadata on startup.
 interval is the maximum of it, the pinned NewsNow source interval, and RSS
 `ttl`. HTTP cache hints and bounded exponential failure backoff may postpone
 `next_fetch_at` further. `Retry-After` is respected. Positive jitter never
-causes earlier polling. `default_sources()` provides two NewsNow sources with
-different intervals and the China News immediate feed as unverified sources.
+causes earlier polling.
+
+## Default sources
+
+`default_sources()` provides 388 enabled, unverified sources:
+
+- 47 NewsNow sources from the **More / 更多** menu at
+  <https://newsnow.busiyi.world/c/hottest>, captured on 2026-09-19.
+  `DEFAULT_NEWSNOW_SOURCE_IDS` in `catalog.py` pins this selection separately
+  from the full upstream metadata catalog. Redirect aliases are omitted, as
+  are the five `disable: "cf"` entries absent from that public deployment
+  (36kr-quick, 36kr-renqi, bilibili-hot-video, bilibili-ranking, kuaishou).
+  Each source keeps its upstream polling interval. The base URL remains
+  configurable through `NEWSNOW_BASE_URL`.
+- 341 RSS sources in `default-rss-sources.json`: the existing China News
+  immediate feed plus all 340 feed URLs in the table at
+  <https://juejin.cn/post/7459966392429101067>, captured on 2026-09-19.
+  These use a 30-minute configured interval. Original URLs are preserved,
+  including HTTP/HTTPS, host and trailing-slash variants; different URLs
+  with the same name remain separate. Three unnamed rows use their URL as
+  the display name. The article's preview links are not feed URLs.
+
+The three original source IDs are unchanged. New RSS IDs were generated from
+the hostname and the first 12 SHA-256 hex characters of the original URL, then
+saved in the JSON file; keep these IDs stable when editing entries. This is a
+source inventory, not a claim that all endpoints currently return valid feeds.
+
+For new or existing installations, run from the repository root:
+
+```sh
+uv run --project backend python -m zhigenews.cli init
+```
+
+Initialization adds missing source IDs only. Re-running it preserves existing
+URLs, intervals and disabled states. Editing defaults does not update rows
+already in the database; use the admin Sources page for those changes.
+
+## Storage and evidence
 
 Each source configuration has a separate root at
 `{kind}/{source_db_id}/configs/{identity_hash}/`. The identity uses the

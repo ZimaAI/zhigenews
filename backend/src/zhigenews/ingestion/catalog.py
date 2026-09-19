@@ -7,6 +7,58 @@ from urllib.parse import urlencode
 CATALOG_REVISION = "0f95b2c998dffbfd2ddbc51b47b5809887dc6b97"
 DEFAULT_NEWSNOW_URL = "https://newsnow.busiyi.world"
 
+# All 47 sources offered by the public site's More menu on 2026-09-19.
+# Use canonical IDs, excluding redirect aliases and sources unavailable there.
+DEFAULT_NEWSNOW_SOURCE_IDS = (
+    "hackernews",
+    "solidot",
+    "v2ex-share",
+    "coolapk",
+    "aihot",
+    "ithome",
+    "pcbeta-windows11",
+    "producthunt",
+    "github-trending-today",
+    "sspai",
+    "juejin",
+    "hupu",
+    "dongqiudi",
+    "zhihu",
+    "weibo",
+    "douyin",
+    "tieba",
+    "toutiao",
+    "thepaper",
+    "bilibili-hot-search",
+    "baidu",
+    "nowcoder",
+    "ifeng",
+    "chongbuluo-latest",
+    "chongbuluo-hot",
+    "douban",
+    "tencent-hot",
+    "freebuf",
+    "qqvideo-tv-hotsearch",
+    "iqiyi-hot-ranklist",
+    "zaobao",
+    "sputniknewscn",
+    "cankaoxiaoxi",
+    "kaopu",
+    "steam",
+    "mktnews-flash",
+    "wallstreetcn-quick",
+    "wallstreetcn-news",
+    "wallstreetcn-hot",
+    "cls-telegraph",
+    "cls-depth",
+    "cls-hot",
+    "xueqiu-hotstock",
+    "gelonghui",
+    "fastbull-express",
+    "fastbull-news",
+    "jin10",
+)
+
 
 def newsnow_catalog() -> dict:
     return json.loads(files(__package__).joinpath("newsnow-sources.json").read_text(encoding="utf-8"))
@@ -33,7 +85,7 @@ def catalog_source(source_id: str) -> dict:
 
 def default_sources(base_url: str = DEFAULT_NEWSNOW_URL) -> list[dict]:
     sources = []
-    for source_id in ("hackernews", "solidot"):
+    for source_id in DEFAULT_NEWSNOW_SOURCE_IDS:
         entry = catalog_source(source_id)
         sources.append(
             {
@@ -47,18 +99,18 @@ def default_sources(base_url: str = DEFAULT_NEWSNOW_URL) -> list[dict]:
                 "enabled": True,
             }
         )
-    sources.append(
-        {
-            "id": "rss-chinanews",
-            "name": "中国新闻网 · 即时新闻",
-            "kind": "rss",
-            "source_id": "",
-            "url": "https://www.chinanews.com.cn/rss/scroll-news.xml",
-            "configured_interval_seconds": 1800,
-            "upstream_interval_seconds": 0,
-            "effective_interval_seconds": 1800,
-            "status": "unverified",
-            "enabled": True,
-        }
-    )
+    rss_catalog = json.loads(files(__package__).joinpath("default-rss-sources.json").read_text(encoding="utf-8"))
+    for entry in rss_catalog["sources"]:
+        sources.append(
+            {
+                **entry,
+                "kind": "rss",
+                "source_id": "",
+                "configured_interval_seconds": rss_catalog["configured_interval_seconds"],
+                "upstream_interval_seconds": 0,
+                "effective_interval_seconds": rss_catalog["configured_interval_seconds"],
+                "status": "unverified",
+                "enabled": True,
+            }
+        )
     return sources

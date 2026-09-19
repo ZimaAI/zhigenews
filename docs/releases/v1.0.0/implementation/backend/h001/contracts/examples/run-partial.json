@@ -1,0 +1,38 @@
+{
+  "synthetic": true,
+  "schema": "AgentRun",
+  "data": {
+    "id": "synthetic-run-01",
+    "userName": "示例读者",
+    "status": "partial",
+    "model": "news-editor",
+    "configVersion": "v3",
+    "startedAt": "2026-09-18T08:00:00+08:00",
+    "elapsedSeconds": 12,
+    "inputTokens": 1000,
+    "outputTokens": 200,
+    "cost": 0.01,
+    "searchCount": 1,
+    "events": [
+      {
+        "id": 1,
+        "time": "2026-09-18T08:00:01+08:00",
+        "title": "【模拟】读取 RSS 快照",
+        "detail": "模拟返回有界文件片段，不曾读取真实数据。",
+        "status": "completed",
+        "duration": "84ms",
+        "tool": "read_file",
+        "params": "{\"path\":\"/rss/demo/entries.jsonl\",\"start_line\":1,\"end_line\":20}",
+        "output": "{\"synthetic\":true,\"truncated\":false,\"hash\":\"fixture-hash\"}"
+      }
+    ],
+    "subtasks": [
+      {
+        "id": "synthetic-sub-01",
+        "name": "【模拟】开源资料核对",
+        "status": "completed",
+        "detail": "固定示例子任务，共享预算。"
+      }
+    ]
+  }
+}

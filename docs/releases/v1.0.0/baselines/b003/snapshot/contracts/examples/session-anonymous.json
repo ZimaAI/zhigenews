@@ -1,0 +1,10 @@
+{
+  "synthetic": true,
+  "schema": "Session",
+  "data": {
+    "kind": "anonymous",
+    "userId": "anon-example",
+    "name": "匿名读者",
+    "onboardingCompleted": false
+  }
+}

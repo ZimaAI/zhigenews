@@ -1,0 +1,40 @@
+{
+  "schema_version": 4,
+  "version": "v1.0.0",
+  "baseline_ref": "v1.0.0/b003",
+  "recorded_at": "2026-09-19T03:39:20.591Z",
+  "source_fingerprint": "bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+  "checks": [
+    {
+      "name": "Frozen API generation check",
+      "command": "npm run check:contract",
+      "status": "passed",
+      "details": "52 schemas and 53 operations; contract SHA256 329f6336ee048922f9619dcbe462271cf8544daa3cef036a0e58bace3502402c",
+      "evidence": ".project-flow/versions/v1.0.0/evidence/frontend-build.txt"
+    },
+    {
+      "name": "Global type check and independent production builds",
+      "command": "npm run build",
+      "status": "passed",
+      "exit_code": 0,
+      "details": "Root vue-tsc plus each app's own vue-tsc/Vite build. User 1639 modules; admin 1615 modules.",
+      "evidence": ".project-flow/versions/v1.0.0/evidence/frontend-build.txt"
+    },
+    {
+      "name": "API client tests",
+      "command": "npm run test:api",
+      "status": "passed",
+      "tests": 9,
+      "failed": 0,
+      "skipped": 0,
+      "details": "Executed earlier in this frontend implementation turn by both client agent and root; unchanged client source since tests. Covered exact contract metadata, URL/cookies/cancellation, CSRF/JSON/idempotency/no automatic writes, bodyless requests, validation, real errors/aborts, fragmented SSE/replay/resume, auth stream stop, opening abort. Original console result was observed; no raw log file was captured."
+    },
+    {
+      "name": "Backend handoff live integrity",
+      "command": "uv run --project backend python .agents/skills/prototype-to-product/scripts/version_flow.py check-backend --root . --version v1.0.0",
+      "status": "passed",
+      "details": "h001 unchanged; live_source_checked true. Frontend implementation did not alter accepted backend."
+    }
+  ],
+  "limitation": "Developer validation is complete for the recorded scope. This is not a claim that all frontend acceptance criteria or full system/provider acceptance have passed."
+}

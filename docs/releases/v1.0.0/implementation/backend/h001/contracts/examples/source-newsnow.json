@@ -1,0 +1,25 @@
+{
+  "synthetic": true,
+  "schema": "Source",
+  "data": {
+    "id": "synthetic-source-01",
+    "name": "【模拟】热榜源",
+    "kind": "newsnow",
+    "sourceId": "synthetic-source",
+    "url": "https://news.example.com/api/s?id=synthetic-source",
+    "interval": 600,
+    "upstreamInterval": 600,
+    "status": "healthy",
+    "lastSuccess": "2026-09-18T08:10:00+08:00",
+    "nextFetch": "2026-09-18T08:20:00+08:00",
+    "lastChanged": "2026-09-18T07:50:00+08:00",
+    "items": 30,
+    "error": "",
+    "snapshotId": "synthetic-snapshot-01",
+    "snapshotFetchedAt": "2026-09-18T08:10:00+08:00",
+    "lastFetchedAt": "2026-09-18T00:10:00Z",
+    "cacheAgeSeconds": 120,
+    "stale": false,
+    "upstreamRevision": "synthetic-newsnow-revision"
+  }
+}

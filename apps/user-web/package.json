@@ -1,0 +1,25 @@
+{
+  "name": "@zhigenews/user-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5173",
+    "build": "vue-tsc --noEmit && vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "preview": "vite preview --host 127.0.0.1 --port 5173"
+  },
+  "dependencies": {
+    "@zhigenews/api-client": "*",
+    "@zhigenews/ui": "*",
+    "vue": "3.5.43",
+    "vue-router": "4.6.4",
+    "lucide-vue-next": "0.468.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.9",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vue-tsc": "3.3.11"
+  }
+}

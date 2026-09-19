@@ -87,3 +87,8 @@ DEC-030（落实当前授权）：最终冻结v1.0.0/b002，manifest SHA256为42
 DEC-031（已实施）：后端采用FastAPI、MySQL8.4、Redis/Celery和真实LangChain create_agent/LangGraph MySQL checkpoint/store。模型provider测试替身明确标记ScriptedModel，仅用于确定性业务测试；真实NewsNow/RSS、数据库迁移/重启、Docker沙箱、HTTP/队列/定时运行已单独验证。完整结果由backend-verification.json及evidence记录，不把测试数量当作所有验收条件通过。
 
 DEC-032（实际外部阻塞）：backend/.env仍缺OPENAI_MODEL、OPENAI_API_KEY、TAVILY_API_KEY，真实模型能力、Tavily及实际LLM评估未通过。保留用户连续推进授权，不再询问阶段确认；阻塞解决后从BACKEND_VERIFY继续，接受真实后端hNNN后才绑定frontend授权。不能以缺凭据为理由跳过门槛或伪造交付。密钥在本地填写，不写入验收文件或聊天。
+
+
+DEC-033（用户本轮明确变更验收安排）：确认当前后端的验收进入到前端实现。我会在整个项目实现完成之后自己进行测试验收。按此解除前端开工阻塞；不视为真实provider已通过。仅验收安排形成b003，保留b002原报告。后端代码/API/产品行为不变，前端实现后交由用户最终验收。
+
+DEC-034（落实用户自行验收安排，2026-09-19）：b003/h001的完整双端正式实现已完成，真实API/类型/独立构建/代表性浏览器开发检查已记录。阶段进入FRONTEND_VERIFY并交付运行入口，由用户后续最终业务验收；不制造阶段确认问题，不将成功provider链路和系统交付记为已通过。前端任务done仅指实现完成，完整验收状态单独保留。

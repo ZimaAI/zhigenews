@@ -1,6 +1,18 @@
 {
-  "active_backend_handoff": null,
-  "active_baseline": "b002",
+  "acceptance_arrangement": {
+    "at": "2026-09-19T03:11:21.657448+00:00",
+    "deferred_checks": [
+      "AC-BE-006",
+      "AC-BE-013",
+      "AC-BE-015",
+      "GATE-BE-RUNTIME"
+    ],
+    "not_claimed": "Deferred external checks remain unverified; no provider credentials supplied or success inferred.",
+    "scope": "Accept current backend for frontend implementation; defer real model/Tavily/LLM judge and final acceptance to user after implementation.",
+    "user_quote": "确认当前后端的验收进入到前端实现。我会在整个项目实现完成之后自己进行测试验收"
+  },
+  "active_backend_handoff": "h001",
+  "active_baseline": "b003",
   "approvals": [
     {
       "at": "2026-09-18T16:08:24.364184+00:00",
@@ -18,12 +30,47 @@
       "manifest_sha256": "420ebd837df8c239cc1b3ecd4b6509ca1ebca98a3fbeaf6fba4efde2fb58e3d3",
       "ref": "v1.0.0/b002",
       "user_quote": "我确认当前原型与文档通过，按顺序实现接下来的所有阶段。先完整实现项目的后端，再完整实现项目的前端。中途不需要我确认，按工作流的顺序完成当前 1.0.0 版本的交付。"
+    },
+    {
+      "at": "2026-09-19T03:11:48.973539+00:00",
+      "context_reference": "当前用户明确接受后端并将最终验收移至项目实现后；b003仅准确记录此安排，功能/视觉/API均未改变，已展示该范围，无需重复确认",
+      "kind": "baseline",
+      "manifest_sha256": "edf798f08091b75c179a714eb6d488aa3868271f9566bed47b057ca39c00c05c",
+      "ref": "v1.0.0/b003",
+      "user_quote": "确认当前后端的验收进入到前端实现。我会在整个项目实现完成之后自己进行测试验收"
+    },
+    {
+      "at": "2026-09-19T03:11:49.845760+00:00",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "context_reference": "用户接受已实现后端；核验既有实现与本地证据并归档交接，未执行的外部服务不记通过",
+      "kind": "backend",
+      "manifest_sha256": "edf798f08091b75c179a714eb6d488aa3868271f9566bed47b057ca39c00c05c",
+      "ref": "v1.0.0/b003",
+      "user_quote": "确认当前后端的验收进入到前端实现。我会在整个项目实现完成之后自己进行测试验收"
+    },
+    {
+      "at": "2026-09-19T03:13:29.304988+00:00",
+      "backend_handoff": "h001",
+      "backend_handoff_sha256": "75bca791c20f71161f7c9ecacb0997aa807fa0ea907eb47c5dd017e0865da136",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + backend complete; formal frontend not yet created",
+      "context_reference": "当前用户明确接受后端并授权完整前端实现，真实外部服务保留未验证交由其最终验收；绑定实际h001",
+      "kind": "frontend",
+      "manifest_sha256": "edf798f08091b75c179a714eb6d488aa3868271f9566bed47b057ca39c00c05c",
+      "ref": "v1.0.0/b003",
+      "user_quote": "确认当前后端的验收进入到前端实现。我会在整个项目实现完成之后自己进行测试验收"
     }
   ],
-  "approved": "b002",
-  "backend_handoffs": {},
+  "approved": "b003",
+  "backend_handoffs": {
+    "h001": {
+      "baseline_ref": "v1.0.0/b003",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "manifest": "docs/releases/v1.0.0/implementation/backend/h001/manifest.json",
+      "sha256": "75bca791c20f71161f7c9ecacb0997aa807fa0ea907eb47c5dd017e0865da136"
+    }
+  },
   "blockers": [],
-  "candidate": "b002",
+  "candidate": "b003",
   "checkpoint_history": [
     {
       "id": "c0001",
@@ -64,9 +111,24 @@
       "id": "c0008",
       "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0008/manifest.json",
       "sha256": "9f6df6a6004d2f34a7e9c05d740a1e31848e962305d74e81ffde44c92bc6b819"
+    },
+    {
+      "id": "c0009",
+      "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0009/manifest.json",
+      "sha256": "825a24d836d51da9d751f3688a0c1e0d259e046f00969b818c267e36468d9d91"
+    },
+    {
+      "id": "c0010",
+      "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0010/manifest.json",
+      "sha256": "577e8d4356d50ebfd4db93312c06dc5c882fd019d3da43dd5e8f385440cf59c0"
+    },
+    {
+      "id": "c0011",
+      "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0011/manifest.json",
+      "sha256": "d83132819ba284ca354a558409fdf79495491c23ea5c87e9786326c51eb8e723"
     }
   ],
-  "code_start_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0; formal-backend-absent",
+  "code_start_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
   "frontend_verification": null,
   "history": [
     {
@@ -164,20 +226,68 @@
       "from": "BACKEND_BUILD",
       "reason": "后端代码和独立实现验证完成，开始验收；真实模型与Tavily仍待配置，未接受交接",
       "to": "BACKEND_VERIFY"
+    },
+    {
+      "at": "2026-09-19T03:07:32.695751+00:00",
+      "event": "stage",
+      "from": "BACKEND_VERIFY",
+      "reason": "BLOCK-LIVE-MODEL / BLOCK-LIVE-TAVILY：后端代码与121项测试完成；缺OPENAI_MODEL、OPENAI_API_KEY和TAVILY_API_KEY，真实模型能力、Tavily及LLM评估尚未验收。配置完成后恢复BACKEND_VERIFY；无hNNN，不启动正式前端。",
+      "to": "BLOCKED"
+    },
+    {
+      "at": "2026-09-19T03:11:19.323489+00:00",
+      "event": "revised",
+      "previous_baseline": "b002",
+      "reason": "用户明确接受当前后端进入前端，真实外部服务与最终测试移交用户在整项目实现后验收；仅调整验收安排，不更改功能/API"
+    },
+    {
+      "at": "2026-09-19T03:11:21.913701+00:00",
+      "event": "stage",
+      "from": "ITERATE",
+      "reason": "",
+      "to": "SPECIFY"
+    },
+    {
+      "at": "2026-09-19T03:11:47.961153+00:00",
+      "event": "sealed",
+      "ref": "v1.0.0/b003"
+    },
+    {
+      "at": "2026-09-19T03:11:50.763921+00:00",
+      "event": "stage",
+      "from": "BACKEND_BUILD",
+      "reason": "",
+      "to": "BACKEND_VERIFY"
+    },
+    {
+      "at": "2026-09-19T03:39:46.195462+00:00",
+      "event": "stage",
+      "from": "FRONTEND_BUILD",
+      "reason": "两端实现完整，契约/类型/独立构建及代表性真实浏览器开发检查通过；按用户安排进入其最终验收准备阶段，不重复询问，不将未运行的业务/外部服务检查标为通过",
+      "to": "FRONTEND_VERIFY"
     }
   ],
   "last_checkpoint": {
-    "id": "c0008",
-    "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0008/manifest.json",
-    "sha256": "9f6df6a6004d2f34a7e9c05d740a1e31848e962305d74e81ffde44c92bc6b819"
+    "id": "c0011",
+    "manifest": ".project-flow/versions/v1.0.0/checkpoints/c0011/manifest.json",
+    "sha256": "d83132819ba284ca354a558409fdf79495491c23ea5c87e9786326c51eb8e723"
   },
-  "next_action": "完成独立后端验收与交接，满足门槛后停在 FRONTEND_READY。",
+  "next_action": "前后端实现已完成；由用户按IMPLEMENTATION.md配置真实模型/Tavily并进行最终业务验收，记录结果与问题后续修复；保留FRONTEND_VERIFY，不把未执行检查视为通过",
   "open_questions": [],
   "pending_stage_review": null,
   "prototype_revision": 5,
+  "resolved_blockers": [
+    {
+      "id": "BLOCK-9",
+      "reason": "BLOCK-LIVE-MODEL / BLOCK-LIVE-TAVILY：后端代码与121项测试完成；缺OPENAI_MODEL、OPENAI_API_KEY和TAVILY_API_KEY，真实模型能力、Tavily及LLM评估尚未验收。配置完成后恢复BACKEND_VERIFY；无hNNN，不启动正式前端。",
+      "resolution": "User explicitly deferred external service acceptance; credentials remain missing.",
+      "user_quote": "确认当前后端的验收进入到前端实现。我会在整个项目实现完成之后自己进行测试验收"
+    }
+  ],
+  "resume_next_action": "完成独立后端验收与交接，满足门槛后停在 FRONTEND_READY。",
   "resume_stage": null,
   "schema_version": 4,
-  "stage": "BACKEND_VERIFY",
+  "stage": "FRONTEND_VERIFY",
   "version": "v1.0.0",
   "workflow_version": 4
 }

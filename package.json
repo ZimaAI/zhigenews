@@ -1,0 +1,38 @@
+{
+  "name": "zhigenews",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:user": "npm run dev --workspace=@zhigenews/user-web",
+    "dev:admin": "npm run dev --workspace=@zhigenews/admin-web",
+    "check": "vue-tsc --noEmit",
+    "generate:api": "node scripts/frontend/generate-contract.mjs",
+    "check:contract": "node scripts/frontend/generate-contract.mjs --check",
+    "test:api": "node --experimental-strip-types --test packages/api-client/tests/*.test.ts",
+    "build:user": "npm run build --workspace=@zhigenews/user-web",
+    "build:admin": "npm run build --workspace=@zhigenews/admin-web",
+    "build": "npm run check:contract && npm run check && npm run build:user && npm run build:admin",
+    "preview:user": "npm run preview --workspace=@zhigenews/user-web",
+    "preview:admin": "npm run preview --workspace=@zhigenews/admin-web"
+  },
+  "dependencies": {
+    "lucide-vue-next": "0.468.0",
+    "vue": "3.5.43",
+    "vue-router": "4.6.4"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.5",
+    "@vitejs/plugin-vue": "6.0.9",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vue-tsc": "3.3.11"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

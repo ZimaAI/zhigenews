@@ -1,0 +1,63 @@
+
+> zhigenews@1.0.0 build
+> npm run check:contract && npm run check && npm run build:user && npm run build:admin
+
+
+> zhigenews@1.0.0 check:contract
+> node scripts/frontend/generate-contract.mjs --check
+
+Contract current: 52 schemas, 53 operations, 329f6336ee048922f9619dcbe462271cf8544daa3cef036a0e58bace3502402c
+
+> zhigenews@1.0.0 check
+> vue-tsc --noEmit
+
+
+> zhigenews@1.0.0 build:user
+> npm run build --workspace=@zhigenews/user-web
+
+
+> @zhigenews/user-web@1.0.0 build
+> vue-tsc --noEmit && vite build
+
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 1639 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.49 kB │ gzip:  0.36 kB
+dist/assets/index-CBcHLp6v.css   44.03 kB │ gzip:  8.78 kB
+dist/assets/index-y70AIbda.js   161.00 kB │ gzip: 57.33 kB
+✓ built in 5.75s
+
+> zhigenews@1.0.0 build:admin
+> npm run build --workspace=@zhigenews/admin-web
+
+
+> @zhigenews/admin-web@1.0.0 build
+> vue-tsc --noEmit && vite build
+
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 1615 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                                      0.41 kB │ gzip:  0.32 kB
+dist/assets/Users-D_re5-Px.css                                       1.33 kB │ gzip:  0.49 kB
+dist/assets/index-DzEfllhx.css                                      24.22 kB │ gzip:  5.52 kB
+dist/assets/play-Bp_7uz0n.js                                         0.14 kB │ gzip:  0.15 kB
+dist/assets/plus-BsbBvT1R.js                                         0.15 kB │ gzip:  0.15 kB
+dist/assets/arrow-left-Bj_VIGh5.js                                   0.17 kB │ gzip:  0.16 kB
+dist/assets/refresh-cw-BMJrsxoh.js                                   0.32 kB │ gzip:  0.23 kB
+dist/assets/NotFound-CrCsmuhJ.js                                     0.43 kB │ gzip:  0.36 kB
+dist/assets/Badge.vue_vue_type_script_setup_true_lang-BfXcbw3_.js    1.44 kB │ gzip:  0.89 kB
+dist/assets/Login-_E3zLKrU.js                                        2.20 kB │ gzip:  1.25 kB
+dist/assets/Deliveries-CNlZTn2B.js                                   4.50 kB │ gzip:  2.34 kB
+dist/assets/Overview-CLYfvdDh.js                                     5.79 kB │ gzip:  2.39 kB
+dist/assets/Models-B1AJ1Nx_.js                                       9.43 kB │ gzip:  3.88 kB
+dist/assets/AgentConfigs-DUDJQsZ8.js                                11.10 kB │ gzip:  4.46 kB
+dist/assets/Runs-BZa7X1Aj.js                                        12.52 kB │ gzip:  5.18 kB
+dist/assets/Sources-3i_rY-JE.js                                     12.97 kB │ gzip:  5.05 kB
+dist/assets/Evaluations-D-aMGpoP.js                                 20.57 kB │ gzip:  7.56 kB
+dist/assets/Users-Cwyh9mnp.js                                       20.66 kB │ gzip:  7.53 kB
+dist/assets/index-C6XjRqrl.js                                      130.60 kB │ gzip: 48.93 kB
+✓ built in 5.46s

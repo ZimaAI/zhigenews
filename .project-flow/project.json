@@ -16,6 +16,10 @@
         "b002": {
           "manifest": "docs/releases/v1.0.0/baselines/b002/manifest.json",
           "sha256": "420ebd837df8c239cc1b3ecd4b6509ca1ebca98a3fbeaf6fba4efde2fb58e3d3"
+        },
+        "b003": {
+          "manifest": "docs/releases/v1.0.0/baselines/b003/manifest.json",
+          "sha256": "edf798f08091b75c179a714eb6d488aa3868271f9566bed47b057ca39c00c05c"
         }
       },
       "created_at": "2026-09-18T12:06:30.265220+00:00",

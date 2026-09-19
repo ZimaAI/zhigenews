@@ -1,0 +1,11 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue';
+import { RefreshCw } from 'lucide-vue-next';
+import { state, api, notify, formatDate } from '@shared/mock';
+import Badge from '@shared/Badge.vue';
+import EmptyState from '@shared/EmptyState.vue';
+const filter = ref('all'); const busy = ref(''); const error = ref('');
+const deliveries = computed(() => state.deliveries.filter(d => filter.value === 'all' || d.status === filter.value));
+async function retry(id: string) { busy.value = id; error.value = ''; try { await api.retryDelivery(id); notify('模拟站内通知已补发，同一份简报内容保持不变。'); } catch (e) { error.value = (e as Error).message; } finally { busy.value = ''; } }
+</script>
+<template><header class="page-header"><div><div class="eyebrow">DELIVERY OPERATIONS</div><h1>投递记录</h1><p class="muted">分别查看简报生成与站内通知状态。</p></div></header><p class="alert">全部投递为模拟记录。“已发布”表示站内可见，不代表用户已读。</p><p v-if="error" class="alert alert--danger" role="alert">{{ error }}</p><div class="admin-toolbar admin-section"><label class="field">投递状态<select v-model="filter" class="field-control"><option value="all">全部状态</option><option value="failed">失败</option><option value="unknown">状态未知</option><option value="pending">待发布</option><option value="submitted">已发布</option></select></label></div><EmptyState v-if="!deliveries.length" title="没有匹配的投递记录" description="站内通知发布后会显示在这里。" /><template v-else><p class="admin-scroll-hint">表格可左右滚动，失败原因保留在对应记录中。</p><div class="table-wrap"><table class="data-table admin-table"><thead><tr><th>用户 / 目的地</th><th>简报</th><th>状态</th><th>最近尝试</th><th>结果与操作</th></tr></thead><tbody><tr v-for="item in deliveries" :key="item.id"><td class="wide-cell"><strong>{{ item.userName }}</strong><small>{{ item.destination }}</small><small>站内通知</small></td><td class="mono nowrap">{{ item.briefId }}</td><td><Badge :status="item.status" /></td><td class="nowrap">{{ formatDate(item.time) }}<small>已尝试 {{ item.attempts }} 次</small></td><td class="wide-cell"><p class="meta">{{ item.error || (item.status === 'submitted' ? '模拟站内通知已发布。' : '等待站内通知状态更新。') }}</p><button v-if="item.status === 'failed'" class="button" :disabled="!!busy" @click="retry(item.id)"><RefreshCw :size="15" />{{ busy === item.id ? '正在补发…' : '补发站内通知' }}</button><span v-if="item.status === 'unknown'" class="meta">确认发布状态后再补发，避免重复通知。</span></td></tr></tbody></table></div></template></template>

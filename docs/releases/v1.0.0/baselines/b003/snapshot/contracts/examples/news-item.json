@@ -1,0 +1,26 @@
+{
+  "synthetic": true,
+  "schema": "NewsItem",
+  "data": {
+    "id": "synthetic-news-01",
+    "title": "【模拟】一份带引用的 Agent 工程简报条目",
+    "summary": "用于检验交互与交换格式的固定样例，不是实际新闻。",
+    "reason": "示例命中主题「Agent 工程」。",
+    "topic": "Agent 工程",
+    "source": "示例资料源",
+    "sourceType": "rss",
+    "publishedAt": null,
+    "url": "https://news.example.com/synthetic/agent-news",
+    "citations": [
+      {
+        "id": "synthetic-citation-01",
+        "name": "示例资料源",
+        "title": "【模拟】原始材料",
+        "url": "https://news.example.com/synthetic/source",
+        "publishedAt": null
+      }
+    ],
+    "fetchedAt": "2026-09-18T00:00:00Z",
+    "snapshotId": "synthetic-snapshot-01"
+  }
+}

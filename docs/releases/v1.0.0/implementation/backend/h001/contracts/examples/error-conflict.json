@@ -1,0 +1,12 @@
+{
+  "synthetic": true,
+  "schema": "Error",
+  "data": {
+    "code": "VERSION_CONFLICT",
+    "message": "示例：偏好已经更新，请重新读取后保存。",
+    "requestId": "synthetic-request-01",
+    "fields": {
+      "version": "当前版本与提交版本不同。"
+    }
+  }
+}

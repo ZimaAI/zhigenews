@@ -1,0 +1,257 @@
+{
+  "schema_version": 4,
+  "version": "v1.0.0",
+  "baseline_ref": "v1.0.0/b002",
+  "manifest_sha256": "420ebd837df8c239cc1b3ecd4b6509ca1ebca98a3fbeaf6fba4efde2fb58e3d3",
+  "phase": "backend",
+  "status": "blocked",
+  "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+  "source_fingerprint": "64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+  "verified_at": "2026-09-19T03:06:47.099179+00:00",
+  "open_blockers": [
+    "BLOCK-LIVE-MODEL",
+    "BLOCK-LIVE-TAVILY"
+  ],
+  "blocker_details": [
+    {
+      "id": "BLOCK-LIVE-MODEL",
+      "reason": "backend/.env缺OPENAI_MODEL/OPENAI_API_KEY；兼容供应商需配置OPENAI_BASE_URL。实际能力测试、模型生成/发布与LLM评估尚未通过。",
+      "required_action": "本地配置真实模型，运行受限依赖探针和管理API模型验证，再执行真实生成/站内发布/评估并记录证据。"
+    },
+    {
+      "id": "BLOCK-LIVE-TAVILY",
+      "reason": "backend/.env缺TAVILY_API_KEY；真实Tavily检索未执行。",
+      "required_action": "本地配置Tavily，运行真实搜索及Agent来源追溯验证。"
+    }
+  ],
+  "checks": [
+    {
+      "id": "AC-BE-001",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+        ".project-flow/versions/v1.0.0/evidence/runtime-smoke.json"
+      ],
+      "details": "真实create_agent/LangGraph与MySQL分层及Linux进程通过；确定性测试只替换provider为ScriptedModel。",
+      "blocker_ids": []
+    },
+    {
+      "id": "AC-BE-002",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+        ".project-flow/versions/v1.0.0/evidence/runtime-smoke.json"
+      ],
+      "details": "实际Cookie创建/恢复/过期/撤销/封禁、跨用户404、CSRF及生产Secure Cookie测试通过。",
+      "blocker_ids": []
+    },
+    {
+      "id": "AC-BE-003",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml"
+      ],
+      "details": "偏好CAS与首次完成原子写入、并发409、无匹配不凑条数及未知时间语义通过。",
+      "blocker_ids": []
+    },
+    {
+      "id": "AC-BE-004",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+        ".project-flow/versions/v1.0.0/evidence/ingestion-live.json"
+      ],
+      "details": "两个真实NewsNow源抓取成功；不同周期、租约/文件锁、失败缓存与重复调度测试通过。",
+      "blocker_ids": []
+    },
+    {
+      "id": "AC-BE-005",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+        ".project-flow/versions/v1.0.0/evidence/ingestion-live.json"
+      ],
+      "details": "真实RSS抓取成功；条件304/超时/坏XML/退避/不可变快照测试通过。",
+      "blocker_ids": []
+    },
+    {
+      "id": "AC-BE-006",
+      "status": "blocked",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+        ".project-flow/versions/v1.0.0/evidence/live-services.json"
+      ],
+      "details": "文件/bash/delegate及Tavily调用边界测试通过；实际Tavily搜索因缺TAVILY_API_KEY未执行。",
+      "blocker_ids": [
+        "BLOCK-LIVE-TAVILY"
+      ]
+    },
+    {
+      "id": "AC-BE-007",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml"
+      ],
+      "details": "虚拟路径/跨用户隔离、遍历/盘符/UNC/链接/路径替换拒绝通过，包含实际Linux检查。",
+      "blocker_ids": []
+    },
+    {
+      "id": "AC-BE-008",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml"
+      ],
+      "details": "全文件hash、CAS竞争/FILE_CHANGED、新建排他、重放副作用幂等通过。",
+      "blocker_ids": []
+    },
+    {
+      "id": "AC-BE-009",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+        ".project-flow/versions/v1.0.0/evidence/runtime-smoke.json"
+      ],
+      "details": "真实Docker非root/无网络/无秘密/只读挂载/资源限制通过；worker内嵌套沙箱也通过。",
+      "blocker_ids": []
+    },
+    {
+      "id": "AC-BE-010",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+        ".project-flow/versions/v1.0.0/evidence/runtime-smoke.json"
+      ],
+      "details": "实际LangGraph工具循环、预算、子任务隔离/取消、MySQL进程重启checkpoint和用户记忆通过；provider为明确ScriptedModel，非模型质量证据。",
+      "blocker_ids": []
+    },
+    {
+      "id": "AC-BE-011",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml"
+      ],
+      "details": "消息乱序/缺失/重复/中断修复、原始journal序号、重复修复幂等通过。",
+      "blocker_ids": []
+    },
+    {
+      "id": "AC-BE-012",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml"
+      ],
+      "details": "SummarizationMiddleware继承、三类触发、旧摘要滚动/独立渲染/最新用户保留/完整预算通过；真实摘要模型尚未配置。",
+      "blocker_ids": []
+    },
+    {
+      "id": "AC-BE-013",
+      "status": "blocked",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+        ".project-flow/versions/v1.0.0/evidence/live-services.json"
+      ],
+      "details": "密钥加密只写/替换撤销、配置不可变和运行快照通过；实际模型工具能力因缺OPENAI_MODEL/API_KEY未执行。",
+      "blocker_ids": [
+        "BLOCK-LIVE-MODEL"
+      ]
+    },
+    {
+      "id": "AC-BE-014",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+        ".project-flow/versions/v1.0.0/evidence/runtime-smoke.json"
+      ],
+      "details": "MySQL事件与原始消息持久化、脱敏、管理SSE追赶、公开DTO隔离及发布前95%/事务后100%通过；未知用量保持null。",
+      "blocker_ids": []
+    },
+    {
+      "id": "AC-BE-015",
+      "status": "blocked",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+        ".project-flow/versions/v1.0.0/evidence/live-services.json"
+      ],
+      "details": "规则/人工/LLM评分区分、固定数据版本与时钟、真实execute_evaluation/create_agent/MySQL、失败null和不发布通过；真实judge/模型评分未执行。",
+      "blocker_ids": [
+        "BLOCK-LIVE-MODEL"
+      ]
+    },
+    {
+      "id": "AC-BE-016",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml"
+      ],
+      "details": "账号/IP原子配额、并发幂等/429+Retry-After/拒绝不入队、清Cookie不重置IP限额及封禁调度通过。",
+      "blocker_ids": []
+    },
+    {
+      "id": "AC-BE-017",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml"
+      ],
+      "details": "请求监测/审计/秘密不回显/独立管理身份和受信代理链边界通过。",
+      "blocker_ids": []
+    },
+    {
+      "id": "GATE-BE-CONTRACT",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml"
+      ],
+      "details": "53个操作实际HTTP成功/受理契约与SSE通过；400/401/403/404/409/429/503及内部错误出口实际验证冻结Error schema。202与verified:false不证明外部执行成功。"
+    },
+    {
+      "id": "GATE-BE-RUNTIME",
+      "status": "blocked",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+        ".project-flow/versions/v1.0.0/evidence/runtime-smoke.json",
+        ".project-flow/versions/v1.0.0/evidence/ingestion-live.json",
+        ".project-flow/versions/v1.0.0/evidence/live-services.json"
+      ],
+      "details": "真实MySQL升级/数据重启、Redis worker、Linux Docker沙箱、公开来源采集通过；模型、Tavily和真实LLM评估仍缺凭据。"
+    },
+    {
+      "id": "GATE-BE-HANDOFF",
+      "status": "blocked",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/live-services.json"
+      ],
+      "details": "53接口清单、运行/迁移/环境/可重复冒烟候选已齐备，外部服务未通过，未执行accept-backend，无hNNN。"
+    }
+  ],
+  "summary": {
+    "tests": {
+      "tests": 121,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "synthetic_provider": "ScriptedModel only replaces provider in deterministic tests; no real model or Tavily success claimed",
+    "frontend": "not_started",
+    "integration": "not_run",
+    "backend_handoff": null
+  }
+}

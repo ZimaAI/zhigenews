@@ -1,0 +1,10 @@
+{
+  "synthetic": true,
+  "schema": "AnonymousPolicy",
+  "data": {
+    "requestsPerMinute": 60,
+    "generationsPerDay": 20,
+    "maxConcurrentGenerations": 1,
+    "accountsPerIpHour": 10
+  }
+}

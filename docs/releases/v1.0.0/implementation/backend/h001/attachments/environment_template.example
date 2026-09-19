@@ -1,0 +1,18 @@
+# Copy to .env for local development. Never commit real credentials.
+DATABASE_URL=mysql+pymysql://zhigenews:local-development@127.0.0.1:13316/zhigenews
+REDIS_URL=redis://127.0.0.1:56386/0
+DATA_DIR=./data
+COOKIE_SECURE=false
+ALLOWED_ORIGINS=["http://127.0.0.1:5173","http://127.0.0.1:5174","http://localhost:5173","http://localhost:5174"]
+# Generate with: uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+SECRET_ENCRYPTION_KEY=
+IP_HASH_KEY=
+ADMIN_EMAIL=admin@localhost.test
+ADMIN_PASSWORD=
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=
+OPENAI_API_KEY=
+TAVILY_API_KEY=
+NEWSNOW_BASE_URL=https://newsnow.busiyi.world
+SANDBOX_IMAGE=python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
+TRUSTED_PROXY_CIDRS=[]

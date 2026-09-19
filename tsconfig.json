@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler",
+    "strict": true, "skipLibCheck": true, "esModuleInterop": true,
+    "noEmit": true, "allowImportingTsExtensions": true,
+    "resolveJsonModule": true, "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "node"], "baseUrl": ".",
+    "paths": {
+      "@ui/*": ["packages/ui/src/*"], "@api": ["packages/api-client/src/index.ts"],
+      "@api/*": ["packages/api-client/src/*"],
+      "@zhigenews/ui": ["packages/ui/src/index.ts"],
+      "@zhigenews/api-client": ["packages/api-client/src/index.ts"]
+    }
+  },
+  "include": ["apps/**/*.ts", "apps/**/*.vue", "packages/**/*.ts", "packages/**/*.vue"]
+}

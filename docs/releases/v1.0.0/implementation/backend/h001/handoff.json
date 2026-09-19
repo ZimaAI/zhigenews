@@ -1,0 +1,31 @@
+{
+  "baseline_ref": "v1.0.0/b003",
+  "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted backend snapshot 64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+  "deferred_acceptance": [
+    {
+      "id": "BLOCK-LIVE-MODEL",
+      "reason": "backend/.env缺OPENAI_MODEL/OPENAI_API_KEY；兼容供应商需配置OPENAI_BASE_URL。实际能力测试、模型生成/发布与LLM评估尚未通过。",
+      "required_action": "本地配置真实模型，运行受限依赖探针和管理API模型验证，再执行真实生成/站内发布/评估并记录证据。"
+    },
+    {
+      "id": "BLOCK-LIVE-TAVILY",
+      "reason": "backend/.env缺TAVILY_API_KEY；真实Tavily检索未执行。",
+      "required_action": "本地配置Tavily，运行真实搜索及Agent来源追溯验证。"
+    }
+  ],
+  "endpoint_inventory": "attachments/endpoint_inventory.md",
+  "environment_template": "attachments/environment_template.example",
+  "known_limitations": [
+    "当前仅本地开发容器栈；未部署生产。",
+    "正式前端和系统全链路验收尚未开始。",
+    "确定性模型测试使用明确ScriptedModel，不能证明真实外部模型服务成功。",
+    "用户将模型、Tavily、LLM评分和最终完整业务测试留待全部实现之后验收，相关服务未被宣称通过。"
+  ],
+  "open_blockers": [],
+  "runbook": "attachments/runbook.md",
+  "schema_version": 4,
+  "smoke_instructions": "attachments/smoke_instructions.md",
+  "source_fingerprint": "64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+  "status": "user_accepted_with_deferred_external_verification",
+  "version": "v1.0.0"
+}

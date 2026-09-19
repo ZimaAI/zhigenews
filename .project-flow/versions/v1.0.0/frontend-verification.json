@@ -1,0 +1,202 @@
+{
+  "schema_version": 4,
+  "version": "v1.0.0",
+  "baseline_ref": "v1.0.0/b003",
+  "manifest_sha256": "edf798f08091b75c179a714eb6d488aa3868271f9566bed47b057ca39c00c05c",
+  "phase": "frontend",
+  "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+  "source_fingerprint": "bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+  "backend_handoff": "h001",
+  "backend_handoff_sha256": "75bca791c20f71161f7c9ecacb0997aa807fa0ea907eb47c5dd017e0865da136",
+  "implementation_status": "complete",
+  "acceptance_status": "awaiting_user_final_acceptance",
+  "recorded_at": "2026-09-19T03:39:20.591Z",
+  "open_blockers": [],
+  "acceptance_arrangement": {
+    "owner": "user",
+    "quote": "确认当前后端的验收进入到前端实现。我会在整个项目实现完成之后自己进行测试验收",
+    "meaning": "All implementation is complete. Developer checks recorded below do not replace final business acceptance; no further permission question is pending."
+  },
+  "checks": [
+    {
+      "id": "AC-UI-001",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "AC-UI-002",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "AC-UI-003",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "AC-UI-004",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "AC-UI-005",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "AC-UI-006",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "AC-UI-007",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "AC-UI-008",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "AC-UI-009",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "AC-UI-010",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "AC-UI-011",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "AC-UI-012",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "AC-UI-013",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "AC-UI-014",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "AC-UI-015",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "AC-UI-016",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Implementation complete; representative developer observations are recorded. Full criterion, including dependent successful/partial provider paths where applicable, awaits user acceptance; not claimed passed as a whole."
+    },
+    {
+      "id": "GATE-FE-BUILD",
+      "status": "passed",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-build.txt",
+        ".project-flow/versions/v1.0.0/evidence/frontend-developer-checks.json"
+      ]
+    },
+    {
+      "id": "GATE-FE-UX",
+      "status": "not_run",
+      "code_ref": "994e069c0cb3b688248efd3deb7ec0bc1fd522b0 + uncommitted frontend snapshot bafd33fbd87cff395a55ab8a46541c796be1a7a752b92cfb39c4117e7624a0f0",
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
+      "note": "Representative real-API/keyboard/mobile checks passed; full required UX matrix awaits user final acceptance."
+    }
+  ],
+  "next_action": "User follows docs/releases/v1.0.0/IMPLEMENTATION.md to configure providers and perform final acceptance; record failures and fix them in the current implementation phase. Do not claim DELIVERED or advance integration without actual required results."
+}

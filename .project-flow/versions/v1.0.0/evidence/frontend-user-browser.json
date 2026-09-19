@@ -1,0 +1,82 @@
+{
+  "version": "1.0.0",
+  "phase": "FRONTEND_BUILD",
+  "baseline": "b003",
+  "contract": "b002 API bytes unchanged",
+  "checkedAt": "2026-09-19T03:31:26.4280967Z",
+  "method": "cua_repl Chrome independent tab, real local API, accessibility tree and screenshots",
+  "url": "http://127.0.0.1:5173",
+  "api": "http://127.0.0.1:18000/api/v1",
+  "servicePid": 26964,
+  "browserTabId": "274807145",
+  "testReaderLabel": "读者 d9c4ee",
+  "checked": [
+    {
+      "name": "Anonymous entry and onboarding",
+      "result": "passed",
+      "observed": "Opening user app automatically entered onboarding; selected Agent 工程 and LangGraph, saved, then entered /today."
+    },
+    {
+      "name": "Cookie restoration",
+      "result": "passed",
+      "observed": "Reload at /today remained on /today for the same reader; onboarding was not repeated."
+    },
+    {
+      "name": "Preferences persist",
+      "result": "passed",
+      "observed": "Saved background text, selected topic and keyword were restored after reload."
+    },
+    {
+      "name": "Unsaved leave and Escape",
+      "result": "passed",
+      "observed": "Changing background then selecting schedule opened the unsaved modal; Escape kept the draft and focus returned to schedule link. Corrected afterEach so cancelled navigation does not change document title."
+    },
+    {
+      "name": "Daily schedule",
+      "result": "passed",
+      "observed": "Changed 08:00 to 09:15; saved state appeared and reload restored 09:15."
+    },
+    {
+      "name": "Real generation prerequisite error",
+      "result": "passed",
+      "observed": "Clicking update returned 管理员尚未发布可用配置; no generated brief or simulated success was presented."
+    },
+    {
+      "name": "History empty and search empty",
+      "result": "passed",
+      "observed": "No history showed 还没有历史简报; search LangGraph changed URL to ?q=LangGraph and showed 没有匹配的简报; clear returned no-history state."
+    },
+    {
+      "name": "Responsive settings",
+      "result": "passed visual inspection",
+      "widths": [
+        320,
+        375,
+        768,
+        1024,
+        1440,
+        1920
+      ],
+      "observed": "Settings screenshots showed contained layout at each width. At 320, scrolling exposed keyword and save controls completely. Temporary viewport override was reset."
+    },
+    {
+      "name": "Source migration scan",
+      "result": "passed",
+      "observed": "No @shared, mock, localStorage, demo, scenario or prototype references remained in apps/user-web/src."
+    },
+    {
+      "name": "Production build",
+      "result": "passed",
+      "observed": "vue-tsc completed, Vite 7.3.6 built 1639 modules; final assets index-CBcHLp6v.css and index-y70AIbda.js.",
+      "command": "npm run build --workspace @zhigenews/user-web"
+    }
+  ],
+  "notChecked": [
+    "Real model/Tavily provider success and generated news content are explicitly deferred to user acceptance.",
+    "Successful or partial generation progress and cancellation against a live provider were not exercised in the browser.",
+    "No real brief was available, so real brief detail/news modal/source link interaction was not exercised in the browser.",
+    "History multi-page data and browser-back cursor correction were reviewed in source but not exercised with fabricated news.",
+    "401/403/429 browser error scenarios and optimistic version conflict were implemented/reviewed, not forced in this browser smoke."
+  ],
+  "artifacts": "Screenshots were inspected in cua_repl output, not persisted as local screenshot files."
+}

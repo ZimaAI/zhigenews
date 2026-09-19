@@ -1,0 +1,28 @@
+{
+  "synthetic": true,
+  "schema": "AgentConfig",
+  "data": {
+    "id": "synthetic-config-03",
+    "name": "【模拟】每日新闻编辑",
+    "version": "v3",
+    "status": "published",
+    "modelId": "synthetic-model-01",
+    "summaryModelId": "synthetic-model-02",
+    "maxModelCalls": 30,
+    "maxToolCalls": 60,
+    "maxSeconds": 480,
+    "summaryTokens": 24000,
+    "summaryMessages": 40,
+    "summaryRatio": 0.65,
+    "subagentConcurrency": 2,
+    "tools": [
+      "list_dir",
+      "read_file",
+      "search_content",
+      "write_file",
+      "bash",
+      "web_search"
+    ],
+    "systemPrompt": "根据用户偏好整理资料；保留引用与时间，证据不足时不凑条数。"
+  }
+}

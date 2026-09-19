@@ -1,0 +1,71 @@
+{
+  "schema_version": 4,
+  "version": "v1.0.0",
+  "baseline_ref": "v1.0.0/b003",
+  "recorded_at": "2026-09-19T03:39:20.591Z",
+  "method": "CUA in-app browser against actual local API; DOM/accessibility snapshots and screenshots. No mocked HTTP or fabricated provider success.",
+  "url": "http://127.0.0.1:5174",
+  "api": "http://127.0.0.1:18000/api/v1",
+  "checks": [
+    {
+      "name": "Administrator authentication",
+      "status": "passed",
+      "observed": "Temporary scoped admin logged in using real API. Overview reported 0 runs/0 failures and null completion rate as —; actual RSS/NewsNow snapshots displayed. Logged out after checks."
+    },
+    {
+      "name": "News sources",
+      "status": "passed",
+      "observed": "3 actual sources loaded. Solidot detail showed 20 entries, upstream/effective period both 3600 seconds, source URL, snapshot ID and success/next-fetch times."
+    },
+    {
+      "name": "Model form",
+      "status": "passed",
+      "observed": "Real empty list. New-model dialog has roles, model ID, base URL, context window and write-only key. Empty submit focused required name; Escape closed dialog. No model was created/tested."
+    },
+    {
+      "name": "Agent configuration",
+      "status": "passed",
+      "observed": "Empty version list and new draft render. No verified model options exist; page directs administrator to configure models. Budget/tool/prompt fields present. No draft was saved or published."
+    },
+    {
+      "name": "Runs",
+      "status": "passed",
+      "observed": "Real empty list with status/model/date and loaded-record user/ID filters. No synthetic run/SSE event added."
+    },
+    {
+      "name": "Evaluation case persistence",
+      "status": "passed",
+      "observed": "Created explicit temporary developer case via UI. Backend returned revision 1 and 3 fixed source snapshots; browser reload preserved case count. No evaluation was launched."
+    },
+    {
+      "name": "Accounts and policy validation",
+      "status": "passed",
+      "observed": "Existing developer reader appeared with masked IP, real counts and status. Four actual policy fields loaded as 60/20/1/10. Entering request limit 0 displayed 1–600 validation, focused field and retained input. Discarded draft; no quota mutation."
+    },
+    {
+      "name": "Responsive layout/menu",
+      "status": "passed",
+      "observed": "Account page at 320/375/768 widths had document scrollWidth equal clientWidth (305/360/753 respectively, excluding scrollbar). Mobile menu opened and navigated to deliveries. 1440 desktop source detail inspected visually. Temporary viewport reset."
+    },
+    {
+      "name": "Delivery empty state",
+      "status": "passed",
+      "observed": "Real empty list, appropriate filters and submitted-means-published copy. No fake attempts or read receipts."
+    }
+  ],
+  "fixture_cleanup": {
+    "status": "passed",
+    "removed": [
+      "temporary administrator ui_smoke_b003_0919 and its sessions",
+      "temporary evaluation case case_0534b884f2054a549b2c8d4bd64a76ec"
+    ],
+    "preserved": "User-agent's anonymous developer reader and saved preferences remain for local inspection; no real source/model/config/policy was changed."
+  },
+  "not_checked": [
+    "Actual model verification, config publication and real-provider evaluation/A-B metrics",
+    "Live run SSE/status/cancel browser path (client stream mechanics have separate unit coverage)",
+    "Full successful/partial brief and publication retry path",
+    "All browser 401/403/429 and multi-page account/record scenarios; final business acceptance belongs to user"
+  ],
+  "screenshots": "Inspected CUA output; screenshots were not persisted as local evidence files."
+}

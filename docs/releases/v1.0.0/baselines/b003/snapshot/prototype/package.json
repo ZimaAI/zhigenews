@@ -1,0 +1,32 @@
+{
+  "name": "zhigenews-prototype",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "user-web",
+    "admin-web"
+  ],
+  "scripts": {
+    "dev:user": "npm run dev --workspace=user-web",
+    "dev:admin": "npm run dev --workspace=admin-web",
+    "build": "vue-tsc --noEmit && npm run build --workspaces",
+    "check": "vue-tsc --noEmit",
+    "check:contract": "node scripts/check-contract.mjs",
+    "check:anonymous": "node scripts/check-anonymous.mjs"
+  },
+  "dependencies": {
+    "lucide-vue-next": "^0.468.0",
+    "vue": "^3.5.0",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0",
+    "vue-tsc": "^3.0.0"
+  }
+}

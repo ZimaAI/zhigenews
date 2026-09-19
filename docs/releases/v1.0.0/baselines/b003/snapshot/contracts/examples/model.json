@@ -1,0 +1,16 @@
+{
+  "synthetic": true,
+  "schema": "ModelConfig",
+  "data": {
+    "id": "synthetic-model-01",
+    "name": "【模拟】编辑模型",
+    "provider": "OpenAI-compatible",
+    "modelId": "news-editor",
+    "endpoint": "https://api.example.com/v1",
+    "keyMasked": "demo-key-••••4821",
+    "role": "主模型",
+    "enabled": true,
+    "verified": true,
+    "contextWindow": 128000
+  }
+}

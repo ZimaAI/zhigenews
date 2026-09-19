@@ -1,0 +1,5478 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "ZhigeNews v1.0.0 exchange contract",
+    "version": "1.0.0",
+    "description": "v1.0.0 正式交换契约。自动匿名 Cookie 会话、新闻详情、公开生成进度和匿名防滥用监测；Agent 事件仅供管理员。原型 /__demo 与正式 Gateway 隔离，固定样例均为 synthetic。"
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "正式 FastAPI Gateway 前缀。"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "User"
+    },
+    {
+      "name": "Admin"
+    }
+  ],
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "paths": {
+    "/auth/session": {
+      "get": {
+        "operationId": "getSession",
+        "description": "恢复当前匿名会话；缺失/过期401，封禁403；不创建新账号。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/me/preferences": {
+      "get": {
+        "operationId": "getPreferences",
+        "tags": [
+          "User"
+        ],
+        "summary": "读取本人订阅偏好",
+        "x-required-role": "authenticated",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preferences"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "put": {
+        "operationId": "savePreferences",
+        "tags": [
+          "User"
+        ],
+        "summary": "按版本更新偏好；新运行生效",
+        "x-required-role": "authenticated",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferencesWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preferences"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "description": "原样回传版本进行乐观并发校验；至少一个话题或关键词。成功保存与首次引导完成标记在同一事务持久化，仅后续新运行使用新偏好。"
+      }
+    },
+    "/me/delivery-settings": {
+      "get": {
+        "operationId": "getDeliverySettings",
+        "tags": [
+          "User"
+        ],
+        "summary": "读取本人推送计划",
+        "x-required-role": "authenticated",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliverySettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "put": {
+        "operationId": "saveDeliverySettings",
+        "tags": [
+          "User"
+        ],
+        "summary": "保存每日站内推送时间",
+        "description": "只接受 HH:mm；每日启用，系统时区 Asia/Shanghai。保存不会立即生成或发布简报，不补发历史槽位。",
+        "x-required-role": "authenticated",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliverySettingsWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliverySettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/me/memories": {
+      "get": {
+        "operationId": "listMemories",
+        "tags": [
+          "User"
+        ],
+        "summary": "列出本人长期记忆",
+        "x-required-role": "authenticated",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/me/memories/{id}": {
+      "delete": {
+        "operationId": "deleteMemory",
+        "tags": [
+          "User"
+        ],
+        "summary": "删除本人记忆",
+        "x-required-role": "authenticated",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "成功"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/me/briefs": {
+      "get": {
+        "operationId": "listBriefs",
+        "tags": [
+          "User"
+        ],
+        "summary": "按日期、主题与状态列出本人简报",
+        "x-required-role": "authenticated",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "topic",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/RunStatus"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "搜索简报标题、摘要和新闻标题；与日期/主题/状态过滤组合，分页前执行。"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "post": {
+        "operationId": "generateBrief",
+        "tags": [
+          "User"
+        ],
+        "summary": "基于当前偏好创建简报生成意图",
+        "description": "按当前偏好创建简报生成意图，返回公开进度。相同幂等键返回原意图；并发/配额校验在队列入队前由服务器原子执行。 preferenceVersion必须匹配当前已保存偏好，否则409。",
+        "x-required-role": "authenticated",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "同身份、同路由和相同请求体的重放返回原任务；同 key 不同请求体返回 409。"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateBriefRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationProgress"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/me/briefs/{id}": {
+      "get": {
+        "operationId": "getBrief",
+        "tags": [
+          "User"
+        ],
+        "summary": "读取本人简报及偏好快照",
+        "x-required-role": "authenticated",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brief"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/me/deliveries": {
+      "get": {
+        "operationId": "listOwnDeliveries",
+        "tags": [
+          "User"
+        ],
+        "summary": "列出本人投递",
+        "x-required-role": "authenticated",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/me/deliveries/{id}/retry": {
+      "post": {
+        "operationId": "retryOwnDelivery",
+        "tags": [
+          "User"
+        ],
+        "summary": "重试同一期简报投递",
+        "description": "保持 briefId 和内容版本，重试站内发布；已 submitted/pending 不重复创建，unknown 先核对发布记录。",
+        "x-required-role": "authenticated",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "同身份、同路由和相同请求体的重放返回原任务；同 key 不同请求体返回 409。"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Delivery"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/admin/overview": {
+      "get": {
+        "operationId": "getOverview",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "读取脱敏运营概览",
+        "x-required-role": "admin",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/sources": {
+      "get": {
+        "operationId": "listSources",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "列出 Source",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourcePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createSource",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "创建 Source",
+        "x-required-role": "admin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Source"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/sources/{id}": {
+      "put": {
+        "operationId": "saveSource",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "更新 Source",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Source"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "getSource",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "读取来源采集详情",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Source"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/models": {
+      "get": {
+        "operationId": "listModels",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "列出 ModelConfig",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelConfigPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createModel",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "创建 ModelConfig",
+        "x-required-role": "admin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/models/{id}": {
+      "put": {
+        "operationId": "saveModel",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "更新 ModelConfig",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/agent-configs": {
+      "get": {
+        "operationId": "listConfigs",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "列出 AgentConfig",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfigPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createConfig",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "创建 AgentConfig",
+        "x-required-role": "admin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/agent-configs/{id}": {
+      "put": {
+        "operationId": "saveConfig",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "更新 AgentConfig",
+        "description": "只更新草稿；已发布版本不可覆写，需另建草稿。",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/eval-cases": {
+      "get": {
+        "operationId": "listEvalCases",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "列出 EvalCase",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalCasePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createEvalCase",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "创建 EvalCase",
+        "x-required-role": "admin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvalCaseWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalCase"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/eval-cases/{id}": {
+      "put": {
+        "operationId": "saveEvalCase",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "更新 EvalCase",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvalCaseWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalCase"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/sources/{id}/enabled": {
+      "put": {
+        "operationId": "setSourceEnabled",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "显式启用或停用新闻源",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnabledWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Source"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/sources/{id}/fetch": {
+      "post": {
+        "operationId": "fetchSource",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "排队一次来源验证/采集",
+        "description": "同源已有采集时复用活动任务；NewsNow 配置周期约束仍生效。",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "同身份、同路由和相同请求体的重放返回原任务；同 key 不同请求体返回 409。"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Source"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/models/{id}/enabled": {
+      "put": {
+        "operationId": "setModelEnabled",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "启用或停用模型",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnabledWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/models/{id}/test": {
+      "post": {
+        "operationId": "testModel",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "测试连接与工具能力",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionTest"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/models/{id}/secret": {
+      "delete": {
+        "operationId": "revokeModelSecret",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "撤销模型密钥",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "成功"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/agent-configs/{id}/publish": {
+      "post": {
+        "operationId": "publishConfig",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "发布不可变 Agent 配置版本",
+        "description": "校验模型可用、阈值和工具集合；后续运行使用该版本，已有运行绑定原快照。",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/runs": {
+      "get": {
+        "operationId": "listAdminRuns",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "按状态、模型与时间查看所有运行",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/RunStatus"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/runs/{id}": {
+      "get": {
+        "operationId": "getAdminRun",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "查看脱敏运行、工具及子任务",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRun"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/runs/{id}/cancel": {
+      "post": {
+        "operationId": "cancelAdminRun",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "请求取消活动运行",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRun"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/evaluations": {
+      "get": {
+        "operationId": "listEvaluations",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "查看固定样例实验",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "runEvaluation",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "对指定配置创建固定样例实验",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "同身份、同路由和相同请求体的重放返回原任务；同 key 不同请求体返回 409。"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedEvaluation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/evaluations/{id}": {
+      "get": {
+        "operationId": "getEvaluation",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "读取评估分数；未完成或评分失败为 null",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Evaluation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/deliveries": {
+      "get": {
+        "operationId": "listAdminDeliveries",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "查看脱敏投递故障",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/deliveries/{id}/retry": {
+      "post": {
+        "operationId": "retryAdminDelivery",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "重试原简报投递",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "同身份、同路由和相同请求体的重放返回原任务；同 key 不同请求体返回 409。"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Delivery"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/runs/{id}/events": {
+      "get": {
+        "operationId": "adminRunEvents",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "订阅可回放的持久运行事件",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "仅此 run 内单调递增的事件 ID；先补发其后的持久事件再监听。"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE：id 为 RunEvent.id，event 为 run.event，data 为 RunEvent JSON。断线不改变 run 状态。",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "x-event-schema": {
+                  "$ref": "#/components/schemas/RunEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/auth/anonymous": {
+      "post": {
+        "operationId": "ensureAnonymousSession",
+        "description": "无有效Cookie且通过IP门槛后创建匿名账号并Set-Cookie；已有有效会话幂等恢复，不重置偏好或重复计数。被封禁会话返回403，不能自动换号。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "仅首次/更新会话返回不透明token，HttpOnly; Secure(生产HTTPS); SameSite=Lax; Path=/。服务端控制过期和撤销。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": []
+      }
+    },
+    "/admin/auth/login": {
+      "post": {
+        "operationId": "adminLogin",
+        "description": "仅管理员认证入口，签发独立管理员Cookie；匿名账号不能提升权限。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminLoginRequest"
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/admin/auth/session": {
+      "get": {
+        "operationId": "getAdminSession",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "adminLogout",
+        "description": "",
+        "responses": {
+          "204": {
+            "description": "成功"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/me/generations/{id}": {
+      "get": {
+        "operationId": "getGenerationProgress",
+        "description": "仅本人公开生成进度；跨账号404，不返回AgentRun或事件。客户端短轮询，不在本地推算完成。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationProgress"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ]
+      }
+    },
+    "/me/generations/{id}/cancel": {
+      "post": {
+        "operationId": "cancelGeneration",
+        "description": "服务能力：请求取消，先返回cancelling；由worker确认cancelled，不影响每日计划。",
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationProgress"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ]
+      }
+    },
+    "/admin/anonymous-accounts": {
+      "get": {
+        "operationId": "listAnonymousAccounts",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnonymousAccountPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/anonymous-accounts/{id}/status": {
+      "put": {
+        "operationId": "setAnonymousAccountStatus",
+        "description": "封禁/解除封禁需审计；封禁停止新生成与后续调度，保留已有内容。解除后仍受IP/账户限额约束。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnonymousAccount"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnonymousAccountStatusWrite"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/abuse-events": {
+      "get": {
+        "operationId": "listAbuseEvents",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AbuseEventPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/admin/anonymous-policy": {
+      "get": {
+        "operationId": "getAnonymousPolicy",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnonymousPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      },
+      "put": {
+        "operationId": "saveAnonymousPolicy",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnonymousPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnonymousPolicy"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ]
+      }
+    },
+    "/me/generations/current": {
+      "get": {
+        "operationId": "getCurrentGeneration",
+        "description": "恢复当前匿名账户最近一次生成（包括终态），用于刷新页面或仅凭 Cookie 恢复；从未生成返回 null。仍按本人归属投影，不返回内部 runId。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/GenerationProgress"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "zg_session",
+        "description": "用户匿名不透明会话 token；服务端签发，生产 HttpOnly; Secure; SameSite=Lax; Path=/，不含个人资料，存储哈希并检查有效期/撤销。写请求另校验 Origin/CSRF。"
+      },
+      "adminSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "zg_admin_session",
+        "description": "独立管理员会话；不接受匿名 Cookie。生产 HttpOnly/Secure/SameSite=Lax，服务端管理员认证和角色校验。"
+      }
+    },
+    "schemas": {
+      "RunStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "completed",
+          "partial",
+          "failed",
+          "cancelling",
+          "cancelled"
+        ]
+      },
+      "DeliveryStatus": {
+        "type": "string",
+        "enum": [
+          "disabled",
+          "pending",
+          "submitted",
+          "failed",
+          "unknown"
+        ],
+        "description": "站内发布状态；submitted 表示已发布，不表示用户已阅读。failed/unknown 可由管理员核对后重试原简报；disabled 仅用于历史或被停用账户。"
+      },
+      "Preferences": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "role",
+          "topics",
+          "keywords"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "服务端版本，0 表示尚未配置；提交时原样回传作并发校验，成功保存由服务端递增。"
+          },
+          "role": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "关注背景/职业说明，并非鉴权角色。"
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "maxItems": 20,
+            "uniqueItems": true
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "maxItems": 20,
+            "uniqueItems": true
+          }
+        },
+        "description": "用户偏好仅话题、背景与关键词。读取未配置偏好允许空数组与 version 0；保存至少一个话题或关键词。"
+      },
+      "DeliverySettings": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "time"
+        ],
+        "properties": {
+          "time": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+            "default": "08:00",
+            "description": "每日站内自动推送时间，按系统时区 Asia/Shanghai 解释。"
+          }
+        },
+        "description": "仅支持站内发布。每日任务默认启用；不提供邮箱、渠道、时区或开关字段。"
+      },
+      "Citation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "title",
+          "url",
+          "publishedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "name": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "NewsItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "summary",
+          "reason",
+          "topic",
+          "source",
+          "sourceType",
+          "publishedAt",
+          "url",
+          "citations",
+          "fetchedAt",
+          "snapshotId"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "rss",
+              "newsnow",
+              "search"
+            ]
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "citations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            }
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "实际采集或搜索取得证据的时刻；绝不能代替 publishedAt。"
+          },
+          "snapshotId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "不可变来源或搜索证据快照的公开不透明标识，不是宿主路径或运行标识。"
+          }
+        }
+      },
+      "Brief": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "date",
+          "version",
+          "summary",
+          "items",
+          "generationStatus",
+          "deliveryStatus",
+          "generatedAt",
+          "missingSources"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "title": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "summary": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewsItem"
+            }
+          },
+          "generationStatus": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "deliveryStatus": {
+            "$ref": "#/components/schemas/DeliveryStatus"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "missingSources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "未取得有效证据的来源名称；部分完成时向读者明确缺失。"
+          }
+        },
+        "description": "用户阅读投影；不含内部运行关联、模型配置或偏好技术快照。"
+      },
+      "RunEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "time",
+          "title",
+          "detail",
+          "status",
+          "duration"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "完整 RFC 3339 实际事件时间，服务端持久化为 UTC；页面可格式化为本地短时间。"
+          },
+          "title": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "params": {
+            "type": "string",
+            "description": "脱敏、有界参数文本；不是凭据或私有思维链。"
+          },
+          "output": {
+            "type": "string",
+            "description": "有界结果/错误摘要。"
+          }
+        }
+      },
+      "Subtask": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "status",
+          "detail"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentRun": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "userName",
+          "status",
+          "model",
+          "configVersion",
+          "startedAt",
+          "elapsedSeconds",
+          "inputTokens",
+          "outputTokens",
+          "cost",
+          "searchCount",
+          "events",
+          "subtasks"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "userName": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "model": {
+            "type": "string"
+          },
+          "configVersion": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "elapsedSeconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "inputTokens": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "提供商实际报告的输入 token 数，未知为 null。"
+          },
+          "outputTokens": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "提供商实际报告的输出 token 数，未知为 null。"
+          },
+          "cost": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "按已配置价格估算的美元金额；真实用量或价格不可用时为 null。"
+          },
+          "searchCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunEvent"
+            }
+          },
+          "subtasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Subtask"
+            }
+          }
+        }
+      },
+      "Source": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "sourceId",
+          "url",
+          "interval",
+          "upstreamInterval",
+          "status",
+          "lastSuccess",
+          "nextFetch",
+          "lastChanged",
+          "items",
+          "error",
+          "snapshotId",
+          "snapshotFetchedAt",
+          "lastFetchedAt",
+          "cacheAgeSeconds",
+          "stale",
+          "upstreamRevision"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "rss",
+              "newsnow"
+            ]
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "interval": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "有效轮询周期，单位秒；界面可以换算为分钟显示。"
+          },
+          "upstreamInterval": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "NewsNow 上游配置周期，单位秒；RSS 未提供时为 0。"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "syncing",
+              "failed",
+              "disabled",
+              "unverified"
+            ]
+          },
+          "lastSuccess": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "const": ""
+              }
+            ],
+            "description": "RFC 3339 UTC 时间；原型未知/尚未发生时为空串。不得将空值显示为成功。"
+          },
+          "nextFetch": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "const": ""
+              }
+            ],
+            "description": "RFC 3339 UTC 时间；原型未知/尚未发生时为空串。不得将空值显示为成功。"
+          },
+          "lastChanged": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "const": ""
+              }
+            ],
+            "description": "RFC 3339 UTC 时间；原型未知/尚未发生时为空串。不得将空值显示为成功。"
+          },
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "error": {
+            "type": "string"
+          },
+          "snapshotId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "当前有效不可变快照 ID；无有效快照为 null。失败或304保留原值。"
+          },
+          "snapshotFetchedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "当前快照原始数据实际取得时刻；304或失败不能更新成新的内容采集时间。"
+          },
+          "lastFetchedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "最近一次实际HTTP采集尝试时刻（含失败/304），不代表发布成功。"
+          },
+          "cacheAgeSeconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "当前时间减snapshotFetchedAt；无有效快照为null。"
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "无快照或缓存超过有效周期时为true；响应为304可延期有效性但不伪造快照年龄。"
+          },
+          "upstreamRevision": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "NewsNow上游周期配置来源提交或内容指纹；RSS或没有可信元数据为null。"
+          }
+        }
+      },
+      "ModelConfig": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "provider",
+          "modelId",
+          "endpoint",
+          "keyMasked",
+          "role",
+          "enabled",
+          "verified",
+          "contextWindow"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "name": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "modelId": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string",
+            "format": "uri"
+          },
+          "keyMasked": {
+            "type": "string",
+            "description": "固定遮罩/后缀标识，绝不返回原始 API key。"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "主模型",
+              "摘要模型",
+              "评估模型",
+              "子模型"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "contextWindow": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "AgentConfig": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "version",
+          "status",
+          "modelId",
+          "summaryModelId",
+          "maxModelCalls",
+          "maxToolCalls",
+          "maxSeconds",
+          "summaryTokens",
+          "summaryMessages",
+          "summaryRatio",
+          "subagentConcurrency",
+          "tools",
+          "systemPrompt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "published",
+              "draft"
+            ]
+          },
+          "modelId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "summaryModelId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "maxModelCalls": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          },
+          "maxToolCalls": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 40
+          },
+          "maxSeconds": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 1800,
+            "default": 180
+          },
+          "summaryTokens": {
+            "type": "integer",
+            "minimum": 1000,
+            "default": 12000
+          },
+          "summaryMessages": {
+            "type": "integer",
+            "minimum": 4,
+            "default": 30
+          },
+          "summaryRatio": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "default": 0.7
+          },
+          "subagentConcurrency": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 8,
+            "default": 2
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "list_dir",
+                "read_file",
+                "search_content",
+                "write_file",
+                "bash",
+                "web_search",
+                "delegate_research"
+              ]
+            }
+          },
+          "systemPrompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32000
+          }
+        }
+      },
+      "EvalCase": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "preference",
+          "expected",
+          "preferenceSnapshot",
+          "fixedAt",
+          "sourceSnapshotIds",
+          "revision"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "name": {
+            "type": "string"
+          },
+          "preference": {
+            "type": "string"
+          },
+          "expected": {
+            "type": "string"
+          },
+          "preferenceSnapshot": {
+            "$ref": "#/components/schemas/Preferences"
+          },
+          "fixedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "评估的新鲜度判定时钟；省略时在保存用例时由服务器固定，后续实验不能使用当前时钟替换。"
+          },
+          "sourceSnapshotIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "uniqueItems": true,
+            "description": "固定来源快照标识；省略时保存用例时捕获当前可用快照。显式空数组是无证据测试用例，不能偷偷查询实时网络。"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "每次保存递增；实验绑定该修订，后续修改不影响已创建实验。"
+          }
+        }
+      },
+      "Evaluation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "configVersion",
+          "status",
+          "relevance",
+          "faithfulness",
+          "citations",
+          "cost",
+          "latency",
+          "cases",
+          "createdAt",
+          "datasetVersion",
+          "scorerVersion",
+          "modelId",
+          "results"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "name": {
+            "type": "string"
+          },
+          "configVersion": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ]
+          },
+          "relevance": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 5,
+            "description": "0–5，明确标记模型评分；未评分为 null。"
+          },
+          "faithfulness": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 5,
+            "description": "0–5，明确标记模型评分；未评分为 null。"
+          },
+          "citations": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100,
+            "description": "0–100%，固定评估样本的引用规则检查结果，不代表模型整体准确率。"
+          },
+          "cost": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "latency": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "秒。"
+          },
+          "cases": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "datasetVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "固定用例修订与来源快照清单的内容指纹；同一标识表示相同输入集合。"
+          },
+          "scorerVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "规则实现与人工/LLM评分器配置的不可变版本标识。"
+          },
+          "modelId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "实验实际使用的模型配置 ID；由所选已发布配置绑定。"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvaluationCaseResult"
+            },
+            "description": "逐用例和逐指标结果；未执行的指标不伪造分数，聚合值只统计可用项。"
+          }
+        }
+      },
+      "Delivery": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "briefId",
+          "userName",
+          "destination",
+          "channel",
+          "status",
+          "attempts",
+          "time",
+          "error"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "briefId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "userName": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string",
+            "description": "站内简报位置，不包含邮件地址。"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "in_app"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/DeliveryStatus"
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "Memory": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "text",
+          "source",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "text": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Session": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "userId",
+          "name",
+          "onboardingCompleted"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "anonymous"
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "name": {
+            "type": "string"
+          },
+          "onboardingCompleted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "VALIDATION_ERROR",
+              "UNAUTHENTICATED",
+              "FORBIDDEN",
+              "NOT_FOUND",
+              "VERSION_CONFLICT",
+              "INVALID_STATE",
+              "SECRET_REQUIRED",
+              "SOURCE_INTERVAL_TOO_SHORT",
+              "RATE_LIMITED",
+              "DEPENDENCY_UNAVAILABLE",
+              "INTERNAL_ERROR",
+              "ACCOUNT_BLOCKED",
+              "CSRF_REJECTED"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AcceptedEvaluation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evaluationId"
+        ],
+        "properties": {
+          "evaluationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        }
+      },
+      "SourceWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "kind",
+          "sourceId",
+          "url",
+          "interval"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "rss",
+              "newsnow"
+            ]
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "interval": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "有效轮询周期，单位秒。"
+          }
+        }
+      },
+      "ModelWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "provider",
+          "modelId",
+          "endpoint",
+          "role",
+          "contextWindow"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "provider": {
+            "type": "string"
+          },
+          "modelId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "endpoint": {
+            "type": "string",
+            "format": "uri"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "主模型",
+              "摘要模型",
+              "评估模型",
+              "子模型"
+            ]
+          },
+          "contextWindow": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "apiKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "writeOnly": true,
+            "description": "可选；缺省保留旧 key，非空值创建或替换；撤销使用独立 DELETE。"
+          }
+        }
+      },
+      "ConfigWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "modelId",
+          "summaryModelId",
+          "maxModelCalls",
+          "maxToolCalls",
+          "maxSeconds",
+          "summaryTokens",
+          "summaryMessages",
+          "summaryRatio",
+          "subagentConcurrency",
+          "tools",
+          "systemPrompt"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "modelId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "summaryModelId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "maxModelCalls": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          },
+          "maxToolCalls": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 40
+          },
+          "maxSeconds": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 1800,
+            "default": 180
+          },
+          "summaryTokens": {
+            "type": "integer",
+            "minimum": 1000,
+            "default": 12000
+          },
+          "summaryMessages": {
+            "type": "integer",
+            "minimum": 4,
+            "default": 30
+          },
+          "summaryRatio": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "default": 0.7
+          },
+          "subagentConcurrency": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 8,
+            "default": 2
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "list_dir",
+                "read_file",
+                "search_content",
+                "write_file",
+                "bash",
+                "web_search",
+                "delegate_research"
+              ]
+            }
+          },
+          "systemPrompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32000
+          }
+        }
+      },
+      "EvalCaseWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "preference",
+          "expected"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "preference": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected": {
+            "type": "string",
+            "minLength": 1
+          },
+          "preferenceSnapshot": {
+            "$ref": "#/components/schemas/Preferences"
+          },
+          "fixedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "评估的新鲜度判定时钟；省略时在保存用例时由服务器固定，后续实验不能使用当前时钟替换。"
+          },
+          "sourceSnapshotIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "uniqueItems": true,
+            "description": "固定来源快照标识；省略时保存用例时捕获当前可用快照。显式空数组是无证据测试用例，不能偷偷查询实时网络。"
+          }
+        },
+        "description": "保留名称、偏好描述、预期三字段编辑；可选结构化偏好、固定时钟与来源快照。新建省略结构化偏好时将偏好描述保存为 role，version=0、topics=[]、keywords=[]，评估Agent仍按完整偏好描述理解；编辑省略固定字段则保持原值。后台完整返回冻结快照。"
+      },
+      "DeliverySettingsWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "time"
+        ],
+        "properties": {
+          "time": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+            "default": "08:00",
+            "description": "每日站内自动推送时间，按系统时区 Asia/Shanghai 解释。"
+          }
+        },
+        "description": "仅支持站内发布。每日任务默认启用；不提供邮箱、渠道、时区或开关字段。"
+      },
+      "EnabledWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "GenerateBriefRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "preferenceVersion"
+        ],
+        "properties": {
+          "preferenceVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "EvaluationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "configVersion"
+        ],
+        "properties": {
+          "configVersion": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "description": "绑定已发布配置；服务器原子捕获当前全部用例修订、来源快照和固定时钟形成不可变 datasetVersion。没有用例返回400，不生成空准确率。"
+      },
+      "ConnectionTest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "verified",
+          "message",
+          "testedAt",
+          "capabilities"
+        ],
+        "properties": {
+          "verified": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "testedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "HealthSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "activeRuns",
+          "failedSources",
+          "failedDeliveries",
+          "sampleCount",
+          "completionRate",
+          "generatedAt"
+        ],
+        "properties": {
+          "activeRuns": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failedSources": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failedDeliveries": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sampleCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "completionRate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "BriefPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Brief"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AgentRunPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentRun"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "MemoryPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Memory"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "SourcePage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ModelConfigPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelConfig"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AgentConfigPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentConfig"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "EvalCasePage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvalCase"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "EvaluationPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Evaluation"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "DeliveryPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Delivery"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PreferencesWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "role",
+          "topics",
+          "keywords"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "服务端版本，0 表示尚未配置；提交时原样回传作并发校验，成功保存由服务端递增。"
+          },
+          "role": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "关注背景/职业说明，并非鉴权角色。"
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "maxItems": 20,
+            "uniqueItems": true
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "maxItems": 20,
+            "uniqueItems": true
+          }
+        },
+        "description": "提交当前版本及三个偏好字段；有效保存同时持久化 onboardingCompleted=true，背景可为空。",
+        "anyOf": [
+          {
+            "properties": {
+              "topics": {
+                "minItems": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "keywords": {
+                "minItems": 1
+              }
+            }
+          }
+        ]
+      },
+      "AdminSession": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "userId",
+          "name"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "admin"
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "AdminLoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 256,
+            "writeOnly": true
+          }
+        }
+      },
+      "GenerationProgress": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "status",
+          "percent",
+          "remainingSeconds",
+          "updatedAt",
+          "briefId",
+          "error"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "percent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100,
+            "description": "可估计时为0..100；null时展示不定进度。成功发布前不能显示100。"
+          },
+          "remainingSeconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "服务端估计的剩余秒数，可随负载更新；null表示暂不能估计。不是完成承诺。"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "briefId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "description": "仅向拥有者公开此投影，不包含模型、工具、文件、事件、子任务或推理过程。partial/completed时可给出briefId；失败不能把百分比冒充完成。"
+      },
+      "AnonymousAccount": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "createdAt",
+          "lastSeenAt",
+          "status",
+          "risk",
+          "requestsLastMinute",
+          "generationsToday",
+          "rateLimitHits",
+          "activeGenerations",
+          "ipLabel",
+          "blockReason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "blocked"
+            ]
+          },
+          "risk": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "watch",
+              "high"
+            ]
+          },
+          "requestsLastMinute": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "generationsToday": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rateLimitHits": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "activeGenerations": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "ipLabel": {
+            "type": "string",
+            "description": "脱敏来源标签，不返回原始IP或会话token。"
+          },
+          "blockReason": {
+            "type": "string"
+          }
+        }
+      },
+      "AbuseEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "accountId",
+          "time",
+          "kind",
+          "detail"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "rate_limited",
+              "account_blocked",
+              "account_unblocked",
+              "generation_rejected"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "AnonymousPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestsPerMinute",
+          "generationsPerDay",
+          "maxConcurrentGenerations",
+          "accountsPerIpHour"
+        ],
+        "properties": {
+          "requestsPerMinute": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600,
+            "default": 60
+          },
+          "generationsPerDay": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          },
+          "maxConcurrentGenerations": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 1
+          },
+          "accountsPerIpHour": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 10
+          }
+        }
+      },
+      "AnonymousAccountStatusWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "reason"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "blocked"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": ".*\\S.*"
+          }
+        }
+      },
+      "AnonymousAccountPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnonymousAccount"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AbuseEventPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AbuseEvent"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AdminBrief": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "date",
+          "version",
+          "summary",
+          "items",
+          "generationStatus",
+          "deliveryStatus",
+          "generatedAt",
+          "runId",
+          "preferenceSnapshot",
+          "missingSources"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "title": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "summary": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewsItem"
+            }
+          },
+          "generationStatus": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "deliveryStatus": {
+            "$ref": "#/components/schemas/DeliveryStatus"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "preferenceSnapshot": {
+            "$ref": "#/components/schemas/Preferences"
+          },
+          "missingSources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "未取得有效证据的来源名称；部分完成时向读者明确缺失。"
+          }
+        },
+        "description": "管理员和内部持久化投影，包含runId与偏好快照；不能返回普通用户。"
+      },
+      "EvaluationScore": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric",
+          "method",
+          "value",
+          "maximum",
+          "passed",
+          "error"
+        ],
+        "properties": {
+          "metric": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "faithfulness",
+              "freshness",
+              "deduplication",
+              "sourceCoverage",
+              "citationAccuracy",
+              "latency",
+              "cost"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "rule",
+              "human",
+              "llm"
+            ]
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "maximum": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "passed": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "规则判定适用时给出布尔值；无评分/评分器失败为 null。"
+          },
+          "error": {
+            "type": "string",
+            "description": "评分失败的简短脱敏原因；未失败为空串。"
+          }
+        }
+      },
+      "EvaluationCaseResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "caseId",
+          "caseRevision",
+          "status",
+          "scores"
+        ],
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "caseRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ]
+          },
+          "scores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvaluationScore"
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "输入校验失败",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthenticated": {
+        "description": "会话缺失、过期或已撤销",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "角色不允许、账号被封禁或CSRF校验失败；封禁不会自动创建替代身份。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "资源不存在，或本人作用域不可见（跨用户 ID 不暴露存在性）",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "版本冲突、状态冲突或同幂等键不同请求体",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "请求频率、生成配额、并发或同IP新账号门槛达到上限",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "headers": {
+          "Retry-After": {
+            "required": true,
+            "description": "等待秒数；客户端显示并停止自动重试，不能清Cookie绕过。",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      },
+      "Unavailable": {
+        "description": "依赖服务暂不可用",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-prototype": {
+    "synthetic": true,
+    "clock": "2026-09-18T08:12:00+08:00",
+    "adapter": "../prototype/shared/mock.ts",
+    "status": "draft-not-frozen"
+  }
+}

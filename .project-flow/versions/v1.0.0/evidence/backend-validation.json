@@ -1,0 +1,73 @@
+{
+  "executed_at": "2026-09-19T03:06:47.100176+00:00",
+  "source_fingerprint": "64fd2c11f1b643bc0a53615de685626d303f55c735d7254d7f8e20548b9e42f0",
+  "pytest": {
+    "command": "HARNESS_TEST_MYSQL_URL=<local-development>; HARNESS_TEST_DOCKER=1; MIGRATION_ADMIN_DATABASE_URL=<local-migration-admin>; uv run --project backend pytest backend/tests -q --junitxml=.project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+    "exit_code": 0,
+    "tests": 121,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "ruff": {
+    "command": "uv run --project backend ruff check backend",
+    "exit_code": 0
+  },
+  "build": {
+    "command": "docker compose --profile app build api",
+    "exit_code": 0,
+    "image_id": "sha256:e027f81c5254d89c0e869cdb4550045a2d4618645166d6b97fbb8a033113d80f"
+  },
+  "runtime": {
+    "at": "2026-09-19T03:05:14.823103+00:00",
+    "environment": "Linux compose API + worker + beat + MySQL + Redis",
+    "checks": {
+      "health": {
+        "status": "ok",
+        "version": "1.0.0"
+      },
+      "anonymous_preferences_cookie": "passed; scoped synthetic reader, real HTTP/MySQL",
+      "admin_auth": "passed; configured local admin, secret omitted",
+      "worker_ping": [
+        {
+          "celery@c9134ee9c1d7": {
+            "ok": "pong"
+          }
+        }
+      ],
+      "broker_worker_task": {
+        "status": "passed",
+        "task": "zhigenews.tick",
+        "result": {
+          "scheduled": {
+            "sources": [],
+            "runs": [],
+            "failures": []
+          },
+          "recovered": [],
+          "outbox": {
+            "sent": [],
+            "failed": []
+          }
+        }
+      },
+      "worker_nested_sandbox": {
+        "ok": true,
+        "code": "OK",
+        "output": "isolated-runtime-passed\n",
+        "exitCode": 0,
+        "durationMs": 1565,
+        "truncated": false,
+        "timeout": false
+      }
+    },
+    "status": "passed"
+  },
+  "contract_sha256": "329f6336ee048922f9619dcbe462271cf8544daa3cef036a0e58bace3502402c",
+  "warning": "Starlette test client uses deprecated anyio BlockingPortal alias; one non-failing test warning.",
+  "logs": {
+    "backend-tests.log": "6032929ac98578bc27c15d2fabed9aea280579040b694ab6c9a5d827dfda0365",
+    "backend-lint.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "backend-build.log": "a9f3227e898f3cb0aec8c154b0f7fd6729002a5145183cc3a6f0a9899e5297ae"
+  }
+}

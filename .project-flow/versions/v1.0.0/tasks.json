@@ -1,11 +1,131 @@
 {
+  "note": "b003/h001 implementations complete. Frontend tasks denote implementation completion, not full AC acceptance. Final user acceptance and required system checks remain pending by the current user instruction.",
+  "planning_tasks": [
+    {
+      "evidence": [
+        ".project-flow/versions/v1.0.0/session-notes.md"
+      ],
+      "id": "TASK-DISC-001",
+      "status": "done",
+      "title": "恢复工作区并读取技能/设计/已有资料"
+    },
+    {
+      "evidence": [
+        "docs/research/agent-runtime.md",
+        "docs/research/news-ingestion.md",
+        "docs/research/sandbox-observability.md"
+      ],
+      "id": "TASK-DISC-002",
+      "status": "done",
+      "title": "联网调研 Agent、新闻采集、沙箱及监测"
+    },
+    {
+      "evidence": [
+        "docs/releases/v1.0.0/draft/DISCOVERY.md"
+      ],
+      "id": "TASK-DISC-003",
+      "status": "done",
+      "title": "合并需求、双端流程、架构和可评审入口"
+    },
+    {
+      "evidence": [
+        "docs/releases/v1.0.0/draft/prototype/README.md",
+        ".project-flow/versions/v1.0.0/evidence/prototype-validation.json"
+      ],
+      "id": "TASK-ITER-001",
+      "status": "done",
+      "title": "制作双端交互原型 r1 并同步领域、契约、样例和验收"
+    },
+    {
+      "evidence": [
+        "design-user.md",
+        "design.md",
+        ".project-flow/versions/v1.0.0/evidence/prototype-r2-validation.json"
+      ],
+      "id": "TASK-ITER-002",
+      "status": "done",
+      "title": "按参考图改版用户端并拆分两端设计规范（r2）"
+    },
+    {
+      "evidence": [
+        "design-user.md",
+        "docs/releases/v1.0.0/draft/spec/07-changes.md",
+        ".project-flow/versions/v1.0.0/evidence/prototype-r3-validation.json"
+      ],
+      "id": "TASK-ITER-003",
+      "status": "done",
+      "title": "极简用户端、三字段订阅、站内时间设置与首次引导（r3）"
+    },
+    {
+      "evidence": [
+        "design-user.md",
+        ".project-flow/versions/v1.0.0/evidence/prototype-r4-validation.json"
+      ],
+      "id": "TASK-ITER-004",
+      "status": "done",
+      "title": "回到最新 main，为极简用户端恢复图标、按钮和标签层次（r4）"
+    },
+    {
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/prototype-r4-icons-validation.json"
+      ],
+      "id": "TASK-ITER-005",
+      "status": "done",
+      "title": "按截图去掉来源字母方块并恢复更新简报魔杖图标"
+    },
+    {
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/prototype-r5-validation.json",
+        "docs/releases/v1.0.0/draft/spec/07-changes.md"
+      ],
+      "id": "TASK-ITER-006",
+      "status": "done",
+      "title": "r5 自动匿名会话、新闻弹窗、公开生成进度和匿名防滥用监测"
+    },
+    {
+      "evidence": [
+        ".project-flow/versions/v1.0.0/decisions.md"
+      ],
+      "id": "TASK-ITER-007",
+      "status": "done",
+      "title": "按后续反馈继续调整 r5 原型及方案"
+    }
+  ],
   "schema_version": 4,
-  "version": "v1.0.0",
   "tasks": [
     {
+      "acceptance_ids": [
+        "AC-BE-001",
+        "AC-BE-002",
+        "AC-BE-003",
+        "AC-BE-013",
+        "AC-BE-014",
+        "AC-BE-016",
+        "AC-BE-017"
+      ],
+      "baseline_ref": "v1.0.0/b003",
+      "blocker_ids": [],
+      "contract_refs": [
+        "contracts/openapi.json"
+      ],
+      "depends_on": [],
+      "done_when": [
+        "FastAPI Gateway 与 Harness 分层；模型/工具循环实际来自 LangChain create_agent + LangGraph，数据库为 MySQL；正式进程可按说明启动。",
+        "首次无Cookie请求由服务器建立匿名账号并签发HttpOnly Cookie；生产Secure/SameSite=Lax，服务器只存token哈希且执行过期/撤销；同Cookie幂等恢复，封禁403不换号。匿名全部用户功能可用但管理接口403；跨用户简报/进度/记忆404，CSRF跨源写请求拒绝。",
+        "偏好仅接收话题、背景、关键词及并发版本；空话题和空关键词不能一起保存，并发冲突返回 409；保存与首次完成标记原子持久化；无匹配不凑条数，未知发布时间不冒充新新闻。",
+        "密钥加密保存、只写不回显，可替换/撤销；模型能力实际测试；配置发布不可变且运行绑定快照，热修改不能改变正在运行的参数。",
+        "管理运行事件持久化并脱敏，真实延迟/用量/预算可查、未知保持未知；管理SSE用Last-Event-ID追赶。用户接口不接受run/events请求，公开生成/简报响应不含内部运行数据；进度与预计剩余时间由服务器提供，null不冒充0，未发布不显示100%。",
+        "配额在账号/IP维度原子执行：并发重放同意图只扣一次；新意图超限429并返回Retry-After，未入队不计成功生成；清Cookie不能重置IP新号门槛；封禁403停止新任务/调度，解除仍受配额限制。",
+        "管理监测按真实请求汇总，风险/限流/封禁事件可追溯，封禁/解封/策略变更有管理员审计；读接口不返回token、API key或原始IP；代理IP只信配置的受信边界，匿名Cookie不能调用管理API。"
+      ],
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+        ".project-flow/versions/v1.0.0/evidence/backend-validation.json"
+      ],
       "id": "TASK-BE-001",
+      "implementation_status": "implemented",
       "phase": "backend",
-      "title": "Gateway、MySQL、鉴权、偏好、配额和管理API",
+      "previous_status": "blocked",
       "requirements": [
         "REQ-ABUSE-001",
         "REQ-ADMIN-001",
@@ -17,64 +137,85 @@
         "REQ-PLT-001",
         "REQ-PREF-001"
       ],
-      "acceptance_ids": [
-        "AC-BE-001",
-        "AC-BE-002",
-        "AC-BE-003",
-        "AC-BE-013",
-        "AC-BE-014",
-        "AC-BE-016",
-        "AC-BE-017"
+      "status": "done",
+      "title": "Gateway、MySQL、鉴权、偏好、配额和管理API",
+      "verification_commands": [
+        "uv run --project backend pytest backend/tests -q",
+        "uv run --project backend ruff check backend",
+        "docker compose --profile app build api"
       ],
-      "depends_on": [],
-      "contract_refs": [
-        "contracts/openapi.json"
-      ],
-      "baseline_ref": "v1.0.0/b002",
-      "status": "in_progress",
-      "done_when": [
-        "FastAPI Gateway 与 Harness 分层；模型/工具循环实际来自 LangChain create_agent + LangGraph，数据库为 MySQL；正式进程可按说明启动。",
-        "首次无Cookie请求由服务器建立匿名账号并签发HttpOnly Cookie；生产Secure/SameSite=Lax，服务器只存token哈希且执行过期/撤销；同Cookie幂等恢复，封禁403不换号。匿名全部用户功能可用但管理接口403；跨用户简报/进度/记忆404，CSRF跨源写请求拒绝。",
-        "偏好仅接收话题、背景、关键词及并发版本；空话题和空关键词不能一起保存，并发冲突返回 409；保存与首次完成标记原子持久化；无匹配不凑条数，未知发布时间不冒充新新闻。",
-        "密钥加密保存、只写不回显，可替换/撤销；模型能力实际测试；配置发布不可变且运行绑定快照，热修改不能改变正在运行的参数。",
-        "管理运行事件持久化并脱敏，真实延迟/用量/预算可查、未知保持未知；管理SSE用Last-Event-ID追赶。用户接口不接受run/events请求，公开生成/简报响应不含内部运行数据；进度与预计剩余时间由服务器提供，null不冒充0，未发布不显示100%。",
-        "配额在账号/IP维度原子执行：并发重放同意图只扣一次；新意图超限429并返回Retry-After，未入队不计成功生成；清Cookie不能重置IP新号门槛；封禁403停止新任务/调度，解除仍受配额限制。",
-        "管理监测按真实请求汇总，风险/限流/封禁事件可追溯，封禁/解封/策略变更有管理员审计；读接口不返回token、API key或原始IP；代理IP只信配置的受信边界，匿名Cookie不能调用管理API。"
-      ],
-      "verification_commands": [],
-      "evidence": [],
-      "blocker_ids": []
+      "acceptance_arrangement": "用户接受实现交接，外部服务验收deferred"
     },
     {
-      "id": "TASK-BE-002",
-      "phase": "backend",
-      "title": "NewsNow/RSS采集、快照与调度",
-      "requirements": [
-        "REQ-SRC-001",
-        "REQ-SRC-002"
-      ],
       "acceptance_ids": [
         "AC-BE-004",
         "AC-BE-005"
       ],
-      "depends_on": [],
+      "baseline_ref": "v1.0.0/b003",
+      "blocker_ids": [],
       "contract_refs": [
         "contracts/openapi.json"
       ],
-      "baseline_ref": "v1.0.0/b002",
-      "status": "in_progress",
+      "depends_on": [],
       "done_when": [
         "至少两个 NewsNow 源按各自上游周期调度；本地不快于上游；重复调度不并发拉取同源；缓存年龄及失败可追溯。",
         "RSS 条件请求/304、超时、坏 XML 与退避有可重复样例；原始文件与元数据按源/日期/快照落盘；失败不覆写有效快照。"
       ],
-      "verification_commands": [],
-      "evidence": [],
-      "blocker_ids": []
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+        ".project-flow/versions/v1.0.0/evidence/backend-validation.json",
+        ".project-flow/versions/v1.0.0/evidence/ingestion-live.json"
+      ],
+      "id": "TASK-BE-002",
+      "implementation_status": "implemented",
+      "phase": "backend",
+      "previous_status": "done",
+      "requirements": [
+        "REQ-SRC-001",
+        "REQ-SRC-002"
+      ],
+      "status": "done",
+      "title": "NewsNow/RSS采集、快照与调度",
+      "verification_commands": [
+        "uv run --project backend pytest backend/tests -q",
+        "uv run --project backend ruff check backend",
+        "docker compose --profile app build api"
+      ],
+      "acceptance_arrangement": "用户接受实现交接，外部服务验收deferred"
     },
     {
+      "acceptance_ids": [
+        "AC-BE-006",
+        "AC-BE-007",
+        "AC-BE-008",
+        "AC-BE-009",
+        "AC-BE-010",
+        "AC-BE-011",
+        "AC-BE-012"
+      ],
+      "baseline_ref": "v1.0.0/b003",
+      "blocker_ids": [],
+      "contract_refs": [
+        "contracts/openapi.json"
+      ],
+      "depends_on": [],
+      "done_when": [
+        "六个必需工具可实际调用；Tavily 保留来源与查询并限制结果/调用/超时；list/search/bash 输出有上限与截断标志，read 支持行范围。",
+        "合法虚拟挂载可读取；`../`、宿主绝对路径、盘符/UNC、符号链接/重解析点及路径替换后越界均拒绝；RSS 只读且其他用户根不可见。",
+        "读片段仍记录全文件 hash；并发变更后写返回 FILE_CHANGED；重读后可写；两个并发覆盖仅一个成功；新建排他且合法父目录必需。",
+        "bash 在隔离环境运行，无宿主凭据/他人目录/网络；持久挂载写入失败，CAS write_file 合法写入成功；无隔离环境时不能回退宿主 shell。",
+        "Agent 能按工具结果继续选择行动且受总预算限制；MySQL checkpoint 经进程重启可恢复；子任务共享预算/取消并隔离 thread；长期记忆按用户持久化。",
+        "多工具错序、缺失、孤儿、重复及中断日志经过修复后每个 tool_call 配对；user/AI 相对顺序保持，原始 seq 不改；重复修复幂等且不重做副作用。",
+        "中间件继承 SummarizationMiddleware，消息/token/比例均可触发；摘要包含旧摘要，独立字段保存；最新用户原文保留，另一个渲染器注入摘要；总预算计入摘要/工具/schema/输出预留。"
+      ],
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+        ".project-flow/versions/v1.0.0/evidence/backend-validation.json"
+      ],
       "id": "TASK-BE-003",
+      "implementation_status": "implemented",
       "phase": "backend",
-      "title": "Harness、工具、沙箱、记忆、消息和摘要",
+      "previous_status": "blocked",
       "requirements": [
         "REQ-AGENT-002",
         "REQ-FS-001",
@@ -87,71 +228,49 @@
         "REQ-SUM-001",
         "REQ-TOOL-001"
       ],
-      "acceptance_ids": [
-        "AC-BE-006",
-        "AC-BE-007",
-        "AC-BE-008",
-        "AC-BE-009",
-        "AC-BE-010",
-        "AC-BE-011",
-        "AC-BE-012"
+      "status": "done",
+      "title": "Harness、工具、沙箱、记忆、消息和摘要",
+      "verification_commands": [
+        "uv run --project backend pytest backend/tests -q",
+        "uv run --project backend ruff check backend",
+        "docker compose --profile app build api"
       ],
-      "depends_on": [],
-      "contract_refs": [
-        "contracts/openapi.json"
-      ],
-      "baseline_ref": "v1.0.0/b002",
-      "status": "in_progress",
-      "done_when": [
-        "六个必需工具可实际调用；Tavily 保留来源与查询并限制结果/调用/超时；list/search/bash 输出有上限与截断标志，read 支持行范围。",
-        "合法虚拟挂载可读取；`../`、宿主绝对路径、盘符/UNC、符号链接/重解析点及路径替换后越界均拒绝；RSS 只读且其他用户根不可见。",
-        "读片段仍记录全文件 hash；并发变更后写返回 FILE_CHANGED；重读后可写；两个并发覆盖仅一个成功；新建排他且合法父目录必需。",
-        "bash 在隔离环境运行，无宿主凭据/他人目录/网络；持久挂载写入失败，CAS write_file 合法写入成功；无隔离环境时不能回退宿主 shell。",
-        "Agent 能按工具结果继续选择行动且受总预算限制；MySQL checkpoint 经进程重启可恢复；子任务共享预算/取消并隔离 thread；长期记忆按用户持久化。",
-        "多工具错序、缺失、孤儿、重复及中断日志经过修复后每个 tool_call 配对；user/AI 相对顺序保持，原始 seq 不改；重复修复幂等且不重做副作用。",
-        "中间件继承 SummarizationMiddleware，消息/token/比例均可触发；摘要包含旧摘要，独立字段保存；最新用户原文保留，另一个渲染器注入摘要；总预算计入摘要/工具/schema/输出预留。"
-      ],
-      "verification_commands": [],
-      "evidence": [],
-      "blocker_ids": []
+      "acceptance_arrangement": "用户接受实现交接，外部服务验收deferred"
     },
     {
-      "id": "TASK-BE-004",
-      "phase": "backend",
-      "title": "评估与后端独立验收交接",
-      "requirements": [
-        "REQ-EVAL-001"
-      ],
       "acceptance_ids": [
         "AC-BE-015"
       ],
-      "depends_on": [],
+      "baseline_ref": "v1.0.0/b003",
+      "blocker_ids": [],
       "contract_refs": [
         "contracts/openapi.json"
       ],
-      "baseline_ref": "v1.0.0/b002",
-      "status": "in_progress",
+      "depends_on": [],
       "done_when": [
         "实验绑定固定来源/偏好/时钟和配置/评分器版本；规则检查、人工与 LLM 评分可区分；评分器失败为不可用而非 0/通过；实验不向真实用户发布简报。"
       ],
-      "verification_commands": [],
-      "evidence": [],
-      "blocker_ids": []
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/backend-junit.xml",
+        ".project-flow/versions/v1.0.0/evidence/backend-validation.json"
+      ],
+      "id": "TASK-BE-004",
+      "implementation_status": "implemented",
+      "phase": "backend",
+      "previous_status": "blocked",
+      "requirements": [
+        "REQ-EVAL-001"
+      ],
+      "status": "done",
+      "title": "评估与后端独立验收交接",
+      "verification_commands": [
+        "uv run --project backend pytest backend/tests -q",
+        "uv run --project backend ruff check backend",
+        "docker compose --profile app build api"
+      ],
+      "acceptance_arrangement": "用户接受实现交接，外部服务验收deferred"
     },
     {
-      "id": "TASK-FE-001",
-      "phase": "frontend",
-      "title": "用户端真实API与交互",
-      "requirements": [
-        "REQ-AGENT-002",
-        "REQ-AUTH-001",
-        "REQ-BRIEF-001",
-        "REQ-DELIVERY-001",
-        "REQ-OBS-001",
-        "REQ-PLT-001",
-        "REQ-PREF-001",
-        "REQ-UX-001"
-      ],
       "acceptance_ids": [
         "AC-UI-001",
         "AC-UI-002",
@@ -164,17 +283,17 @@
         "AC-UI-009",
         "AC-UI-010"
       ],
+      "baseline_ref": "v1.0.0/b003",
+      "blocker_ids": [],
+      "contract_refs": [
+        "contracts/openapi.json"
+      ],
       "depends_on": [
         "TASK-BE-001",
         "TASK-BE-002",
         "TASK-BE-003",
         "TASK-BE-004"
       ],
-      "contract_refs": [
-        "contracts/openapi.json"
-      ],
-      "baseline_ref": "v1.0.0/b002",
-      "status": "pending",
       "done_when": [
         "用户/管理员为两个可独立启动与构建的 Vue 3 项目；共用契约与语义组件，分别遵循 design-user.md / design.md，用户主题不污染管理员；首页持续标明模拟数据，重置恢复固定时钟与 seed。",
         "首次访问自动建立匿名 Cookie 会话；无邮箱/密码/注册/退出表单。欢迎页采用旧版视觉，显示自动进入、加载或失败重试；未配置时进入引导，保存后进入今日；同Cookie刷新保持完成状态，丢失Cookie创建新身份。",
@@ -187,14 +306,68 @@
         "生成展示进度条和预计剩余时间，未知估计为正在估算；保留旧简报、刷新恢复进度；完成/部分完成可读结果，失败可重试；页面不显示运行事件、工具、子任务、配置或工作区。",
         "两端正常/loading/empty/error/partial/unauthorized 可演示；320/375/768px 重排，长标题无全页横向溢出；键盘可达操作，弹窗可关闭并恢复焦点。"
       ],
-      "verification_commands": [],
-      "evidence": [],
-      "blocker_ids": []
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-developer-checks.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-user-browser.json"
+      ],
+      "id": "TASK-FE-001",
+      "phase": "frontend",
+      "previous_status": "pending",
+      "requirements": [
+        "REQ-AGENT-002",
+        "REQ-AUTH-001",
+        "REQ-BRIEF-001",
+        "REQ-DELIVERY-001",
+        "REQ-OBS-001",
+        "REQ-PLT-001",
+        "REQ-PREF-001",
+        "REQ-UX-001"
+      ],
+      "status": "done",
+      "title": "用户端真实API与交互",
+      "verification_commands": [
+        "npm run build",
+        "npm run test:api"
+      ],
+      "implementation_status": "implemented",
+      "acceptance_status": "awaiting_user_final_acceptance",
+      "completion_note": "All scoped frontend functionality implemented against actual accepted API; developer checks recorded. Full business acceptance is explicitly user-owned and remains unverified in frontend-verification.json."
     },
     {
+      "acceptance_ids": [
+        "AC-UI-011",
+        "AC-UI-012",
+        "AC-UI-013",
+        "AC-UI-014",
+        "AC-UI-015",
+        "AC-UI-016"
+      ],
+      "baseline_ref": "v1.0.0/b003",
+      "blocker_ids": [],
+      "contract_refs": [
+        "contracts/openapi.json"
+      ],
+      "depends_on": [
+        "TASK-BE-001",
+        "TASK-BE-002",
+        "TASK-BE-003",
+        "TASK-BE-004"
+      ],
+      "done_when": [
+        "管理员可新增/编辑/启停源、模拟采集；NewsNow 展示不同上游/有效周期，RSS 失败保留最后成功值，显示下次抓取。",
+        "可配置模型 ID/端点/角色、输入替换 key、模拟连接测试与启停；输入 key 不在列表、提示或日志回显，失败保留非秘密字段。",
+        "参数与提示词草稿可保存/校验/发布；显示配置版本及新运行生效说明；已发布版本不可直接改写。",
+        "管理运行列表可过滤状态/模型/时间，详情包含工具参数和结果摘要、压缩、文件冲突及子任务示例；全部事件标明模拟且无私有思维链。",
+        "固定用例可编辑/保存，选择配置发起模拟实验，可比较两次结果；相关性/忠实度与引用规则分开标明，排队或失败无伪造分数。",
+        "管理员可查看匿名账户状态、请求/生成计数、限流/并发、风险和脱敏来源；可修改有效配额、封禁/解封并看到审计事件；投递重试仍沿用同一期，不制造运行完成率。"
+      ],
+      "evidence": [
+        ".project-flow/versions/v1.0.0/evidence/frontend-developer-checks.json",
+        ".project-flow/versions/v1.0.0/evidence/frontend-admin-browser.json"
+      ],
       "id": "TASK-FE-002",
       "phase": "frontend",
-      "title": "管理端真实API与交互",
+      "previous_status": "pending",
       "requirements": [
         "REQ-ABUSE-001",
         "REQ-ADMIN-001",
@@ -206,41 +379,40 @@
         "REQ-SRC-001",
         "REQ-SRC-002"
       ],
+      "status": "done",
+      "title": "管理端真实API与交互",
+      "verification_commands": [
+        "npm run build",
+        "npm run test:api"
+      ],
+      "implementation_status": "implemented",
+      "acceptance_status": "awaiting_user_final_acceptance",
+      "completion_note": "All scoped frontend functionality implemented against actual accepted API; developer checks recorded. Full business acceptance is explicitly user-owned and remains unverified in frontend-verification.json."
+    },
+    {
       "acceptance_ids": [
-        "AC-UI-011",
-        "AC-UI-012",
-        "AC-UI-013",
-        "AC-UI-014",
-        "AC-UI-015",
-        "AC-UI-016"
+        "AC-INT-001",
+        "AC-INT-002",
+        "AC-INT-003"
       ],
-      "depends_on": [
-        "TASK-BE-001",
-        "TASK-BE-002",
-        "TASK-BE-003",
-        "TASK-BE-004"
-      ],
+      "baseline_ref": "v1.0.0/b003",
+      "blocker_ids": [],
       "contract_refs": [
         "contracts/openapi.json"
       ],
-      "baseline_ref": "v1.0.0/b002",
-      "status": "pending",
-      "done_when": [
-        "管理员可新增/编辑/启停源、模拟采集；NewsNow 展示不同上游/有效周期，RSS 失败保留最后成功值，显示下次抓取。",
-        "可配置模型 ID/端点/角色、输入替换 key、模拟连接测试与启停；输入 key 不在列表、提示或日志回显，失败保留非秘密字段。",
-        "参数与提示词草稿可保存/校验/发布；显示配置版本及新运行生效说明；已发布版本不可直接改写。",
-        "管理运行列表可过滤状态/模型/时间，详情包含工具参数和结果摘要、压缩、文件冲突及子任务示例；全部事件标明模拟且无私有思维链。",
-        "固定用例可编辑/保存，选择配置发起模拟实验，可比较两次结果；相关性/忠实度与引用规则分开标明，排队或失败无伪造分数。",
-        "管理员可查看匿名账户状态、请求/生成计数、限流/并发、风险和脱敏来源；可修改有效配额、封禁/解封并看到审计事件；投递重试仍沿用同一期，不制造运行完成率。"
+      "depends_on": [
+        "TASK-FE-001",
+        "TASK-FE-002"
       ],
-      "verification_commands": [],
+      "done_when": [
+        "真实偏好 → 采集快照/搜索 → Agent → 可追溯简报 → 站内发布闭环，无邮件服务依赖；部分来源失败可产生明确 partial，证据不足不会发布虚构内容。",
+        "首次偏好完成后按系统时区和 HH:mm 每日调度；未完成/禁用账户不调度；改时间不补发历史；唯一键和队列重投不产生重复简报，重试发布引用原版本，发布不冒充已读。",
+        "两个正式前端对接同一真实Gateway；匿名Cookie可恢复本人偏好/历史/生成进度，管理员独立认证后监测和封禁影响用户请求；schema、失败/429、角色隔离及发布错误可验证，不依赖mock。"
+      ],
       "evidence": [],
-      "blocker_ids": []
-    },
-    {
       "id": "TASK-INT-001",
       "phase": "integration",
-      "title": "系统闭环、每日调度和双端验收",
+      "previous_status": "pending",
       "requirements": [
         "REQ-ABUSE-001",
         "REQ-AUTH-001",
@@ -249,120 +421,11 @@
         "REQ-PLT-001",
         "REQ-UX-001"
       ],
-      "acceptance_ids": [
-        "AC-INT-001",
-        "AC-INT-002",
-        "AC-INT-003"
-      ],
-      "depends_on": [
-        "TASK-FE-001",
-        "TASK-FE-002"
-      ],
-      "contract_refs": [
-        "contracts/openapi.json"
-      ],
-      "baseline_ref": "v1.0.0/b002",
       "status": "pending",
-      "done_when": [
-        "真实偏好 → 采集快照/搜索 → Agent → 可追溯简报 → 站内发布闭环，无邮件服务依赖；部分来源失败可产生明确 partial，证据不足不会发布虚构内容。",
-        "首次偏好完成后按系统时区和 HH:mm 每日调度；未完成/禁用账户不调度；改时间不补发历史；唯一键和队列重投不产生重复简报，重试发布引用原版本，发布不冒充已读。",
-        "两个正式前端对接同一真实Gateway；匿名Cookie可恢复本人偏好/历史/生成进度，管理员独立认证后监测和封禁影响用户请求；schema、失败/429、角色隔离及发布错误可验证，不依赖mock。"
-      ],
+      "title": "系统闭环、每日调度和双端验收",
       "verification_commands": [],
-      "evidence": [],
-      "blocker_ids": []
+      "acceptance_owner": "user"
     }
   ],
-  "planning_tasks": [
-    {
-      "id": "TASK-DISC-001",
-      "title": "恢复工作区并读取技能/设计/已有资料",
-      "status": "done",
-      "evidence": [
-        ".project-flow/versions/v1.0.0/session-notes.md"
-      ]
-    },
-    {
-      "id": "TASK-DISC-002",
-      "title": "联网调研 Agent、新闻采集、沙箱及监测",
-      "status": "done",
-      "evidence": [
-        "docs/research/agent-runtime.md",
-        "docs/research/news-ingestion.md",
-        "docs/research/sandbox-observability.md"
-      ]
-    },
-    {
-      "id": "TASK-DISC-003",
-      "title": "合并需求、双端流程、架构和可评审入口",
-      "status": "done",
-      "evidence": [
-        "docs/releases/v1.0.0/draft/DISCOVERY.md"
-      ]
-    },
-    {
-      "id": "TASK-ITER-001",
-      "title": "制作双端交互原型 r1 并同步领域、契约、样例和验收",
-      "status": "done",
-      "evidence": [
-        "docs/releases/v1.0.0/draft/prototype/README.md",
-        ".project-flow/versions/v1.0.0/evidence/prototype-validation.json"
-      ]
-    },
-    {
-      "id": "TASK-ITER-002",
-      "title": "按参考图改版用户端并拆分两端设计规范（r2）",
-      "status": "done",
-      "evidence": [
-        "design-user.md",
-        "design.md",
-        ".project-flow/versions/v1.0.0/evidence/prototype-r2-validation.json"
-      ]
-    },
-    {
-      "id": "TASK-ITER-003",
-      "title": "极简用户端、三字段订阅、站内时间设置与首次引导（r3）",
-      "status": "done",
-      "evidence": [
-        "design-user.md",
-        "docs/releases/v1.0.0/draft/spec/07-changes.md",
-        ".project-flow/versions/v1.0.0/evidence/prototype-r3-validation.json"
-      ]
-    },
-    {
-      "id": "TASK-ITER-004",
-      "title": "回到最新 main，为极简用户端恢复图标、按钮和标签层次（r4）",
-      "status": "done",
-      "evidence": [
-        "design-user.md",
-        ".project-flow/versions/v1.0.0/evidence/prototype-r4-validation.json"
-      ]
-    },
-    {
-      "id": "TASK-ITER-005",
-      "title": "按截图去掉来源字母方块并恢复更新简报魔杖图标",
-      "status": "done",
-      "evidence": [
-        ".project-flow/versions/v1.0.0/evidence/prototype-r4-icons-validation.json"
-      ]
-    },
-    {
-      "id": "TASK-ITER-006",
-      "title": "r5 自动匿名会话、新闻弹窗、公开生成进度和匿名防滥用监测",
-      "status": "done",
-      "evidence": [
-        ".project-flow/versions/v1.0.0/evidence/prototype-r5-validation.json",
-        "docs/releases/v1.0.0/draft/spec/07-changes.md"
-      ]
-    },
-    {
-      "id": "TASK-ITER-007",
-      "title": "按后续反馈继续调整 r5 原型及方案",
-      "status": "done",
-      "evidence": [
-        ".project-flow/versions/v1.0.0/decisions.md"
-      ]
-    }
-  ],
-  "note": "正式 backend/frontend/integration 任务在具体基线形成后建立；planning_tasks 仅记录当前探索阶段，不能代替构建验收。"
+  "version": "v1.0.0"
 }

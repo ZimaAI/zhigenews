@@ -1,0 +1,21 @@
+{
+  "synthetic": true,
+  "schema": "Evaluation",
+  "data": {
+    "id": "synthetic-eval-02",
+    "name": "【模拟】待评估",
+    "configVersion": "v4",
+    "status": "queued",
+    "relevance": null,
+    "faithfulness": null,
+    "citations": null,
+    "cost": null,
+    "latency": null,
+    "cases": 3,
+    "createdAt": "2026-09-18T08:12:00+08:00",
+    "datasetVersion": "synthetic-dataset-v1",
+    "scorerVersion": "synthetic-scorer-v1",
+    "modelId": "synthetic-model-01",
+    "results": []
+  }
+}

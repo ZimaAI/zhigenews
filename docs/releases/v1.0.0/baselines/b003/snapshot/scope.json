@@ -1,0 +1,20 @@
+{
+  "base_ref": null,
+  "change_summary": "首版 r5：自动匿名会话、三字段偏好、每日站内发布、新闻详情弹窗与公开生成进度；管理员模型/配置/采集/运行/评估/匿名防滥用；后端先行连续实现。",
+  "documents": {
+    "acceptance": "spec/05-acceptance.md",
+    "architecture": "spec/04-architecture.md",
+    "changes": "spec/07-changes.md",
+    "domain": "spec/03-domain.md",
+    "implementation": "spec/06-implementation.md",
+    "index": "spec/00-index.md",
+    "migration": "spec/08-compatibility-migration.md",
+    "release_plan": "spec/09-release-plan.md",
+    "requirements": "spec/01-requirements.md",
+    "ux": "spec/02-ux.md"
+  },
+  "incorporated_refs": [],
+  "product_version": "v1.0.0",
+  "readiness_reviewed": true,
+  "schema_version": 4
+}

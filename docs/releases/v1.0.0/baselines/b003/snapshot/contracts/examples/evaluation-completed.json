@@ -1,0 +1,115 @@
+{
+  "synthetic": true,
+  "schema": "Evaluation",
+  "data": {
+    "id": "synthetic-eval-01",
+    "name": "【模拟】固定样例评估",
+    "configVersion": "v3",
+    "status": "completed",
+    "relevance": 4.2,
+    "faithfulness": 4.5,
+    "citations": 100,
+    "cost": 0.24,
+    "latency": 14.3,
+    "cases": 3,
+    "createdAt": "2026-09-18T07:00:00+08:00",
+    "datasetVersion": "synthetic-dataset-v1",
+    "scorerVersion": "synthetic-scorer-v1",
+    "modelId": "synthetic-model-01",
+    "results": [
+      {
+        "caseId": "synthetic-case-01",
+        "caseRevision": 1,
+        "status": "completed",
+        "scores": [
+          {
+            "metric": "relevance",
+            "method": "llm",
+            "value": 4.2,
+            "maximum": 5,
+            "passed": null,
+            "error": ""
+          },
+          {
+            "metric": "faithfulness",
+            "method": "llm",
+            "value": 4.5,
+            "maximum": 5,
+            "passed": null,
+            "error": ""
+          },
+          {
+            "metric": "citationAccuracy",
+            "method": "rule",
+            "value": 100,
+            "maximum": 100,
+            "passed": true,
+            "error": ""
+          }
+        ]
+      },
+      {
+        "caseId": "synthetic-case-02",
+        "caseRevision": 1,
+        "status": "completed",
+        "scores": [
+          {
+            "metric": "relevance",
+            "method": "llm",
+            "value": 4.2,
+            "maximum": 5,
+            "passed": null,
+            "error": ""
+          },
+          {
+            "metric": "faithfulness",
+            "method": "llm",
+            "value": 4.5,
+            "maximum": 5,
+            "passed": null,
+            "error": ""
+          },
+          {
+            "metric": "citationAccuracy",
+            "method": "rule",
+            "value": 100,
+            "maximum": 100,
+            "passed": true,
+            "error": ""
+          }
+        ]
+      },
+      {
+        "caseId": "synthetic-case-03",
+        "caseRevision": 1,
+        "status": "completed",
+        "scores": [
+          {
+            "metric": "relevance",
+            "method": "llm",
+            "value": 4.2,
+            "maximum": 5,
+            "passed": null,
+            "error": ""
+          },
+          {
+            "metric": "faithfulness",
+            "method": "llm",
+            "value": 4.5,
+            "maximum": 5,
+            "passed": null,
+            "error": ""
+          },
+          {
+            "metric": "citationAccuracy",
+            "method": "rule",
+            "value": 100,
+            "maximum": 100,
+            "passed": true,
+            "error": ""
+          }
+        ]
+      }
+    ]
+  }
+}

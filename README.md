@@ -1,8 +1,23 @@
 # 知更 · v1.0.0
 
-基于 FastAPI、MySQL、LangChain/LangGraph 的个性化新闻简报。当前实施基线为 **v1.0.0/b002**，正式前端须在后端独立验收后实现；原型位于 `docs/releases/v1.0.0/draft/prototype/`，其模拟数据与正式应用隔离。
+基于 FastAPI、MySQL、LangChain/LangGraph 的个性化新闻简报。当前实施基线为 **v1.0.0/b003**，后端交接为 **h001**。b003只记录用户确认的验收安排：先完成前后端实现，真实外部模型、Tavily及最终业务验收由用户随后进行。原型位于 `docs/releases/v1.0.0/draft/prototype/`，其模拟数据与正式应用隔离。
 
 当前阶段与剩余工作请读 [.project-flow/RESUME.md](.project-flow/RESUME.md)，实际验收结果以版本 evidence/ 中的日志为准。不能把自动化测试中的 synthetic 模型结果视为真实模型或 Tavily 服务通过。
+
+## 正式前端
+
+使用Node.js24，在仓库根运行`npm ci`。分别在两个终端执行：
+
+```powershell
+npm run dev:user
+npm run dev:admin
+```
+
+用户端为 [127.0.0.1:5173](http://127.0.0.1:5173)，管理员端为 [127.0.0.1:5174](http://127.0.0.1:5174)。两端均代理真实后端18000端口；用户自动取得匿名Cookie，管理员使用`backend/.env`的账号密码独立登录。
+
+`npm run build`检查契约、类型并分别构建两个应用；也可单独执行`build:user`、`build:admin`。生产输出为`apps/user-web/dist`和`apps/admin-web/dist`，停止相应dev进程后用`npm run preview:user`/`preview:admin`在原端口预览。共享API客户端由h001契约生成，`npm run check:contract`检查一致性，`npm run test:api`验证传输及SSE恢复。
+
+完整启动、模型配置和用户验收步骤见 [实现与验收入口](docs/releases/v1.0.0/IMPLEMENTATION.md)。模型/Tavily密钥保留在后端，不放入VITE前端变量。
 
 ## 本地后端
 
@@ -69,4 +84,4 @@ Get-Content backend/scripts/verify_runtime.py -Raw | docker compose exec -T work
 
 全套测试前先停止beat/worker，避免调度消费测试outbox，完成后再启动。迁移测试还需设置`MIGRATION_ADMIN_DATABASE_URL`指向本地MySQL管理员连接；仅创建/清理随机命名的`zg_migration_test_*`临时库。`verify_runtime.py`验证容器HTTP、队列与嵌套沙箱，并清理自己的synthetic reader；它不验证外部模型。
 
-详细规范见 [基线索引](docs/releases/v1.0.0/baselines/b002/snapshot/spec/00-index.md)，运行事件仅记录可展示结果、耗时和脱敏工具摘要，不采集模型私有思维链。
+详细规范见 [基线索引](docs/releases/v1.0.0/baselines/b003/snapshot/spec/00-index.md)，运行事件仅记录可展示结果、耗时和脱敏工具摘要，不采集模型私有思维链。

@@ -1,0 +1,13 @@
+{
+  "synthetic": true,
+  "schema": "GenerationProgress",
+  "data": {
+    "id": "gen-estimating",
+    "status": "queued",
+    "percent": null,
+    "remainingSeconds": null,
+    "updatedAt": "2026-09-18T08:12:00+08:00",
+    "briefId": null,
+    "error": ""
+  }
+}

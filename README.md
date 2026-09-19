@@ -40,15 +40,17 @@ uv run --project backend uvicorn zhigenews.gateway:app --host 127.0.0.1 --port 1
 
 ## VS Code 启动与断点调试
 
-用 VS Code 打开仓库根目录，安装工作区推荐的 Python、Python Debugger 扩展；调试 Vue 原型时安装 Vue - Official，并准备 Node.js 22.12+ 与 Microsoft Edge。
+用 VS Code 打开仓库根目录，安装工作区推荐的 Python、Python Debugger、Vue - Official 扩展，并准备 Node.js 22.12+、Python 3.12、uv 与 Microsoft Edge。先启动 Docker Desktop 的 Linux engine，后端准备任务需要 MySQL/Redis。
 
-1. 首次使用先按上文配置 `backend/.env`，再通过「终端 → 运行任务」执行 `backend: init`。任务会依次同步 Python 依赖、等待 MySQL/Redis 就绪、执行迁移并初始化数据库；已有 `.env` 不会被覆盖。
+1. 首次使用先按上文配置 `backend/.env`，再通过「终端 → 运行任务」执行 `frontend: install`（根目录 `npm ci`）和 `backend: init`。后者会依次同步 Python 依赖、等待 MySQL/Redis 就绪、执行迁移并初始化数据库；已有 `.env` 不会被覆盖。前端依赖仅需首次安装或锁文件更新后重新安装，F5 不重复安装。
 2. 在「运行和调试」选择 **后端：API（18001）**，按 F5 启动，在 `backend/src/zhigenews/gateway.py` 的 `health()` 内设置断点，访问 `http://127.0.0.1:18001/healthz` 即可命中。启动后自动打开 `/docs`；Shift+F5 停止调试。调试端口使用 18001，避免与 Docker API 的 18000 冲突。为保持断点稳定，未启用自动重载，修改代码后重启调试。
 3. 异步任务可分别启动 **Worker（本机 solo）** 和 **Beat（本机调度）**。先停止容器中的 worker/beat（`docker compose --profile app stop worker beat`），避免争抢相同队列或重复调度。本机进程共用根目录工作路径及 `.env`；Beat 状态保存在被忽略的 `backend/.venv/`。Windows 的 solo 入口供逐步调试，涉及 Docker 沙箱挂载的完整生成流程仍使用下方 Linux 容器栈。调试结束后可用 `docker compose --profile app up -d worker beat` 恢复容器任务服务。
 4. **后端：CLI** 支持选择 `environment`、`init`、`collect`、`tick` 并设置断点；后两项会执行真实工作。`backend: lint`、`backend: test` 可从任务菜单运行，测试所需服务与环境变量见「验证」章节。测试资源管理器也支持运行与调试 pytest；如曾选过其他 Python，执行「Python: Select Interpreter」选择 `backend/.venv`。
-5. **原型：用户端 / 管理端（模拟数据）** 会自动安装 npm 依赖、启动 Vite 并打开 Edge 调试，支持 Vue/TypeScript 断点。用户端为 5173，管理端为 5174；管理端同时启动用户端以提供模拟会话接口。原型没有接入正式后端。关闭浏览器调试后，可通过「终端 → 终止任务」停止 Vite。
+5. 选择 **全栈：用户端 + API**、**全栈：管理员端 + API** 或 **全栈：双前端 + API**，按 F5 同时启动本机 API、正式前端 Vite 和 Edge 调试。用户端为 `http://127.0.0.1:5173`，管理员端为 `http://127.0.0.1:5174`；可以在 `apps/*/src` 的 Vue/TypeScript 与 `backend/src` 的 Python 中设置断点。API 首次准备可能晚于浏览器打开，待后端就绪后刷新页面。
+6. **前端：用户端 / 管理员端（正式应用）** 可单独启动浏览器调试，需要另外启动 **后端：API（18001）**。前端调试任务通过进程变量 `ZHIGENEWS_API_TARGET=http://127.0.0.1:18001` 指定代理；普通 `npm run dev:*` 和 `preview:*` 仍默认连接 18000。断点也支持共享 `packages/` 源码。联合调试停止一个会话时会停止其余调试会话；Vite 后台任务需通过「终端 → 终止任务」停止。切换普通开发、调试或原型前先停止旧 Vite，避免端口占用或复用错误的代理目标。
+7. **原型：用户端 / 管理端（模拟数据）** 保留为独立入口，会自动安装原型 npm 依赖、启动 Vite 并打开 Edge。用户端为 5173，管理端为 5174；管理端同时启动用户端以提供模拟会话接口。原型没有接入正式后端，与正式前端不能同时占用相同端口。
 
-各后端调试入口都会先执行 `backend: prepare`（同步依赖、启动数据库与缓存、迁移），不会重复初始化管理员。调试结束后数据库与缓存继续运行。配置见 [.vscode/launch.json](.vscode/launch.json)、[.vscode/tasks.json](.vscode/tasks.json)；配置字段遵循 [VS Code Python 调试文档](https://code.visualstudio.com/docs/python/debugging) 与 [任务文档](https://code.visualstudio.com/docs/debugtest/tasks)。
+各后端调试入口都会先执行 `backend: prepare`（同步依赖、启动数据库与缓存、迁移），不会重复初始化管理员。调试结束后数据库与缓存继续运行。配置见 [.vscode/launch.json](.vscode/launch.json)、[.vscode/tasks.json](.vscode/tasks.json)；配置字段遵循 [VS Code Python 调试文档](https://code.visualstudio.com/docs/python/debugging)、[联合调试文档](https://code.visualstudio.com/docs/debugtest/debugging-configuration) 与 [浏览器调试文档](https://code.visualstudio.com/docs/nodejs/browser-debugging)。
 
 ## Linux API / worker / scheduler
 

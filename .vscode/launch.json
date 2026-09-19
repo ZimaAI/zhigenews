@@ -93,6 +93,30 @@
       "preLaunchTask": "backend: prepare"
     },
     {
+      "name": "前端：用户端（正式应用）",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://127.0.0.1:5173",
+      "webRoot": "${workspaceFolder}/apps/user-web",
+      "sourceMapPathOverrides": {
+        "/@fs/*": "*",
+        "/*": "${webRoot}/*"
+      },
+      "preLaunchTask": "frontend: user"
+    },
+    {
+      "name": "前端：管理员端（正式应用）",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://127.0.0.1:5174",
+      "webRoot": "${workspaceFolder}/apps/admin-web",
+      "sourceMapPathOverrides": {
+        "/@fs/*": "*",
+        "/*": "${webRoot}/*"
+      },
+      "preLaunchTask": "frontend: admin"
+    },
+    {
       "name": "原型：用户端（模拟数据）",
       "type": "msedge",
       "request": "launch",
@@ -121,6 +145,33 @@
         "tick"
       ],
       "default": "environment"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "全栈：用户端 + API",
+      "configurations": [
+        "后端：API（18001）",
+        "前端：用户端（正式应用）"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "全栈：管理员端 + API",
+      "configurations": [
+        "后端：API（18001）",
+        "前端：管理员端（正式应用）"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "全栈：双前端 + API",
+      "configurations": [
+        "后端：API（18001）",
+        "前端：用户端（正式应用）",
+        "前端：管理员端（正式应用）"
+      ],
+      "stopAll": true
     }
   ]
 }

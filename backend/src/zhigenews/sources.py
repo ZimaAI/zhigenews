@@ -36,6 +36,9 @@ def source_state(row):
     if health not in ("healthy", "failed", "invalid", "unverified"):
         health = "healthy" if data.get("snapshotId") else "unverified"
     collection = data.get("collectionStatus", "queued" if data["status"] == "syncing" else "idle")
+    if "collectionStatus" not in data and collection == "queued" and health == "invalid":
+        # Legacy automatic commands are no longer eligible; keep manual recovery available.
+        collection = "running" if is_collecting(row.id) else "idle"
     if row.private.get("stop_requested"):
         collection = "stopping" if is_collecting(row.id) else "stopped"
     status = (

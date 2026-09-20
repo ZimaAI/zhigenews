@@ -1,7 +1,7 @@
 # 管理员新闻来源搜索、分页、失效处理与批量管理
 
 Type: task
-Status: claimed
+Status: resolved
 Labels: ready-for-agent
 
 本规格发布于项目本地 Markdown 任务系统。业务范围来自已完成的需求讨论；实现与验证进度见 [实现任务](issues/01-implementation.md)。

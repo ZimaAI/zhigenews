@@ -86,6 +86,33 @@ def test_invalid_source_stops_automatic_collection_and_recovers_manually(api_san
     assert restored["health"] == "healthy" and restored["enabled"] is False
 
 
+def test_legacy_queued_invalid_source_can_recover_manually(api_sandbox, tmp_path, monkeypatch):
+    from test_workers import collector
+
+    from zhigenews.settings import get_settings
+
+    monkeypatch.setattr(get_settings(), "data_dir", tmp_path)
+    admin = api_sandbox.admin()
+    source = create_source(api_sandbox, admin, api_sandbox.prefix)
+    with transaction() as session:
+        row = session.get(Resource, source["id"])
+        row.data = {
+            key: value
+            for key, value in row.data.items()
+            if key not in ("health", "enabled", "collectionStatus")
+        }
+        row.data = {**row.data, "status": "syncing"}
+        row.private = {"state": {"failure_count": 3, "status": "failed"}}
+    assert workers.collect_source(source["id"], collector=collector)["status"] == "invalid"
+    state = admin.get(BASE + "/" + source["id"]).json()
+    assert state["health"] == "invalid" and state["collectionStatus"] == "idle"
+    queued = admin.post(
+        BASE + "/" + source["id"] + "/fetch", headers={"Idempotency-Key": "legacy-manual-restore"}
+    )
+    assert queued.status_code == 202, queued.text
+    assert workers.collect_source(source["id"], collector=collector)["status"] == "healthy"
+
+
 def test_stop_must_finish_before_batch_delete_and_queued_work_cannot_recreate(
     api_sandbox, tmp_path, monkeypatch
 ):

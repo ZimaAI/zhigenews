@@ -27,6 +27,18 @@ def rss_source():
     }
 
 
+def test_two_failed_backoff_retries_invalidate_source_and_success_recovers(tmp_path):
+    source = rss_source()
+    for offset, expected in [(0, "failed"), (600, "failed"), (1800, "invalid")]:
+        result = call(source, tmp_path, httpx.Response(503), now=NOW + timedelta(seconds=offset))
+        source = result["source"]
+        assert source["status"] == expected
+    assert source["next_fetch_at"] == ""
+    recovered = call(source, tmp_path, httpx.Response(200, content=RSS), now=NOW + timedelta(hours=2))
+    assert recovered["source"]["status"] == "healthy"
+    assert recovered["source"]["failure_count"] == 0
+
+
 def call(source, tmp_path, response, **kwargs):
     with httpx.Client(transport=httpx.MockTransport(lambda request: response)) as client:
         return fetch_source(
@@ -136,7 +148,7 @@ def test_timeout_exponential_backoff_and_retry_after(tmp_path):
     assert first["attempt"]["error_type"] == "TIMEOUT"
     assert first["source"]["next_fetch_at"] == "2026-09-18T16:10:00Z"
     assert second["source"]["next_fetch_at"] == "2026-09-18T16:20:00Z"
-    limited = call(second["source"], tmp_path, httpx.Response(429, headers={"retry-after": "7200"}))
+    limited = call(first["source"], tmp_path, httpx.Response(429, headers={"retry-after": "7200"}))
     assert limited["source"]["next_fetch_at"] == "2026-09-18T18:00:00Z"
     assert limited["attempt"]["http_status"] == 429
     dated = call(

@@ -70,6 +70,9 @@ def test_all_active_operations_return_their_real_http_contract(api_sandbox, monk
     probe.call("setSourceEnabled", admin, ident=source["id"], body={"enabled": True})
     probe.call("fetchSource", admin, ident=source["id"])
     probe.call("listSources", admin)
+    probe.call("stopSource", admin, ident=source["id"])
+    probe.call("batchSources", admin, body={"action": "disable", "ids": [source["id"]]})
+    probe.call("deleteInvalidSources", user, status=403)
 
     generation = probe.call("generateBrief", user, body={"preferenceVersion": 1}).json()
     probe.call("getCurrentGeneration", user)

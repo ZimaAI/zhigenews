@@ -37,6 +37,7 @@ from .security import (
     policy,
     public_session,
 )
+from .sources import batch_sources, is_collecting, set_enabled, source_state, stop_collection
 
 ACTIVE = ("queued", "running", "cancelling")
 CN = ZoneInfo("Asia/Shanghai")
@@ -376,7 +377,7 @@ class Application:
         sources = self.db.scalars(select(Resource).where(Resource.kind == "source")).all()
         return dict(
             activeRuns=sum(r.status in ACTIVE for r in runs),
-            failedSources=sum(s.data["status"] == "failed" for s in sources),
+            failedSources=sum(source_state(s)["health"] in ("failed", "invalid") for s in sources),
             failedDeliveries=self.db.scalar(
                 select(func.count()).select_from(Delivery).where(Delivery.status.in_(["failed", "unknown"]))
             ),
@@ -396,7 +397,7 @@ class Application:
         return paginated([self.source_view(r) if kind == "source" else r.data for r in rows], self.params)
 
     def source_view(self, row):
-        data = deepcopy(row.data)
+        data = source_state(row)
         at = data.get("snapshotFetchedAt")
         if at:
             age = max(
@@ -411,12 +412,38 @@ class Application:
             checked = row.private.get("state", {}).get("last_checked_at") or at
             checked_at = datetime.fromisoformat(checked.replace("Z", "+00:00")).replace(tzinfo=None)
             data["stale"] = (
-                data["status"] == "failed" or (utcnow() - checked_at).total_seconds() > data["interval"]
+                data["health"] in ("failed", "invalid")
+                or (utcnow() - checked_at).total_seconds() > data["interval"]
             )
         return data
 
     def listSources(self):
-        return self.listing("source")
+        query = select(Resource).where(Resource.kind == "source")
+        name = self.params.get("q", "").strip()
+        if name:
+            query = query.where(
+                func.lower(Resource.data["name"].as_string()).contains(name.lower(), autoescape=True)
+            )
+        if self.params.get("kind"):
+            query = query.where(Resource.data["kind"].as_string() == self.params["kind"])
+        total = self.db.scalar(select(func.count()).select_from(query.subquery()))
+        total_pages = (total + 9) // 10
+        page = min(int(self.params.get("page", 1)), max(1, total_pages))
+        rows = self.db.scalars(
+            query.order_by(Resource.created_at.desc(), Resource.id.desc()).offset((page - 1) * 10).limit(10)
+        )
+        invalid_total = sum(
+            source_state(r)["health"] == "invalid"
+            for r in self.db.scalars(select(Resource).where(Resource.kind == "source"))
+        )
+        return dict(
+            items=[self.source_view(r) for r in rows],
+            total=total,
+            page=page,
+            pageSize=10,
+            totalPages=total_pages,
+            invalidTotal=invalid_total,
+        )
 
     def listEvalCases(self):
         return self.listing("case")
@@ -449,7 +476,11 @@ class Application:
             **b,
             "id": self.ident or uid("src_"),
             "upstreamInterval": int(upstream),
-            "status": "unverified",
+            "status": "unverified" if not old or old.get("enabled", True) else "disabled",
+            "enabled": old.get("enabled", True) if old else True,
+            "health": "unverified",
+            "failureCount": 0,
+            "collectionStatus": "idle",
             "lastSuccess": "",
             "nextFetch": iso(utcnow()),
             "lastChanged": "",
@@ -470,29 +501,48 @@ class Application:
 
     def saveSource(self):
         row = resource(self.db, self.ident, "source", True)
-        if row.lease_until and row.lease_until > utcnow():
+        if is_collecting(row.id) or row.private.get("delete_pending"):
             raise AppError("SOURCE_BUSY", "来源采集中，请稍后保存", 409)
-        previous = row.data
-        row.data = self.source_data(row.data)
+        previous = source_state(row)
+        row.data = self.source_data(previous)
         if any(row.data[k] != previous.get(k) for k in ("kind", "sourceId", "url")):
             row.private = {}
-        row.due_at = utcnow() + timedelta(seconds=row.data["interval"])
-        return row.data
+        row.due_at = (
+            utcnow() + timedelta(seconds=row.data["interval"])
+            if row.data["enabled"] and row.data["health"] != "invalid"
+            else None
+        )
+        row.data = {**row.data, "nextFetch": iso(row.due_at) or ""}
+        return self.source_view(row)
 
     def setSourceEnabled(self):
         row = resource(self.db, self.ident, "source", True)
-        row.data = {**row.data, "status": "unverified" if self.body["enabled"] else "disabled"}
-        row.due_at = utcnow() if self.body["enabled"] else None
-        return row.data
+        set_enabled(row, self.body["enabled"], utcnow())
+        return self.source_view(row)
 
     def fetchSource(self):
         row = resource(self.db, self.ident, "source", True)
-        if row.data["status"] == "disabled":
+        data = source_state(row)
+        if row.private.get("delete_pending") or data["collectionStatus"] == "stopping":
+            raise AppError("SOURCE_BUSY", "请先等待停止或完成删除清理", 409)
+        if not data["enabled"] and data["health"] != "invalid":
             raise AppError("SOURCE_DISABLED", "请先启用来源", 409)
-        if row.data["status"] != "syncing":
-            row.data = {**row.data, "status": "syncing"}
+        if data["collectionStatus"] not in ("queued", "running", "stopping"):
+            row.data = {**data, "status": "syncing", "collectionStatus": "queued"}
+            row.private = {**row.private, "manual_request": True, "stop_requested": False}
             add_outbox(self.db, "source", row.id)
         return self.source_view(row)
+
+    def stopSource(self):
+        return stop_collection(resource(self.db, self.ident, "source", True))
+
+    def batchSources(self):
+        return batch_sources(self.db, self.body["ids"], self.body["action"])
+
+    def deleteInvalidSources(self):
+        rows = self.db.scalars(select(Resource).where(Resource.kind == "source"))
+        ids = [row.id for row in rows if source_state(row)["health"] == "invalid"]
+        return batch_sources(self.db, ids, "delete", invalid_only=True)
 
     def write_case(self, row=None):
         body = deepcopy(self.body)

@@ -83,11 +83,15 @@ def _source_dir(source: dict, storage: Path) -> Path:
     if source.get("kind") not in {"rss", "newsnow"}:
         raise IngestionError("INVALID_SOURCE_KIND", "Source kind must be rss or newsnow")
     normalized = _normalize_source(source)
-    identity = _hash(_json_bytes({
-        "kind": normalized["kind"],
-        "url": normalized["url"],
-        "source_id": normalized.get("source_id", ""),
-    }))
+    identity = _hash(
+        _json_bytes(
+            {
+                "kind": normalized["kind"],
+                "url": normalized["url"],
+                "source_id": normalized.get("source_id", ""),
+            }
+        )
+    )
     return _path(storage, f"{source['kind']}/{source['id']}/configs/{identity}")
 
 
@@ -164,7 +168,9 @@ def resolve_source_evidence(source: dict, storage: Path, evidence_id: str) -> di
                 continue
             item = json.loads(line)
             if (item.get("id"), item.get("evidence_id"), item.get("source_id")) == (
-                item_id, evidence_id, source["id"]
+                item_id,
+                evidence_id,
+                source["id"],
             ):
                 return item
     return None
@@ -175,7 +181,8 @@ def _maintain_source_index(source: dict, storage: Path, now: datetime, snapshot:
     cutoff = now - timedelta(hours=24)
     prior = read_source_index(source, storage)
     entries = {
-        item["id"]: item for item in (prior or {}).get("items", [])
+        item["id"]: item
+        for item in (prior or {}).get("items", [])
         if (published := _datetime(item.get("published_at"))) is not None and cutoff <= published <= now
     }
     for line, item in enumerate(load_snapshot_items(snapshot, storage), 1):
@@ -183,8 +190,7 @@ def _maintain_source_index(source: dict, storage: Path, now: datetime, snapshot:
         if published is None or not cutoff <= published <= now:
             continue
         entries[item["id"]] = {
-            key: item[key]
-            for key in ("id", "evidence_id", "source_id", "title", "url", "published_at")
+            key: item[key] for key in ("id", "evidence_id", "source_id", "title", "url", "published_at")
         } | {
             "file": _path(storage, snapshot["parsed_path"]).relative_to(root).as_posix(),
             "line": line,
@@ -519,6 +525,8 @@ def fetch_source(
     owned_client = client is None
     client = client or httpx.Client(follow_redirects=True)
     try:
+        if before_publish is not None:
+            before_publish()
         with client.stream(
             "GET", state["url"], headers=headers, timeout=timeout_seconds, follow_redirects=True
         ) as response:
@@ -537,6 +545,8 @@ def fetch_source(
             else:
                 chunks: list[bytes] = []
                 for chunk in response.iter_bytes():
+                    if before_publish is not None:
+                        before_publish()
                     attempt["bytes"] += len(chunk)
                     if attempt["bytes"] > max_response_bytes:
                         raise IngestionError(
@@ -585,6 +595,8 @@ def fetch_source(
         state.update({"status": "healthy", "failure_count": 0, "error": "", "last_checked_at": _iso(now)})
         delay = max(state["effective_interval_seconds"], _cache_delay(response_headers, now))
     except (httpx.HTTPError, IngestionError) as exc:
+        if isinstance(exc, IngestionError) and exc.code == "SOURCE_STOPPED":
+            raise
         failures = int(state.get("failure_count", 0)) + 1
         error_type = (
             exc.code
@@ -598,7 +610,9 @@ def fetch_source(
             else ("Source request timed out" if error_type == "TIMEOUT" else "Source network request failed")
         )
         attempt.update({"error_type": error_type, "error": message})
-        state.update({"status": "failed", "failure_count": failures, "error": message})
+        state.update(
+            {"status": "invalid" if failures >= 3 else "failed", "failure_count": failures, "error": message}
+        )
         base = state["effective_interval_seconds"]
         delay = max(
             base,
@@ -622,7 +636,7 @@ def fetch_source(
     state.update(
         {
             "last_fetched_at": _iso(now),
-            "next_fetch_at": _iso(now + timedelta(seconds=delay)),
+            "next_fetch_at": "" if state["status"] == "invalid" else _iso(now + timedelta(seconds=delay)),
             "snapshot_id": snapshot["snapshot_id"] if snapshot else None,
             "snapshot_fetched_at": snapshot["fetched_at"] if snapshot else None,
             "items": len(items),
@@ -634,7 +648,9 @@ def fetch_source(
     checked = _datetime(state.get("last_checked_at"))
     validity_age = max(0, int((now - checked).total_seconds())) if checked else age
     state["stale"] = (
-        snapshot is None or state["status"] == "failed" or validity_age > state["effective_interval_seconds"]
+        snapshot is None
+        or state["status"] in ("failed", "invalid")
+        or validity_age > state["effective_interval_seconds"]
     )
     attempt.update(
         {

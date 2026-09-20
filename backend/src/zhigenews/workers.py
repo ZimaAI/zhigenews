@@ -23,6 +23,7 @@ from .errors import AppError
 from .ingestion import fetch_source
 from .ingestion.service import SAFE_ID, IngestionError
 from .settings import get_settings
+from .sources import source_state
 
 logger = logging.getLogger(__name__)
 SOURCE_LEASE_SECONDS = 120
@@ -98,13 +99,14 @@ def schedule_due(*, source_ids=None, user_ids=None, now=None, limit=100):
             query = query.where(Resource.id.in_(source_ids))
         query = query.order_by(Resource.due_at, Resource.id).limit(limit).with_for_update(skip_locked=True)
         for row in session.scalars(query):
-            if row.data["status"] == "disabled":
+            data = source_state(row)
+            if not data["enabled"] or data["health"] == "invalid":
                 row.due_at = None
                 continue
             if row.lease_until and row.lease_until > now:
                 continue
             add_outbox(session, "source", row.id)
-            row.data = {**row.data, "status": "syncing"}
+            row.data = {**data, "status": "syncing", "collectionStatus": "queued"}
             # A durable command survives restarts. Requeue after a minute if no
             # consumer takes it; the consumer lease and interval deduplicate it.
             row.due_at = now + timedelta(seconds=60)
@@ -220,7 +222,7 @@ def _source_input(row):
             "source_id": data["sourceId"],
             "url": data["url"],
             "configured_interval_seconds": configured,
-            "enabled": data["status"] != "disabled",
+            "enabled": source_state(row)["enabled"],
         }
     )
     return state
@@ -234,7 +236,9 @@ def migrate_news_indexes():
     lock_dir = storage / "locks"
     lock_dir.mkdir(parents=True, exist_ok=True)
     with transaction() as session:
-        sources = [_source_input(row) for row in session.scalars(select(Resource).where(Resource.kind == "source"))]
+        sources = [
+            _source_input(row) for row in session.scalars(select(Resource).where(Resource.kind == "source"))
+        ]
     migrated = []
     for source in sources:
         if not SAFE_ID.fullmatch(source["id"]):
@@ -255,7 +259,11 @@ def _source_dto(old, state):
         "url": state["url"],
         "interval": state["effective_interval_seconds"],
         "upstreamInterval": state["upstream_interval_seconds"],
-        "status": state["status"],
+        "status": state["status"] if old.get("enabled", old["status"] != "disabled") else "disabled",
+        "enabled": old.get("enabled", old["status"] != "disabled"),
+        "health": state["status"],
+        "failureCount": state.get("failure_count", 0),
+        "collectionStatus": "idle",
         "lastSuccess": state.get("last_success_at", ""),
         "nextFetch": state.get("next_fetch_at", ""),
         "lastChanged": state.get("last_changed_at", ""),
@@ -275,8 +283,10 @@ def _check_source_lease(ident, token):
         row = session.scalar(
             select(Resource).where(Resource.id == ident, Resource.kind == "source").with_for_update()
         )
-        if not row or row.lease_token != token or row.data["status"] == "disabled":
+        if not row or row.lease_token != token:
             raise IngestionError("LEASE_LOST", "Source collection lease no longer belongs to this worker")
+        if row.private.get("stop_requested"):
+            raise IngestionError("SOURCE_STOPPED", "Source collection was stopped by an administrator")
         row.lease_until = utcnow() + timedelta(seconds=SOURCE_LEASE_SECONDS)
 
 
@@ -325,12 +335,22 @@ def collect_source(source_id, *, collector=None):
             )
             if not row:
                 return {"status": "missing"}
-            if row.data["status"] == "disabled":
+            data = source_state(row)
+            if row.private.get("stop_requested") or row.private.get("delete_pending"):
+                return {"status": "stopped"}
+            manual = row.private.get("manual_request", False)
+            if not manual and not data["enabled"]:
                 return {"status": "disabled"}
+            if not manual and data["health"] == "invalid":
+                row.due_at = None
+                return {"status": "invalid"}
             now = utcnow()
             if row.lease_until and row.lease_until > now:
                 return {"status": "busy", "retry_after": max(1, int((row.lease_until - now).total_seconds()))}
             source = _source_input(row)
+            if manual:
+                source["enabled"] = True
+                source["status"] = data["health"]
             last_fetch = _date(source.get("last_fetched_at"))
             interval = max(
                 source.get("effective_interval_seconds", 0),
@@ -341,18 +361,21 @@ def collect_source(source_id, *, collector=None):
             scheduled = _date(source.get("next_fetch_at"))
             if scheduled and earliest:
                 earliest = max(earliest, scheduled)
-            if earliest and earliest > now:
+            if not (manual and data["health"] == "invalid") and earliest and earliest > now:
+                row.private = {**row.private, "manual_request": False}
                 row.due_at = max(earliest, row.due_at or earliest)
                 row.data = {
                     **row.data,
                     "status": source.get("status", "healthy"),
+                    "collectionStatus": "idle",
                     "nextFetch": iso(row.due_at),
                 }
                 return {"status": "deferred", "next_fetch_at": iso(row.due_at)}
             token = uid()
             row.lease_token = token
             row.lease_until = now + timedelta(seconds=SOURCE_LEASE_SECONDS)
-            row.data = {**row.data, "status": "syncing"}
+            row.private = {**row.private, "manual_request": False}
+            row.data = {**data, "status": "syncing", "collectionStatus": "running"}
         with _SourceHeartbeat(source_id, token):
             result = (collector or fetch_source)(
                 source,
@@ -365,11 +388,13 @@ def collect_source(source_id, *, collector=None):
             )
             if not row or row.lease_token != token:
                 return {"status": "superseded"}
-            if row.data["status"] == "disabled":
+            if row.private.get("stop_requested"):
                 row.lease_token = row.lease_until = None
                 row.due_at = None
-                return {"status": "disabled"}
+                return {"status": "stopped"}
             dto = _source_dto(row.data, result["source"])
+            if not dto["enabled"]:
+                dto["nextFetch"] = ""
             validate(schema("Source"), dto, output=True)
             snapshot = result["snapshot"]
             if snapshot and session.get(Resource, snapshot["snapshot_id"]) is None:
@@ -385,25 +410,36 @@ def collect_source(source_id, *, collector=None):
             session.add(Resource(id="fetch_" + attempt["id"], kind="source_fetch", data=attempt))
             row.data = dto
             row.private = {**row.private, "state": result["source"], "last_attempt": attempt}
-            row.due_at = _date(result["source"]["next_fetch_at"])
+            row.due_at = _date(dto["nextFetch"])
             row.lease_until = row.lease_token = None
         return {"status": dto["status"], "source_id": source_id, "snapshot_id": dto["snapshotId"]}
-    except Exception:
+    except Exception as exc:
+        stopped = isinstance(exc, IngestionError) and exc.code == "SOURCE_STOPPED"
         if token:
             with transaction() as session:
                 row = session.scalar(select(Resource).where(Resource.id == source_id).with_for_update())
                 if row and row.lease_token == token:
-                    if row.data["status"] != "disabled":
+                    if row.private.get("stop_requested"):
+                        stopped = True
+                        row.due_at = None
+                    elif source_state(row)["enabled"]:
                         retry_at = utcnow() + timedelta(seconds=row.data["interval"])
                         row.data = {
                             **row.data,
                             "status": "failed",
+                            "health": "failed",
+                            "collectionStatus": "idle",
                             "error": "采集工作进程失败，请查看服务日志",
                             "stale": True,
                             "nextFetch": iso(retry_at),
                         }
                         row.due_at = retry_at
+                    else:
+                        row.data = {**row.data, "status": "disabled", "collectionStatus": "idle"}
+                        row.due_at = None
                     row.lease_until = row.lease_token = None
+        if stopped:
+            return {"status": "stopped"}
         raise
     finally:
         lock.release()
@@ -446,7 +482,9 @@ def _publish_in_app(session, delivery, brief, run):
 
 def publish_delivery(delivery_id):
     with transaction() as session:
-        initial = session.execute(select(Delivery.user_id, Delivery.brief_id).where(Delivery.id == delivery_id)).first()
+        initial = session.execute(
+            select(Delivery.user_id, Delivery.brief_id).where(Delivery.id == delivery_id)
+        ).first()
         if not initial:
             return {"status": "missing"}
         initial_brief = session.execute(select(Brief.run_id).where(Brief.id == initial.brief_id)).first()

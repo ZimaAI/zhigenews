@@ -20,6 +20,8 @@ from zhigenews.db import (
     Run,
     RunEvent,
     SessionToken,
+    SourceDeletionItem,
+    SourceDeletionJob,
     User,
     transaction,
 )
@@ -91,15 +93,18 @@ class ApiSandbox:
             delivery_ids = list(session.scalars(select(Delivery.id).where(Delivery.user_id.in_(self.users))))
             owned_ids = list(session.scalars(select(Resource.id).where(Resource.owner_id.in_(self.users))))
             resource_ids = self.resources | set(owned_ids)
+            deletion_ids = list(session.scalars(select(SourceDeletionItem.job_id).where(SourceDeletionItem.source_id.in_(resource_ids))))
             # Administrative audit records identify the test actor in private metadata.
             for record in session.scalars(select(Resource).where(Resource.kind == "abuse")):
                 if record.data.get("accountId") in self.users or record.private.get("actor") in self.users:
                     resource_ids.add(record.id)
-            target_ids = set(run_ids) | set(brief_ids) | set(delivery_ids) | resource_ids
+            target_ids = set(run_ids) | set(brief_ids) | set(delivery_ids) | resource_ids | set(deletion_ids)
             for record in session.scalars(select(Idempotency)):
                 if record.response.get("id") in target_ids or record.response.get("evaluationId") in target_ids:
                     session.delete(record)
             session.execute(delete(Outbox).where(Outbox.target_id.in_(target_ids)))
+            session.execute(delete(SourceDeletionItem).where(SourceDeletionItem.job_id.in_(deletion_ids)))
+            session.execute(delete(SourceDeletionJob).where(SourceDeletionJob.id.in_(deletion_ids)))
             session.execute(delete(Delivery).where(Delivery.user_id.in_(self.users)))
             session.execute(delete(Brief).where(Brief.user_id.in_(self.users)))
             session.execute(delete(RunEvent).where(RunEvent.run_id.in_(run_ids)))

@@ -108,7 +108,7 @@ def test_thinking_real_agent_preserves_reasoning_and_finishes_with_auto_tools(
     workspace.mkdir()
     rss.mkdir()
     context = RunContext(
-        "u", "r", "t", {}, {}, Budget(max_model_calls=2), FileService(rss, workspace),
+        "u", "r", "t", {}, {}, Budget(max_steps=4), FileService(rss, workspace),
         events.append, lambda: False, {},
     )
     graph = create_agent(

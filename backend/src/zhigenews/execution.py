@@ -50,7 +50,7 @@ def model_from(snapshot, *, max_seconds=60):
 def output_reserve(snapshot):
     # Completion limits include reasoning tokens on compatible reasoning models.
     # Reserve room for both reasoning and the final brief, within the context window.
-    return min(16384, max(256, snapshot["data"]["contextWindow"] // 4))
+    return snapshot["data"]["contextWindow"] // 4
 
 
 def append_event(session, run, event):
@@ -393,7 +393,7 @@ def execute_run(run_id):
             run.status = "cancelled" if isinstance(exc, RunCancelled) or run.cancel_requested else "failed"
             run.error = "" if run.status == "cancelled" else {
                 "TIME_BUDGET": "生成时间已达上限，请缩小订阅范围或联系管理员调整运行预算",
-                "BUDGET_EXHAUSTED": "生成调用次数已达上限，请联系管理员调整运行预算",
+                "BUDGET_EXHAUSTED": "生成执行步数已达上限，请联系管理员调整运行预算",
                 "APITimeoutError": "模型响应超时，请稍后重试或联系管理员检查模型服务与运行时间上限",
                 "OpenAITimeoutError": "模型响应超时，请稍后重试或联系管理员检查模型服务与运行时间上限",
                 "MODEL_OUTPUT_INCOMPLETE": "模型返回的简报不完整，请重试或联系管理员检查模型输出限制",

@@ -65,7 +65,7 @@ def test_all_active_operations_return_their_real_http_contract(api_sandbox, monk
     source = probe.call("createSource", admin, body=source_write).json()
     api_sandbox.resource(source["id"])
     probe.call("getSource", admin, ident=source["id"])
-    probe.call("saveSource", admin, ident=source["id"], body={**source_write, "interval": 1200})
+    probe.call("saveSource", admin, ident=source["id"], body={**source_write, "interval": 1200, "version": source["version"]})
     probe.call("setSourceEnabled", admin, ident=source["id"], body={"enabled": False})
     probe.call("setSourceEnabled", admin, ident=source["id"], body={"enabled": True})
     probe.call("fetchSource", admin, ident=source["id"])
@@ -73,6 +73,7 @@ def test_all_active_operations_return_their_real_http_contract(api_sandbox, monk
     probe.call("stopSource", admin, ident=source["id"])
     probe.call("batchSources", admin, body={"action": "disable", "ids": [source["id"]]})
     probe.call("deleteInvalidSources", user, status=403)
+    probe.call("currentSourceDeletion", admin)
 
     generation = probe.call("generateBrief", user, body={"preferenceVersion": 1}).json()
     probe.call("getCurrentGeneration", user)

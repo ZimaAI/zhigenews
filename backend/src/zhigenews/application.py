@@ -4,7 +4,7 @@ from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import Integer, cast, func, or_, select
 
 from .contract import CONTRACT, schema, validate
 from .db import (
@@ -37,7 +37,14 @@ from .security import (
     policy,
     public_session,
 )
-from .sources import batch_sources, is_collecting, set_enabled, source_state, stop_collection
+from .sources import (
+    batch_sources,
+    is_collecting,
+    require_available,
+    set_enabled,
+    source_state,
+    stop_collection,
+)
 
 ACTIVE = ("queued", "running", "cancelling")
 CN = ZoneInfo("Asia/Shanghai")
@@ -398,6 +405,7 @@ class Application:
 
     def source_view(self, row):
         data = source_state(row)
+        data["version"] = row.data.get("version", 0)
         at = data.get("snapshotFetchedAt")
         if at:
             age = max(
@@ -432,10 +440,15 @@ class Application:
         rows = self.db.scalars(
             query.order_by(Resource.created_at.desc(), Resource.id.desc()).offset((page - 1) * 10).limit(10)
         )
-        invalid_total = sum(
-            source_state(r)["health"] == "invalid"
-            for r in self.db.scalars(select(Resource).where(Resource.kind == "source"))
-        )
+        invalid_total = self.db.scalar(select(func.count()).select_from(Resource).where(
+            Resource.kind == "source",
+            or_(
+                cast(Resource.private["state"]["failure_count"].as_string(), Integer) >= 3,
+                func.coalesce(Resource.data["health"].as_string(),
+                              Resource.private["state"]["status"].as_string(),
+                              Resource.data["status"].as_string()) == "invalid",
+            ),
+        ))
         return dict(
             items=[self.source_view(r) for r in rows],
             total=total,
@@ -459,6 +472,7 @@ class Application:
 
     def source_data(self, old=None):
         b = deepcopy(self.body)
+        b["version"] = (old or {}).get("version", 0) + 1
         from .ingestion import catalog_source
 
         try:
@@ -500,8 +514,13 @@ class Application:
         return data
 
     def saveSource(self):
+        require_available(self.db, self.ident)
         row = resource(self.db, self.ident, "source", True)
-        if is_collecting(row.id) or row.private.get("delete_pending"):
+        if self.body["version"] != row.data.get("version", 0):
+            raise AppError("VERSION_CONFLICT", "来源配置已被其他管理员修改，请核对最新配置后再保存", 409)
+        if row.private.get("delete_pending"):
+            raise AppError("SOURCE_BUSY", "来源采集文件尚未清理完成，请先重试删除", 409)
+        if is_collecting(row.id):
             raise AppError("SOURCE_BUSY", "来源采集中，请稍后保存", 409)
         previous = source_state(row)
         row.data = self.source_data(previous)
@@ -516,11 +535,13 @@ class Application:
         return self.source_view(row)
 
     def setSourceEnabled(self):
+        require_available(self.db, self.ident)
         row = resource(self.db, self.ident, "source", True)
         set_enabled(row, self.body["enabled"], utcnow())
         return self.source_view(row)
 
     def fetchSource(self):
+        require_available(self.db, self.ident)
         row = resource(self.db, self.ident, "source", True)
         data = source_state(row)
         if row.private.get("delete_pending") or data["collectionStatus"] == "stopping":
@@ -534,15 +555,25 @@ class Application:
         return self.source_view(row)
 
     def stopSource(self):
+        require_available(self.db, self.ident)
         return stop_collection(resource(self.db, self.ident, "source", True))
 
     def batchSources(self):
+        if self.body["action"] == "delete":
+            from .source_deletions import create_job
+
+            return create_job(self.db, self.body["ids"])
         return batch_sources(self.db, self.body["ids"], self.body["action"])
 
     def deleteInvalidSources(self):
-        rows = self.db.scalars(select(Resource).where(Resource.kind == "source"))
-        ids = [row.id for row in rows if source_state(row)["health"] == "invalid"]
-        return batch_sources(self.db, ids, "delete", invalid_only=True)
+        from .source_deletions import create_job
+
+        return create_job(self.db)
+
+    def currentSourceDeletion(self):
+        from .source_deletions import current_job
+
+        return {"job": current_job(self.db)}
 
     def write_case(self, row=None):
         body = deepcopy(self.body)

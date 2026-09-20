@@ -98,7 +98,7 @@ def test_mysql_clean_install_repeated_upgrade_and_new_process_persistence():
             assert set(inspect(connection).get_table_names()) == set(Base.metadata.tables) | {
                 "alembic_version"
             }
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0001"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0002"
             differences = compare_metadata(MigrationContext.configure(connection), Base.metadata)
             assert differences == [], differences
             options = connection.execute(

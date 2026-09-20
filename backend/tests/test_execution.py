@@ -78,8 +78,7 @@ def execution_case():
         status="published",
         modelId="synthetic-model",
         summaryModelId="synthetic-model",
-        maxModelCalls=6,
-        maxToolCalls=6,
+        maxSteps=13,
         maxSeconds=60,
         summaryRatio=0.9,
         subagentConcurrency=0,
@@ -354,7 +353,7 @@ def test_tool_error_can_be_handled_by_real_model_tool_loop(execution_case, monke
 def test_tool_loop_budget_failure_never_publishes_a_completed_brief(execution_case, monkeypatch):
     with transaction() as session:
         run = session.get(Run, execution_case.run_id)
-        run.config = {**run.config, "maxModelCalls": 1}
+        run.config = {**run.config, "maxSteps": 1}
     patch_model(
         monkeypatch,
         ScriptedModel(
@@ -405,7 +404,7 @@ def test_model_timeout_with_empty_provider_code_reports_failure(execution_case, 
     assert not snapshot.briefs and not snapshot.deliveries
 
 
-@pytest.mark.parametrize(("context_window", "expected_output"), [(32000, 8000), (131072, 16384)])
+@pytest.mark.parametrize(("context_window", "expected_output"), [(32000, 8000), (131072, 32768), (258000, 64500)])
 def test_model_uses_run_timeout_and_reasoning_output_budget(context_window, expected_output):
     model = execution.model_from({
         "data": {"modelId": "synthetic-model", "endpoint": "https://fixture.invalid/v1", "contextWindow": context_window},

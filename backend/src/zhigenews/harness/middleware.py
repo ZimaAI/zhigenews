@@ -267,7 +267,7 @@ class RuntimeMiddleware(AgentMiddleware):
         budget = request.runtime.context.budget
         if (
             time.time() - budget.started < budget.max_seconds / 2
-            and budget.model_calls + 1 < budget.max_model_calls
+            and budget.steps + 2 < budget.max_steps
         ):
             return request
         prompt = request.system_message.text if request.system_message else ""
@@ -284,7 +284,7 @@ class RuntimeMiddleware(AgentMiddleware):
     def _before(self, request):
         context = request.runtime.context
         window = context.config.get("contextWindow", 258000)
-        reserve = context.config.get("outputReserve", 2048)
+        reserve = context.config.get("outputReserve", window // 4)
         count = request_tokens(request)
         if count + reserve + max(256, count // 10) > window:
             raise HarnessError(
@@ -304,6 +304,7 @@ class RuntimeMiddleware(AgentMiddleware):
             durationMs=round((time.monotonic() - started) * 1000),
             budget=context.budget.snapshot(),
         )
+        context.budget.check_steps()
         return response
 
     def _thinking_output(self, request, response):
@@ -376,10 +377,13 @@ class RuntimeMiddleware(AgentMiddleware):
                 resultSummary=str(getattr(response, "content", "state update"))[:2000],
                 durationMs=round((time.monotonic() - started) * 1000),
             )
+            context.budget.check_steps()
             return response
         except RunCancelled:
             raise
         except Exception as exc:
+            if isinstance(exc, HarnessError) and exc.code in ("BUDGET_EXHAUSTED", "TIME_BUDGET"):
+                raise
             code = exc.code if isinstance(exc, HarnessError) else "TOOL_FAILED"
             context.emit(
                 "tool_failed",
@@ -416,10 +420,13 @@ class RuntimeMiddleware(AgentMiddleware):
                 resultSummary=str(getattr(response, "content", "state update"))[:2000],
                 durationMs=round((time.monotonic() - started) * 1000),
             )
+            context.budget.check_steps()
             return response
         except RunCancelled:
             raise
         except Exception as exc:
+            if isinstance(exc, HarnessError) and exc.code in ("BUDGET_EXHAUSTED", "TIME_BUDGET"):
+                raise
             code = exc.code if isinstance(exc, HarnessError) else "TOOL_FAILED"
             context.emit("tool_failed", toolCallId=call["id"], code=code)
             return ToolMessage(

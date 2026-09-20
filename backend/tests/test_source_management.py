@@ -16,6 +16,23 @@ pytestmark = pytest.mark.mysql
 BASE = "/api/v1/admin/sources"
 
 
+def complete_deletion(admin, ids=None):
+    """Accept the asynchronous command, then exercise the real worker boundary."""
+    from zhigenews.source_deletions import execute_job
+
+    response = admin.delete(BASE + "/invalid") if ids is None else admin.post(
+        BASE + "/batch", json={"action": "delete", "ids": ids}
+    )
+    assert response.status_code == (202 if ids is None else 200), response.text
+    job = response.json()
+    assert job["status"] == "queued"
+    execute_job(job["id"])
+    result = admin.get("/api/v1/admin/source-deletions/current").json()["job"]
+    assert result["id"] == job["id"] and result["status"] == "completed"
+    return {"succeeded": [item["id"] for item in result["items"] if item["status"] == "deleted"],
+            "failed": [item for item in result["items"] if item["status"] in ("skipped", "failed")]}
+
+
 @pytest.fixture(autouse=True)
 def cleanup_collection_records(api_sandbox):
     yield
@@ -140,7 +157,7 @@ def test_stop_must_finish_before_batch_delete_and_queued_work_cannot_recreate(
             stopped = admin.post(BASE + "/" + source["id"] + "/stop")
             assert stopped.status_code == 200, stopped.text
             assert stopped.json()["collectionStatus"] == "stopping"
-            denied = admin.post(BASE + "/batch", json={"action": "delete", "ids": [source["id"]]}).json()
+            denied = complete_deletion(admin, [source["id"]])
             assert denied["succeeded"] == []
             assert denied["failed"][0]["code"] == "SOURCE_BUSY"
         finally:
@@ -149,9 +166,7 @@ def test_stop_must_finish_before_batch_delete_and_queued_work_cannot_recreate(
     state = admin.get(BASE + "/" + source["id"]).json()
     assert state["collectionStatus"] == "stopped" and state["enabled"] is False
     assert state["failureCount"] == 0
-    assert admin.post(BASE + "/batch", json={"action": "delete", "ids": [source["id"]]}).json()[
-        "succeeded"
-    ] == [source["id"]]
+    assert complete_deletion(admin, [source["id"]])["succeeded"] == [source["id"]]
     assert admin.get(BASE + "/" + source["id"]).status_code == 404
     assert workers.collect_source(source["id"], collector=collector)["status"] == "missing"
     assert not (tmp_path / "rss" / source["id"]).exists()
@@ -194,10 +209,9 @@ def test_global_invalid_delete_includes_disabled_and_cleans_history(api_sandbox,
             row.private = {**row.private, "state": {**row.private.get("state", {}), "failure_count": 3}}
     listing = admin.get(BASE, params={"q": healthy["name"]}).json()
     assert listing["total"] == 1 and listing["invalidTotal"] == 2
-    response = admin.delete(BASE + "/invalid")
-    assert response.status_code == 200, response.text
-    assert set(response.json()["succeeded"]) == {bad["id"], disabled["id"]}
-    assert response.json()["failed"] == []
+    result = complete_deletion(admin)
+    assert set(result["succeeded"]) == {bad["id"], disabled["id"]}
+    assert result["failed"] == []
     assert admin.get(BASE + "/" + healthy["id"]).status_code == 200
     assert admin.get(BASE + "/" + bad["id"]).status_code == 404
     assert not (tmp_path / "rss" / bad["id"]).exists()
@@ -230,11 +244,9 @@ def test_batch_disable_and_cleanup_failure_can_be_retried(api_sandbox, tmp_path,
             raise PermissionError("Synthetic filesystem refusal")
 
         patch.setattr(shutil, "rmtree", denied)
-        result = admin.post(BASE + "/batch", json={"action": "delete", "ids": ids}).json()
+        result = complete_deletion(admin, ids)
         assert result["succeeded"] == [ids[1]]
         assert result["failed"][0]["code"] == "CLEANUP_FAILED"
     assert admin.get(BASE + "/" + ids[0]).json()["enabled"] is False
-    assert admin.post(BASE + "/batch", json={"action": "delete", "ids": [ids[0]]}).json()["succeeded"] == [
-        ids[0]
-    ]
+    assert complete_deletion(admin, [ids[0]])["succeeded"] == [ids[0]]
     assert not directory.exists()

@@ -4,9 +4,9 @@ from .errors import AppError
 from .security import canonical, digest, encrypt
 from .settings import Settings, get_settings
 
-MAX_MODEL_CALLS = 20
-MAX_TOOL_CALLS = 40
-MAX_SECONDS = 180
+MAX_STEPS = 1000
+MAX_SECONDS = 600
+MAX_SEARCH_CALLS = 20
 SUMMARY_RATIO = 0.9
 SUBAGENT_CONCURRENCY = 2
 TOOLS = (
@@ -31,8 +31,8 @@ def agent_config() -> dict:
         name="每日新闻",
         modelId="file-main",
         summaryModelId="file-summary",
-        maxModelCalls=MAX_MODEL_CALLS,
-        maxToolCalls=MAX_TOOL_CALLS,
+        maxSteps=MAX_STEPS,
+        maxSearchCalls=MAX_SEARCH_CALLS,
         maxSeconds=MAX_SECONDS,
         summaryRatio=SUMMARY_RATIO,
         subagentConcurrency=SUBAGENT_CONCURRENCY,

@@ -100,7 +100,7 @@ def harness_request(tmp_path):
         run_id="synthetic-run",
         thread_id="synthetic-thread",
         preferences={"topics": ["AI"]},
-        config={"tools": ["read_file"], "maxModelCalls": 3},
+        config={"tools": ["read_file"], "maxSteps": 4},
         rss_root=tmp_path / "rss",
         workspace_root=workspace,
         model=model,
@@ -171,7 +171,7 @@ def test_export_failure_does_not_fail_generation(tmp_path, recording_tracing):
 def test_subagent_remains_in_parent_trace(tmp_path, recording_tracing):
     session = recording_tracing()
     request = harness_request(tmp_path)
-    request.config.update(tools=["read_file", "delegate_research"], maxModelCalls=6)
+    request.config.update(tools=["read_file", "delegate_research"], maxSteps=7)
     request.model.responses = [
         ai_call("delegate_research", {"task": "Check the supplied fixture"}, "delegate"),
         *request.model.responses,

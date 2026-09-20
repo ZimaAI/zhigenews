@@ -101,7 +101,6 @@ def _evidence_id(item: dict) -> str:
 def validate_items(
     output: BriefOutput,
     evidence: dict,
-    preferences: dict,
     *,
     fixed_at: datetime | None = None,
     window_hours: int = 24,
@@ -121,15 +120,6 @@ def validate_items(
         canonical = url.split("#")[0].rstrip("/")
         if canonical in seen:
             continue
-        haystack = (
-            str(source.get("title", "")) + " " + str(source.get("summary", "")) + " " + selected.summary
-        ).casefold()
-        if preferences.get("topics") or preferences.get("keywords"):
-            related = selected.topic in preferences.get("topics", []) or any(
-                str(k).casefold() in haystack for k in preferences.get("keywords", [])
-            )
-            if not related:
-                raise HarnessError("PREFERENCE_MISMATCH", "条目没有对应所选话题或关键词。")
         published = source.get("published_at", source.get("publishedAt"))
         if not isinstance(published, str):
             continue
@@ -225,9 +215,8 @@ class HarnessRunner:
             shared_context.budget
             if shared_context
             else Budget(
-                max_model_calls=config.get("maxModelCalls", 20),
-                max_tool_calls=config.get("maxToolCalls", 40),
-                max_seconds=config.get("maxSeconds", 180),
+                max_steps=config.get("maxSteps", 1000),
+                max_seconds=config.get("maxSeconds", 600),
             )
         )
         budget_path = files.metadata / "budget.json"
@@ -248,6 +237,7 @@ class HarnessRunner:
                 temporary.replace(budget_path)
 
             budget.persist = persist
+        budget.check(cancelled)
         if shared_context:
             evidence = shared_context.evidence
         context = RunContext(
@@ -277,7 +267,7 @@ class HarnessRunner:
 
         search = shared_search or TavilySearch(
             request.tavily_api_key,
-            max_calls=config.get("maxSearchCalls", 5),
+            max_calls=config.get("maxSearchCalls", 20),
             evidence=evidence,
             persist=persist_search,
         )
@@ -455,7 +445,7 @@ class HarnessRunner:
                 ratio=config.get("summaryRatio", 0.9),
                 context_window=context_window,
                 summary_window=config.get("summaryContextWindow", context_window),
-                output_reserve=config.get("summaryOutputReserve", 2048),
+                output_reserve=config.get("summaryOutputReserve", config.get("summaryContextWindow", context_window) // 4),
                 fixed_overhead=token_count(
                     {
                         "system": prompt,
@@ -463,7 +453,7 @@ class HarnessRunner:
                         "outputSchema": BriefOutput.model_json_schema(),
                     }
                 )
-                + config.get("outputReserve", 2048),
+                + config.get("outputReserve", context_window // 4),
             ),
             SummaryContextMiddleware(),
             RuntimeMiddleware(),
@@ -482,7 +472,7 @@ class HarnessRunner:
         thread_key = request.user_id + ":" + request.thread_id
         invoke_config = {
             "configurable": {"thread_id": thread_key},
-            "recursion_limit": max(30, config.get("maxModelCalls", 20) * 8),
+            "recursion_limit": max(30, config.get("maxSteps", 1000) * 8),
             "run_name": "zhigenews.subagent" if context.depth else "zhigenews.agent",
             "metadata": {
                 "run_id": request.run_id,
@@ -541,7 +531,6 @@ class HarnessRunner:
         items = validate_items(
             output,
             evidence,
-            request.preferences,
             fixed_at=fixed_at,
             window_hours=24,
             resolve_evidence=request.resolve_evidence,

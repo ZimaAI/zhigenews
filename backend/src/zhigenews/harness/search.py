@@ -19,7 +19,7 @@ class TavilySearch:
         self,
         api_key: str | None,
         *,
-        max_calls: int = 5,
+        max_calls: int = 20,
         timeout: float = 15,
         client: httpx.Client | None = None,
         evidence: dict | None = None,

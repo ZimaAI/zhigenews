@@ -48,6 +48,10 @@
 .source-jump { display: inline-flex; align-items: center; gap: var(--space-2); }
 .source-jump input { width: 5rem; }
 .source-table .button { min-height: var(--touch-target); }
+.source-progress { width: 100%; height: var(--space-3); accent-color: var(--color-primary); margin-bottom: var(--space-3); }
+.source-progress-items { max-height: 20rem; overflow-y: auto; }
+.source-progress-items small { display: block; margin-top: var(--space-1); }
+.source-result summary { cursor: pointer; min-height: var(--touch-target); padding-block: var(--space-2); }
 @media (max-width: 767px) {
   .app-shell--admin .app-body { padding-bottom: 0; }
   .app-shell--admin .toast { bottom: 16px; }

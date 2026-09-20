@@ -133,3 +133,6 @@ Get-Content backend/scripts/verify_runtime.py -Raw | docker compose exec -T work
 全套测试前先停止beat/worker，避免调度消费测试outbox，完成后再启动。迁移测试还需设置`MIGRATION_ADMIN_DATABASE_URL`指向本地MySQL管理员连接；仅创建/清理随机命名的`zg_migration_test_*`临时库。`verify_runtime.py`验证容器HTTP、队列与嵌套沙箱，并清理自己的synthetic reader；它不验证外部模型。
 
 详细规范见 [基线索引](docs/releases/v1.0.0/baselines/b003/snapshot/spec/00-index.md)，运行事件仅记录可展示结果、耗时和脱敏工具摘要，不采集模型私有思维链。
+
+
+Agent 执行预算由 `backend/src/zhigenews/runtime_config.py` 管理：默认最多 1000 个执行步骤，模型调用和工具调用各计一步（含摘要模型和子 Agent），达到上限即终止任务并报告 `BUDGET_EXHAUSTED`。运行时间默认 600 秒，联网搜索默认最多 20 次；断点恢复继承已使用预算。模型单次输出 Token 上限为对应模型上下文窗口的四分之一，默认窗口 258,000 时为 64,500。执行图内部节点不作为业务步骤计数，其递归保护上限随执行预算调整。

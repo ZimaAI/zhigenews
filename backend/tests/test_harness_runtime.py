@@ -368,7 +368,7 @@ def test_create_agent_repeated_tool_loop_and_budget(tmp_path):
         "r",
         "t",
         {"topics": ["AI"]},
-        {"maxModelCalls": 5, "maxToolCalls": 5, "tools": ["list_dir", "read_file"]},
+        {"maxSteps": 11, "tools": ["list_dir", "read_file"]},
         tmp_path / "rss",
         workspace,
         model,
@@ -392,7 +392,7 @@ def test_create_agent_repeated_tool_loop_and_budget(tmp_path):
     assert (workspace / "output" / "brief.json").exists()
     assert len([event for event in events if event["type"] == "tool_completed"]) == 2
     req.model = ScriptedModel(responses=[ai_call("list_dir", {}, "repeat")])
-    req.config["maxModelCalls"] = 1
+    req.config["maxSteps"] = 1
     with pytest.raises(HarnessError) as exc:
         HarnessRunner(checkpointer=InMemorySaver()).run(req)
     assert exc.value.code == "BUDGET_EXHAUSTED"
@@ -506,7 +506,7 @@ def test_create_agent_reserves_final_call_without_research_tools(tmp_path, monke
     ])
     request = HarnessRequest(
         "u", "r", "t", {"topics": ["AI"]},
-        {"tools": ["list_dir"], "maxSeconds": 100, "maxModelCalls": 2 if trigger == "calls" else 3,
+        {"tools": ["list_dir"], "maxSeconds": 100, "maxSteps": 4 if trigger == "calls" else 6,
          "systemPrompt": "Preserve these original instructions."},
         tmp_path / "rss", tmp_path / "run", model,
     )
@@ -533,7 +533,7 @@ def test_async_runtime_reserves_completion_on_final_model_call():
     from zhigenews.harness.middleware import RuntimeMiddleware
 
     context = SimpleNamespace(
-        budget=Budget(max_model_calls=1), config={}, cancelled=lambda: False,
+        budget=Budget(max_steps=2), config={}, cancelled=lambda: False,
         emit=lambda *args, **kwargs: None,
     )
     request = ModelRequest(
@@ -553,7 +553,7 @@ def test_async_runtime_reserves_completion_on_final_model_call():
 
 
 def test_shared_budget_and_cancel():
-    budget = Budget(max_model_calls=2)
+    budget = Budget(max_steps=2)
     budget.reserve("model", lambda: False)
     budget.reserve("model", lambda: False)
     with pytest.raises(HarnessError):
@@ -577,7 +577,7 @@ def test_create_agent_mysql_cancel_resume_without_repeating_completed_model(tmp_
         thread,
         thread,
         {"topics": ["AI"]},
-        {"maxModelCalls": 5, "maxToolCalls": 5, "tools": ["list_dir"]},
+        {"maxSteps": 11, "tools": ["list_dir"]},
         tmp_path / "rss",
         tmp_path / "run",
         first,
@@ -621,7 +621,7 @@ def test_subagent_real_loop_shares_total_budget_and_thread(tmp_path):
         "parent",
         "parent",
         {"topics": ["AI"]},
-        {"tools": ["delegate_research"], "maxModelCalls": 4, "subagentConcurrency": 1},
+        {"tools": ["delegate_research"], "maxSteps": 5, "subagentConcurrency": 1},
         tmp_path / "rss",
         tmp_path / "run",
         model,
@@ -665,7 +665,7 @@ def test_interrupted_child_resumes_its_pending_write(tmp_path):
         "recover",
         "recover",
         {"topics": ["AI"]},
-        {"tools": ["delegate_research", "write_file"], "maxModelCalls": 8, "maxToolCalls": 8},
+        {"tools": ["delegate_research", "write_file"], "maxSteps": 17},
         tmp_path / "rss",
         tmp_path / "run",
         model,
@@ -714,6 +714,54 @@ def test_stale_duplicate_cannot_hide_fresh_evidence():
         ],
     )
     items = validate_items(
-        output, evidence, {"topics": ["AI"]}, fixed_at=datetime(2026, 9, 19, tzinfo=timezone.utc)
+        output, evidence, fixed_at=datetime(2026, 9, 19, tzinfo=timezone.utc)
     )
     assert [item["id"] for item in items] == ["fresh"]
+
+
+@pytest.mark.parametrize("last_kind", ["model", "tool"])
+def test_default_step_budget_counts_both_kinds_and_stops_at_1000(last_kind):
+    budget = Budget()
+    for index in range(999):
+        budget.reserve("model" if index % 2 else "tool", lambda: False)
+    budget.reserve(last_kind, lambda: False)
+    assert budget.snapshot()["steps"] == 1000
+    for kind in ("model", "tool"):
+        with pytest.raises(HarnessError) as exc:
+            budget.reserve(kind, lambda: False)
+        assert exc.value.code == "BUDGET_EXHAUSTED"
+    with pytest.raises(HarnessError):
+        budget.check(lambda: False)
+    assert budget.steps == 1000
+
+
+@pytest.mark.parametrize("max_steps", [1, 2, 3])
+def test_agent_stops_at_step_limit_without_publishing(tmp_path, max_steps):
+    model = ScriptedModel(responses=[
+        ai_call("list_dir", {"path": "/workspace"}, "read"),
+        ai_call("BriefOutput", {"title": "Synthetic", "items": []}, "done"),
+    ])
+    request = HarnessRequest(
+        "u", "r", "t", {}, {"maxSteps": max_steps, "tools": ["list_dir"]},
+        tmp_path / "rss", tmp_path / "run", model,
+    )
+    events = []
+    with pytest.raises(HarnessError) as exc:
+        HarnessRunner(checkpointer=InMemorySaver()).run(request, events.append)
+    assert exc.value.code == "BUDGET_EXHAUSTED"
+    persisted = json.loads((tmp_path / ".run.harness" / "budget.json").read_text())
+    assert persisted["steps"] == max_steps
+    assert not any(event["type"] == "harness_completed" for event in events)
+
+
+def test_resume_restores_combined_step_budget(tmp_path):
+    metadata = tmp_path / ".run.harness"
+    metadata.mkdir()
+    # Existing snapshots only stored the separate counters.
+    (metadata / "budget.json").write_text(json.dumps({"modelCalls": 600, "toolCalls": 400}))
+    model = ScriptedModel(responses=[])
+    request = HarnessRequest("u", "r", "t", {}, {}, tmp_path / "rss", tmp_path / "run", model)
+    with pytest.raises(HarnessError) as exc:
+        HarnessRunner(checkpointer=InMemorySaver()).run(request, resume=True)
+    assert exc.value.code == "BUDGET_EXHAUSTED"
+    assert model.position == 0

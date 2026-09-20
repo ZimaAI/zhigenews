@@ -17,6 +17,7 @@ from sqlalchemy import (
     UniqueConstraint,
     create_engine,
 )
+from sqlalchemy.dialects.mysql import DATETIME
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from .settings import get_settings
@@ -156,6 +157,30 @@ class Outbox(Base):
     target_id: Mapped[str] = mapped_column(String(64))
     sent_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class SourceDeletionJob(Base):
+    __tablename__ = "source_deletion_jobs"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    # NULL on terminal jobs; MySQL permits multiple NULLs in a unique constraint.
+    active_slot: Mapped[str | None] = mapped_column(String(16), unique=True)
+    mode: Mapped[str] = mapped_column(String(16))
+    status: Mapped[str] = mapped_column(String(16), default="queued")
+    created_at: Mapped[datetime] = mapped_column(DateTime().with_variant(DATETIME(fsp=6), "mysql"), default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    dispatched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    error: Mapped[str] = mapped_column(Text, default="")
+
+
+class SourceDeletionItem(Base):
+    __tablename__ = "source_deletion_items"
+    job_id: Mapped[str] = mapped_column(ForeignKey("source_deletion_jobs.id"), primary_key=True)
+    source_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    code: Mapped[str] = mapped_column(String(64), default="")
+    message: Mapped[str] = mapped_column(Text, default="")
+    __table_args__ = (Index("ix_source_deletion_item_source", "source_id", "status"),)
 
 
 class Brief(Base):

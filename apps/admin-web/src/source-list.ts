@@ -10,17 +10,27 @@ export function useSourceList() {
   const selectedIds = ref(new Set<string>());
   const page = ref(1), total = ref(0), totalPages = ref(0), invalidTotal = ref(0);
   const loading = ref(false), loaded = ref(false), error = ref('');
+  const refreshing = ref(false);
   const appliedName = ref(''), appliedKind = ref('all');
   let revision = 0;
   let controller: AbortController | undefined;
+  const removedIds = new Set<string>();
   const filtered = computed(() => !!appliedName.value || appliedKind.value !== 'all');
   const allSelected = computed(() => items.value.length > 0 && items.value.every(item => selectedIds.value.has(item.id)));
 
-  async function load(targetPage = page.value) {
+  function invalidate() {
+    revision++;
+    controller?.abort();
+    loading.value = refreshing.value = false;
+  }
+
+  async function load(targetPage = page.value, background = false) {
+    if (background && (loading.value || refreshing.value)) return;
     const current = ++revision;
     controller?.abort();
     controller = new AbortController();
-    loading.value = true;
+    loading.value = !background || !loaded.value;
+    refreshing.value = background && loaded.value;
     error.value = '';
     try {
       const result = await request<SourcePage>('listSources', {
@@ -28,7 +38,7 @@ export function useSourceList() {
         signal: controller.signal,
       });
       if (current !== revision) return;
-      items.value = result.items;
+      items.value = result.items.filter(item => !removedIds.has(item.id));
       page.value = result.page;
       total.value = result.total;
       totalPages.value = result.totalPages;
@@ -37,7 +47,7 @@ export function useSourceList() {
     } catch (err) {
       if (current === revision && !controller.signal.aborted) error.value = errorText(err);
     } finally {
-      if (current === revision) loading.value = false;
+      if (current === revision) loading.value = refreshing.value = false;
     }
   }
 
@@ -71,7 +81,13 @@ export function useSourceList() {
   function replace(source: Source) {
     items.value = items.value.map(item => item.id === source.id ? source : item);
   }
-  onBeforeUnmount(() => { revision++; controller?.abort(); });
+  function remove(ids: string[]) {
+    ids.forEach(id => removedIds.add(id));
+    items.value = items.value.filter(item => !removedIds.has(item.id));
+    forget(ids);
+  }
+  const refresh = () => load(page.value, true);
+  onBeforeUnmount(invalidate);
   return { items, search, kind, selectedIds, page, total, totalPages, invalidTotal,
-    loading, loaded, error, filtered, allSelected, load, applyFilters, toggle, togglePage, forget, replace };
+    loading, refreshing, loaded, error, filtered, allSelected, load, refresh, invalidate, applyFilters, toggle, togglePage, forget, replace, remove };
 }

@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from filelock import FileLock, Timeout
 from sqlalchemy import delete, select
 
-from .db import Outbox, Resource, iso, utcnow
+from .db import Outbox, Resource, SourceDeletionItem, SourceDeletionJob, iso, utcnow
 from .errors import AppError
 from .ingestion.service import SAFE_ID
 from .settings import get_settings
@@ -85,12 +85,33 @@ def stop_collection(row):
     return source_state(row)
 
 
-def batch_sources(session, ids, action, *, invalid_only=False):
+def pending_deletion(session, ident):
+    return (
+        session.scalar(
+            select(SourceDeletionItem.source_id)
+            .join(SourceDeletionJob)
+            .where(
+                SourceDeletionItem.source_id == ident,
+                SourceDeletionItem.status.in_(("pending", "running")),
+                SourceDeletionJob.active_slot == "sources",
+            )
+            .limit(1)
+        )
+        is not None
+    )
+
+
+def require_available(session, ident):
+    if pending_deletion(session, ident):
+        raise AppError("SOURCE_BUSY", "来源正在等待或执行删除，请查看删除进度", 409)
+
+
+def batch_sources(session, ids, action, *, invalid_only=False, lock_held=False):
     succeeded, failed = [], []
     for ident in sorted(set(ids)):
         try:
             # Never wait for a collector while holding a source database row.
-            with source_lock(ident) if action == "delete" else nullcontext():
+            with source_lock(ident) if action == "delete" and not lock_held else nullcontext():
                 row = session.scalar(
                     select(Resource)
                     .where(Resource.kind == "source", Resource.id == ident)
@@ -103,6 +124,7 @@ def batch_sources(session, ids, action, *, invalid_only=False):
                 if invalid_only and data["health"] != "invalid":
                     raise AppError("SOURCE_RECOVERED", "来源已恢复，不再属于失效来源", 409)
                 if action == "disable":
+                    require_available(session, ident)
                     set_enabled(row, False, utcnow())
                 else:
                     # Holding the shared file lock proves no collector can still write.

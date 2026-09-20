@@ -24,9 +24,8 @@ class NewsAgentState(AgentState):
 
 @dataclass
 class Budget:
-    max_model_calls: int = 20
-    max_tool_calls: int = 40
-    max_seconds: int = 180
+    max_steps: int = 1000
+    max_seconds: int = 600
     model_calls: int = 0
     tool_calls: int = 0
     input_tokens: int | None = None
@@ -36,18 +35,26 @@ class Budget:
     lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
     persist: Callable[[dict], None] = field(default=lambda state: None, repr=False)
 
+    @property
+    def steps(self) -> int:
+        return self.model_calls + self.tool_calls
+
     def check(self, cancelled: Callable[[], bool]) -> None:
         if cancelled():
             raise RunCancelled()
         if time.time() - self.started > self.max_seconds:
             raise HarnessError("TIME_BUDGET", "运行时间预算已耗尽。")
 
+        self.check_steps()
+
+    def check_steps(self) -> None:
+        if self.steps >= self.max_steps:
+            raise HarnessError("BUDGET_EXHAUSTED", "执行步数预算已耗尽。")
+
     def reserve(self, kind: str, cancelled: Callable[[], bool]) -> None:
         with self.lock:
             self.check(cancelled)
             field_name = kind + "_calls"
-            if getattr(self, field_name) >= getattr(self, "max_" + field_name):
-                raise HarnessError("BUDGET_EXHAUSTED", "模型或工具调用预算已耗尽。")
             setattr(self, field_name, getattr(self, field_name) + 1)
             self.persist(self.snapshot())
 
@@ -62,6 +69,8 @@ class Budget:
 
     def snapshot(self) -> dict:
         return {
+            "steps": self.steps,
+            "maxSteps": self.max_steps,
             "modelCalls": self.model_calls,
             "toolCalls": self.tool_calls,
             "inputTokens": self.input_tokens if self.usage_complete else None,

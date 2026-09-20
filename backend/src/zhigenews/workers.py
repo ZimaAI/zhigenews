@@ -23,11 +23,11 @@ from .errors import AppError
 from .ingestion import fetch_source
 from .ingestion.service import SAFE_ID, IngestionError
 from .settings import get_settings
-from .sources import source_state
+from .sources import pending_deletion, source_state
 
 logger = logging.getLogger(__name__)
 SOURCE_LEASE_SECONDS = 120
-TASK_NAMES = {kind: "zhigenews." + kind for kind in ("source", "run", "evaluation", "delivery")}
+TASK_NAMES = {kind: "zhigenews." + kind for kind in ("source", "run", "evaluation", "delivery", "source_deletion")}
 
 celery_app = Celery("zhigenews", broker=get_settings().redis_url, backend=get_settings().redis_url)
 celery_app.conf.update(
@@ -336,7 +336,7 @@ def collect_source(source_id, *, collector=None):
             if not row:
                 return {"status": "missing"}
             data = source_state(row)
-            if row.private.get("stop_requested") or row.private.get("delete_pending"):
+            if row.private.get("stop_requested") or row.private.get("delete_pending") or pending_deletion(session, source_id):
                 return {"status": "stopped"}
             manual = row.private.get("manual_request", False)
             if not manual and not data["enabled"]:
@@ -528,6 +528,9 @@ def publish_delivery(delivery_id):
 
 @celery_app.task(name="zhigenews.tick")
 def tick():
+    from .source_deletions import recover_jobs
+
+    recover_jobs()
     scheduled = schedule_due()
     recovered = recover_runs()
     return {"scheduled": scheduled, "recovered": recovered, "outbox": dispatch_outbox()}
@@ -580,3 +583,10 @@ def evaluation_task(self, evaluation_id):
 )
 def delivery_task(delivery_id):
     return publish_delivery(delivery_id)
+
+
+@celery_app.task(name="zhigenews.source_deletion")
+def source_deletion_task(job_id):
+    from .source_deletions import execute_job
+
+    return execute_job(job_id)

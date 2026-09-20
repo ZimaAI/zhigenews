@@ -168,3 +168,14 @@ def test_initialization_does_not_create_model_or_agent_resources(monkeypatch, mo
     assert added
     assert {record.kind for record in added} == {"source"}
     assert "No administrator verification or configuration publishing is required" in capsys.readouterr().out
+
+
+def test_agent_execution_budget_defaults():
+    from zhigenews.harness.runtime import Budget
+    from zhigenews.harness.search import TavilySearch
+
+    config = runtime_config.agent_config()
+    assert config["maxSteps"] == Budget().max_steps == 1000
+    assert config["maxSeconds"] == Budget().max_seconds == 600
+    assert config["maxSearchCalls"] == TavilySearch(None).max_calls == 20
+    assert "maxModelCalls" not in config and "maxToolCalls" not in config

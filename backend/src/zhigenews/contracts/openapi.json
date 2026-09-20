@@ -806,7 +806,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SourceWrite"
+                "$ref": "#/components/schemas/SourceUpdate"
               }
             }
           }
@@ -2546,7 +2546,7 @@
         "tags": [
           "Admin"
         ],
-        "summary": "batchSources",
+        "summary": "批量停用，或提交所选来源后台删除任务",
         "x-required-role": "admin",
         "responses": {
           "200": {
@@ -2554,7 +2554,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SourceBatchResult"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SourceBatchResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SourceDeletionJob"
+                    }
+                  ]
                 }
               }
             }
@@ -2595,7 +2602,20 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "同身份、同路由和相同请求体的重放返回原任务；同 key 不同请求体返回 409。"
+          }
+        ]
       }
     },
     "/admin/sources/invalid": {
@@ -2604,15 +2624,77 @@
         "tags": [
           "Admin"
         ],
-        "summary": "deleteInvalidSources",
+        "summary": "提交全部失效来源后台删除任务",
         "x-required-role": "admin",
+        "responses": {
+          "202": {
+            "description": "已接受后台删除任务",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceDeletionJob"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "同身份、同路由和相同请求体的重放返回原任务；同 key 不同请求体返回 409。"
+          }
+        ]
+      }
+    },
+    "/admin/source-deletions/current": {
+      "get": {
+        "operationId": "currentSourceDeletion",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "获取全局活动或最近完成的来源删除任务",
+        "x-required-role": "admin",
+        "parameters": [],
         "responses": {
           "200": {
             "description": "成功",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SourceBatchResult"
+                  "$ref": "#/components/schemas/CurrentSourceDeletion"
                 }
               }
             }
@@ -3245,6 +3327,11 @@
               "stopping",
               "stopped"
             ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "可编辑配置版本，采集状态变化不递增。"
           }
         }
       },
@@ -4553,6 +4640,176 @@
                 }
               }
             }
+          }
+        }
+      },
+      "SourceUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "kind",
+          "sourceId",
+          "url",
+          "interval",
+          "version"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "rss",
+              "newsnow"
+            ]
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "interval": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "有效轮询周期，单位秒。"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "SourceDeletionItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "status",
+          "code",
+          "message"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "running",
+              "deleted",
+              "skipped",
+              "failed",
+              "unprocessed"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SourceDeletionJob": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "mode",
+          "status",
+          "total",
+          "processed",
+          "deleted",
+          "skipped",
+          "failed",
+          "items",
+          "error",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "selected",
+              "invalid"
+            ]
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "processed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "deleted": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "skipped": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceDeletionItem"
+            }
+          },
+          "error": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CurrentSourceDeletion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "job"
+        ],
+        "properties": {
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceDeletionJob"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       }

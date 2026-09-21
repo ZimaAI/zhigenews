@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import BrandLogo from '@ui/BrandLogo.vue';
+import IcpLink from './IcpLink.vue';
 import { History, Newspaper } from 'lucide-vue-next';
 import { sessionState } from '../state';
 const route = useRoute();
@@ -19,6 +20,7 @@ const active = (path: string) => route.path === path || route.path.startsWith(`$
     <div class="reader-canvas">
       <nav v-if="sessionState.session?.onboardingCompleted" class="reader-nav" aria-label="主要导航"><RouterLink v-for="item in navigation" :key="item.path" :to="item.path" :class="{ selected: active(item.path) }" :aria-current="active(item.path) ? 'page' : undefined"><component :is="item.icon" :size="18" :stroke-width="1.8" aria-hidden="true" />{{ item.label }}</RouterLink></nav>
       <main id="reader-main" class="reader-main" tabindex="-1"><slot /></main>
+      <footer class="reader-footer"><IcpLink /></footer>
     </div>
   </div>
 </template>
@@ -30,7 +32,8 @@ const active = (path: string) => route.path === path || route.path.startsWith(`$
 .reader-utilities { margin-left: auto; display: flex; align-items: center; gap: 24px; }
 .reader-account { width: 40px; height: 40px; border: 1px solid var(--color-primary-border); border-radius: 50%; display: grid; place-items: center; background: var(--color-primary-soft); color: var(--color-primary); text-decoration: none; font-size: 14px; font-weight: 600; }
 .reader-account:hover, .reader-account.selected { border-color: var(--color-primary); }
-.reader-canvas { background: var(--color-surface); border-radius: 8px; box-shadow: var(--shadow-canvas); min-height: calc(100vh - 112px); }
+.reader-canvas { display: flex; flex-direction: column; background: var(--color-surface); border-radius: 8px; box-shadow: var(--shadow-canvas); min-height: calc(100vh - 112px); }
+.reader-footer { margin-top: auto; padding: 8px 16px 16px; text-align: center; }
 .reader-nav { display: flex; gap: 36px; margin-inline: 48px; border-bottom: 1px solid var(--color-border); padding-top: 12px; min-width: 0; overflow-x: auto; }
 .reader-nav a { display: inline-flex; align-items: center; flex-shrink: 0; gap: 8px; min-height: 56px; padding: 8px 0 5px; border-bottom: 2px solid transparent; color: var(--color-text-muted); text-decoration: none; font-size: 14px; }
 .reader-nav a:hover { color: var(--color-primary); }

@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BrandLogo from '@ui/BrandLogo.vue';
+import IcpLink from '../components/IcpLink.vue';
 import { ArrowRight, LoaderCircle, RefreshCw } from 'lucide-vue-next';
 import { sessionState, enterSession, restoreSession } from '../state';
 import { useRequestState } from '../useRequestState';
@@ -38,7 +39,7 @@ onMounted(() => { if (!error.value) void enter(); });
         <p class="auth-note">匿名访问 · 通过当前浏览器 Cookie 恢复偏好</p>
       </section>
     </div>
-    <footer class="auth-footer">知更 · 每天读一点真正关心的事</footer>
+    <footer class="auth-footer"><div>知更 · 每天读一点真正关心的事</div><IcpLink /></footer>
   </main>
 </template>
 <style scoped>

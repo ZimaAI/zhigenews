@@ -75,6 +75,10 @@ docker compose --profile app up -d api worker beat
 
 ## 配置与接口
 
+订阅来源仅支持 RSS / Atom；初始化默认目录包含 341 个 RSS 订阅，管理员可添加、停用或删除。联网补充搜索独立于订阅采集。已生成简报保留原始来源和引用，不会因移除来源而改写。
+
+从仍支持 NewsNow 的旧版本升级时，先在旧管理员页面筛选该类型，停止采集并删除全部对应来源，等待后台删除任务全部完成后再部署本版本。清理包含来源配置、采集记录与文件，历史简报保留；不要运行初始化来代替清理。
+
 `POST /auth/anonymous`自动签发HttpOnly匿名Cookie，管理员使用独立登录Cookie。所有写请求发送 `X-Zhige-Request: 1`；有Origin时必须在ALLOWED_ORIGINS白名单。创建生成、采集、评估与发布重试发送稳定 `Idempotency-Key`（8–128字符），同键不同body返回409。429遵循Retry-After。
 
 模型连接统一在 `backend/.env` 配置，字段示例见 [backend/.env.example](backend/.env.example)。`OPENAI_BASE_URL`、`OPENAI_MODEL`、`OPENAI_API_KEY` 指定主模型；`SUMMARY_OPENAI_*` 可覆盖摘要模型，未设置时继承主模型；`EVALUATION_OPENAI_MODEL` 启用可选评估模型。管理员端不再提供模型与连接、Agent 配置页面和管理 API，无需在页面验证或发布配置。

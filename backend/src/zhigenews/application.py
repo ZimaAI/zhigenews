@@ -473,23 +473,11 @@ class Application:
     def source_data(self, old=None):
         b = deepcopy(self.body)
         b["version"] = (old or {}).get("version", 0) + 1
-        from .ingestion import catalog_source
-
-        try:
-            catalog = catalog_source(b["sourceId"]) if b["kind"] == "newsnow" else None
-        except ValueError as exc:
-            raise AppError("INVALID_SOURCE", "未知或已禁用的 NewsNow 来源") from exc
-        upstream = (catalog or {}).get("upstream_interval_seconds", 0)
-        # The adapter owns source metadata and validates catalog identifiers.
-        if isinstance(upstream, dict):
-            upstream = 0
-        b["interval"] = max(b["interval"], int(upstream))
         if old and all(old.get(k) == b[k] for k in ("kind", "sourceId", "url")):
-            return {**old, **b, "upstreamInterval": int(upstream)}
+            return {**old, **b}
         return {
             **b,
             "id": self.ident or uid("src_"),
-            "upstreamInterval": int(upstream),
             "status": "unverified" if not old or old.get("enabled", True) else "disabled",
             "enabled": old.get("enabled", True) if old else True,
             "health": "unverified",
@@ -505,7 +493,6 @@ class Application:
             "lastFetchedAt": None,
             "cacheAgeSeconds": None,
             "stale": True,
-            "upstreamRevision": (catalog or {}).get("upstream_revision"),
         }
 
     def createSource(self):

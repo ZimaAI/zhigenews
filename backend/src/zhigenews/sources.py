@@ -29,7 +29,8 @@ def is_collecting(ident):
 
 
 def source_state(row):
-    data, state = row.data, row.private.get("state", {})
+    data = {key: value for key, value in row.data.items() if key not in ("upstreamInterval", "upstreamRevision")}
+    state = row.private.get("state", {})
     failures = int(state.get("failure_count", 0))
     enabled = data.get("enabled", data["status"] != "disabled")
     health = "invalid" if failures >= 3 else data.get("health", state.get("status", data["status"]))
@@ -131,12 +132,11 @@ def batch_sources(session, ids, action, *, invalid_only=False, lock_held=False):
                     set_enabled(row, False, utcnow())
                     row.private = {**row.private, "delete_pending": True, "manual_request": False}
                     storage = get_settings().data_dir.resolve()
-                    for kind in ("rss", "newsnow"):
-                        target = (storage / kind / ident).resolve()
-                        if not target.is_relative_to(storage / kind) or target == storage / kind:
-                            raise AppError("INVALID_SOURCE", "来源存储路径无效")
-                        if target.exists():
-                            shutil.rmtree(target)
+                    target = (storage / "rss" / ident).resolve()
+                    if not target.is_relative_to(storage / "rss") or target == storage / "rss":
+                        raise AppError("INVALID_SOURCE", "来源存储路径无效")
+                    if target.exists():
+                        shutil.rmtree(target)
                     session.execute(
                         delete(Resource).where(
                             Resource.kind.in_(("snapshot", "source_fetch")),

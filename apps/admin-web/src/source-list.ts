@@ -6,16 +6,15 @@ import { errorText, request } from './lib';
 export function useSourceList() {
   const items = shallowRef<Source[]>([]);
   const search = ref('');
-  const kind = ref('all');
   const selectedIds = ref(new Set<string>());
   const page = ref(1), total = ref(0), totalPages = ref(0), invalidTotal = ref(0);
   const loading = ref(false), loaded = ref(false), error = ref('');
   const refreshing = ref(false);
-  const appliedName = ref(''), appliedKind = ref('all');
+  const appliedName = ref('');
   let revision = 0;
   let controller: AbortController | undefined;
   const removedIds = new Set<string>();
-  const filtered = computed(() => !!appliedName.value || appliedKind.value !== 'all');
+  const filtered = computed(() => !!appliedName.value);
   const allSelected = computed(() => items.value.length > 0 && items.value.every(item => selectedIds.value.has(item.id)));
 
   function invalidate() {
@@ -34,7 +33,7 @@ export function useSourceList() {
     error.value = '';
     try {
       const result = await request<SourcePage>('listSources', {
-        query: { q: appliedName.value, kind: appliedKind.value === 'all' ? undefined : appliedKind.value, page: targetPage },
+        query: { q: appliedName.value, page: targetPage },
         signal: controller.signal,
       });
       if (current !== revision) return;
@@ -53,12 +52,11 @@ export function useSourceList() {
 
   async function applyFilters() {
     const name = search.value.trim();
-    if (name !== appliedName.value || kind.value !== appliedKind.value) {
+    if (name !== appliedName.value) {
       selectedIds.value = new Set();
       items.value = [];
       loaded.value = false;
       appliedName.value = name;
-      appliedKind.value = kind.value;
     }
     await load(1);
   }
@@ -88,6 +86,6 @@ export function useSourceList() {
   }
   const refresh = () => load(page.value, true);
   onBeforeUnmount(invalidate);
-  return { items, search, kind, selectedIds, page, total, totalPages, invalidTotal,
+  return { items, search, selectedIds, page, total, totalPages, invalidTotal,
     loading, refreshing, loaded, error, filtered, allSelected, load, refresh, invalidate, applyFilters, toggle, togglePage, forget, replace, remove };
 }

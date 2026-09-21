@@ -385,7 +385,8 @@ def test_expired_cookie_creates_new_identity_but_never_recovers_another_users_da
     assert client.get(BASE + "/me/preferences").json()["version"] == 0
 
 
-def test_brief_and_delivery_enforce_owner_before_actions(api_sandbox):
+@pytest.mark.parametrize("source_type", ["rss", "newsnow"])
+def test_brief_and_delivery_enforce_owner_before_actions(api_sandbox, source_type):
     owner = api_sandbox.anonymous()
     other = api_sandbox.anonymous()
     user_id = owner.get(BASE + "/auth/session").json()["userId"]
@@ -394,7 +395,7 @@ def test_brief_and_delivery_enforce_owner_before_actions(api_sandbox):
     brief_data = dict(id=brief_id, title="Synthetic owner-only brief", date="2026-09-19", version=1, summary="Synthetic fixture", items=[], generationStatus="completed", deliveryStatus="submitted", generatedAt=timestamp, missingSources=[])
     item = dict(
         id="synthetic-news", title="Synthetic news", summary="Synthetic summary", topic="test",
-        reason="Internal recommendation reason", source="Synthetic source", sourceType="rss",
+        reason="Internal recommendation reason", source="Synthetic source", sourceType=source_type,
         publishedAt=timestamp, fetchedAt=timestamp, snapshotId="synthetic-snapshot",
         url="https://example.test/news",
         citations=[dict(id="synthetic-news", name="Synthetic source", title="Synthetic news",

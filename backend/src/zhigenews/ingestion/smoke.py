@@ -5,7 +5,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from .catalog import DEFAULT_NEWSNOW_URL, default_sources
+from .catalog import default_sources
 from .service import fetch_source
 
 
@@ -13,10 +13,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--storage", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
-    parser.add_argument("--newsnow-base-url", default=DEFAULT_NEWSNOW_URL)
     args = parser.parse_args()
     results = []
-    for source in default_sources(args.newsnow_base_url):
+    for source in default_sources():
         result = fetch_source(source, args.storage, jitter_ratio=0)
         results.append(
             {

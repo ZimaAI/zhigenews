@@ -20,12 +20,10 @@ from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit
 
 import feedparser
 import httpx
-
-from .catalog import DEFAULT_NEWSNOW_URL, catalog_source
 
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 USER_AGENT = "Mozilla/5.0 (compatible; ZhigeNews/1.0; news feed reader)"
@@ -80,8 +78,8 @@ def _path(storage: Path, relative: str) -> Path:
 def _source_dir(source: dict, storage: Path) -> Path:
     if not SAFE_ID.fullmatch(str(source.get("id", ""))):
         raise IngestionError("INVALID_SOURCE_ID", "Source ID must be a system-generated safe identifier")
-    if source.get("kind") not in {"rss", "newsnow"}:
-        raise IngestionError("INVALID_SOURCE_KIND", "Source kind must be rss or newsnow")
+    if source.get("kind") != "rss":
+        raise IngestionError("INVALID_SOURCE_KIND", "Source kind must be rss")
     normalized = _normalize_source(source)
     identity = _hash(
         _json_bytes(
@@ -223,27 +221,9 @@ def _normalize_source(source: dict) -> dict:
     result = dict(source)
     configured = source.get("configured_interval_seconds", source.get("interval", 1800))
     result["configured_interval_seconds"] = max(1, int(configured))
-    if result["kind"] == "newsnow":
-        source_id = source.get("source_id", source.get("sourceId", ""))
-        if not source_id:
-            source_id = dict(parse_qsl(urlsplit(source.get("url", "")).query)).get("id", "")
-        entry = catalog_source(source_id)
-        result.update({key: value for key, value in entry.items() if key != "name"})
-        result.setdefault("name", entry["name"])
-        url = source.get("url") or source.get("base_url", DEFAULT_NEWSNOW_URL).rstrip("/") + "/api/s"
-        parts = urlsplit(_http_url(url))
-        query = dict(parse_qsl(parts.query))
-        query["id"] = entry["source_id"]
-        # Poll the available anonymous cache; do not claim latest forces refresh.
-        query.pop("latest", None)
-        result["url"] = urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), ""))
-    else:
-        result["url"] = _http_url(source["url"])
-        result["upstream_interval_seconds"] = 0
-        result["upstream_revision"] = None
+    result["url"] = _http_url(source["url"])
     result["effective_interval_seconds"] = max(
         result["configured_interval_seconds"],
-        result["upstream_interval_seconds"],
         int(result.get("feed_ttl_seconds", 0)),
     )
     return result
@@ -312,53 +292,6 @@ def _parse_rss(raw: bytes, source: dict, headers: dict) -> tuple[list[dict], dic
         "parse_warning": type(parsed.get("bozo_exception")).__name__ if parsed.get("bozo") else None,
         "dropped_items": dropped,
         "content_hash": _hash(raw),
-        "upstream_status": None,
-        "upstream_updated_at": None,
-    }
-
-
-def _parse_newsnow(raw: bytes, source: dict, headers: dict) -> tuple[list[dict], dict]:
-    try:
-        payload = json.loads(raw)
-    except (ValueError, UnicodeError):
-        raise IngestionError("INVALID_NEWSNOW", "NewsNow response is not valid JSON") from None
-    if (
-        not isinstance(payload, dict)
-        or payload.get("status") not in {"success", "cache"}
-        or not isinstance(payload.get("items"), list)
-    ):
-        raise IngestionError("INVALID_NEWSNOW", "NewsNow response does not match the source contract")
-    if payload.get("id") != source["source_id"]:
-        raise IngestionError("SOURCE_MISMATCH", "NewsNow returned a different source ID")
-    items, dropped, seen = [], 0, set()
-    for entry in payload["items"]:
-        if not isinstance(entry, dict) or not entry.get("title") or not entry.get("url"):
-            dropped += 1
-            continue
-        try:
-            item = _item(
-                source,
-                str(entry.get("id", "")),
-                str(entry["title"]),
-                str(entry["url"]),
-                _datetime(entry.get("pubDate")),
-                "",
-            )
-        except IngestionError:
-            dropped += 1
-            continue
-        if item["id"] not in seen:
-            items.append(item)
-            seen.add(item["id"])
-    if payload["items"] and not items:
-        raise IngestionError("INVALID_NEWSNOW_ITEMS", "NewsNow contains no usable article links")
-    updated = _datetime(payload.get("updatedTime"))
-    return items, {
-        "content_hash": _hash(_json_bytes(payload["items"])),
-        "upstream_status": payload["status"],
-        "upstream_updated_at": _iso(updated) if updated else None,
-        "parse_warning": None,
-        "dropped_items": dropped,
     }
 
 
@@ -376,7 +309,7 @@ def _publish(
     snapshot_id = uuid.uuid4().hex
     base = _source_dir(source, storage).relative_to(storage.resolve()).as_posix()
     date = now.strftime("%Y/%m/%d")
-    extension = "xml" if source["kind"] == "rss" else "json"
+    extension = "xml"
     prior = {item["id"]: item for item in prior_items}
     for item in items:
         item.update(
@@ -451,7 +384,7 @@ def fetch_source(
 ) -> dict:
     """Perform one bounded request, returning state, attempt, snapshot and items.
 
-    Expected source keys: id, kind, url, source_id (NewsNow), and
+    Expected source keys: id, kind (rss), url, and
     configured_interval_seconds. The returned source preserves original keys
     and contains conditional request state for the caller to persist.
     ``client`` and ``now`` permit deterministic HTTP failure/clock fixtures.
@@ -489,7 +422,6 @@ def fetch_source(
             state["feed_ttl_seconds"] = previous["feed_ttl_seconds"]
             state["effective_interval_seconds"] = max(
                 state["configured_interval_seconds"],
-                state["upstream_interval_seconds"],
                 state["feed_ttl_seconds"],
             )
     attempt = {
@@ -513,9 +445,7 @@ def fetch_source(
         return {"source": state, "attempt": attempt, "snapshot": snapshot, "items": items}
     headers = {
         "User-Agent": USER_AGENT,
-        "Accept": "application/json"
-        if state["kind"] == "newsnow"
-        else "application/atom+xml, application/rss+xml, application/xml, text/xml",
+        "Accept": "application/atom+xml, application/rss+xml, application/xml, text/xml",
     }
     if state.get("etag"):
         headers["If-None-Match"] = state["etag"]
@@ -554,16 +484,11 @@ def fetch_source(
                         )
                     chunks.append(chunk)
                 raw = b"".join(chunks)
-                parsed_items, metadata = (_parse_rss if state["kind"] == "rss" else _parse_newsnow)(
-                    raw, state, response_headers
-                )
+                parsed_items, metadata = _parse_rss(raw, state, response_headers)
                 attempt.update(metadata)
-                state["upstream_updated_at"] = metadata.get("upstream_updated_at")
-                state["upstream_status"] = metadata.get("upstream_status")
                 state["feed_ttl_seconds"] = metadata.get("feed_ttl_seconds", 0)
                 state["effective_interval_seconds"] = max(
                     state["configured_interval_seconds"],
-                    state["upstream_interval_seconds"],
                     state["feed_ttl_seconds"],
                 )
                 if previous is None or metadata["content_hash"] != previous["content_hash"]:
@@ -576,7 +501,6 @@ def fetch_source(
                             "http_status": 200,
                             "etag": response_headers.get("etag"),
                             "last_modified": response_headers.get("last-modified"),
-                            "upstream_revision": state.get("upstream_revision"),
                         }
                     )
                     snapshot = _publish(

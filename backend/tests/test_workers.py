@@ -47,7 +47,6 @@ def source_record(sandbox, suffix="_source", *, interval=600, due=None):
         "sourceId": "",
         "url": "https://example.test/feed.xml",
         "interval": interval,
-        "upstreamInterval": 0,
         "status": "unverified",
         "lastSuccess": "",
         "nextFetch": iso(due or utcnow()),
@@ -59,7 +58,6 @@ def source_record(sandbox, suffix="_source", *, interval=600, due=None):
         "lastFetchedAt": None,
         "cacheAgeSeconds": None,
         "stale": True,
-        "upstreamRevision": None,
     }
     with transaction() as session:
         session.add(Resource(id=ident, kind="source", data=data, due_at=due or utcnow()))

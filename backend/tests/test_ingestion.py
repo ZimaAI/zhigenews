@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 
-from zhigenews.ingestion import catalog_source, default_sources, fetch_source, load_snapshot_items
+from zhigenews.ingestion import default_sources, fetch_source, load_snapshot_items
 
 NOW = datetime(2026, 9, 18, 16, 0, tzinfo=UTC)
 RSS = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>Synthetic feed</title>
@@ -46,12 +46,25 @@ def call(source, tmp_path, response, **kwargs):
         )
 
 
-def test_pinned_catalog_units_redirects_and_distinct_intervals():
-    assert catalog_source("weibo")["upstream_interval_seconds"] == 120
-    assert catalog_source("github")["source_id"] == "github-trending-today"
-    assert [s["upstream_interval_seconds"] for s in default_sources()[:2]] == [600, 3600]
-    with pytest.raises(ValueError):
-        catalog_source("invented-source")
+def test_default_sources_only_include_rss_and_preserve_stable_ids():
+    sources = default_sources()
+    assert len(sources) == 341
+    assert {source["kind"] for source in sources} == {"rss"}
+    assert len({source["id"] for source in sources}) == len(sources)
+    assert all(source["configured_interval_seconds"] == 1800 for source in sources)
+    assert any(source["id"] == "rss-chinanews" for source in sources)
+
+
+def test_unsupported_source_kind_is_rejected_before_http(tmp_path):
+    from zhigenews.ingestion.service import IngestionError
+
+    def unexpected_request(request):
+        pytest.fail("Unsupported source must not make an HTTP request")
+
+    with httpx.Client(transport=httpx.MockTransport(unexpected_request)) as client:
+        with pytest.raises(IngestionError, match="Source kind must be rss"):
+            fetch_source({**rss_source(), "kind": "newsnow"}, tmp_path, client=client)
+    assert not list(tmp_path.iterdir())
 
 
 def test_rss_snapshot_raw_metadata_dates_and_ttl(tmp_path):
@@ -155,29 +168,6 @@ def test_timeout_exponential_backoff_and_retry_after(tmp_path):
         rss_source(), tmp_path, httpx.Response(503, headers={"retry-after": "Fri, 18 Sep 2026 19:00:00 GMT"})
     )
     assert dated["source"]["next_fetch_at"] == "2026-09-18T19:00:00Z"
-
-
-def test_newsnow_upstream_interval_and_updated_time_is_not_news_time(tmp_path):
-    from zhigenews.ingestion import read_source_index, source_news_directory
-
-    source = {**default_sources()[1], "configured_interval_seconds": 1}
-    payload = {
-        "id": "solidot",
-        "status": "cache",
-        "updatedTime": 1789743600000,
-        "items": [{"id": "one", "title": "Synthetic story", "url": "https://example.test/item"}],
-    }
-    first = call(source, tmp_path, httpx.Response(200, json=payload))
-    assert first["source"]["effective_interval_seconds"] == 3600
-    assert first["items"][0]["published_at"] is None
-    assert read_source_index(source, tmp_path)["items"] == []
-    assert source_news_directory({**source, "url": ""}, tmp_path) == source_news_directory(source, tmp_path)
-    assert first["attempt"]["upstream_status"] == "cache"
-    payload.update({"status": "success", "updatedTime": 1789747200000})
-    second = call(first["source"], tmp_path, httpx.Response(200, json=payload), now=NOW + timedelta(hours=1))
-    assert second["attempt"]["outcome"] == "unchanged"
-    assert second["snapshot"] == first["snapshot"]
-    assert second["source"]["cache_age_seconds"] == 3600
 
 
 def test_snapshot_publication_failure_does_not_replace_latest(tmp_path, monkeypatch):

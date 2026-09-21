@@ -30,7 +30,7 @@ def initialize():
                     password_hash=password_hash(s.admin_password),
                 )
             )
-        for source in default_sources(s.newsnow_base_url):
+        for source in default_sources():
             if session.get(Resource, source["id"]):
                 continue
             data = dict(
@@ -40,7 +40,6 @@ def initialize():
                 sourceId=source["source_id"],
                 url=source["url"],
                 interval=source["effective_interval_seconds"],
-                upstreamInterval=source["upstream_interval_seconds"],
                 status="unverified",
                 lastSuccess="",
                 nextFetch=iso(utcnow()),
@@ -52,7 +51,6 @@ def initialize():
                 lastFetchedAt=None,
                 cacheAgeSeconds=None,
                 stale=True,
-                upstreamRevision=source.get("upstream_revision"),
             )
             session.add(Resource(id=source["id"], kind="source", data=data, due_at=utcnow()))
     with mysql_persistence(s.database_url, setup=True):

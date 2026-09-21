@@ -258,7 +258,6 @@ def _source_dto(old, state):
         "sourceId": state.get("source_id", ""),
         "url": state["url"],
         "interval": state["effective_interval_seconds"],
-        "upstreamInterval": state["upstream_interval_seconds"],
         "status": state["status"] if old.get("enabled", old["status"] != "disabled") else "disabled",
         "enabled": old.get("enabled", old["status"] != "disabled"),
         "health": state["status"],
@@ -274,7 +273,6 @@ def _source_dto(old, state):
         "lastFetchedAt": state["last_fetched_at"],
         "cacheAgeSeconds": state["cache_age_seconds"],
         "stale": state["stale"],
-        "upstreamRevision": state.get("upstream_revision"),
     }
 
 
@@ -355,7 +353,6 @@ def collect_source(source_id, *, collector=None):
             interval = max(
                 source.get("effective_interval_seconds", 0),
                 source["configured_interval_seconds"],
-                row.data["upstreamInterval"],
             )
             earliest = last_fetch + timedelta(seconds=interval) if last_fetch else None
             scheduled = _date(source.get("next_fetch_at"))
@@ -392,7 +389,7 @@ def collect_source(source_id, *, collector=None):
                 row.lease_token = row.lease_until = None
                 row.due_at = None
                 return {"status": "stopped"}
-            dto = _source_dto(row.data, result["source"])
+            dto = _source_dto(source_state(row), result["source"])
             if not dto["enabled"]:
                 dto["nextFetch"] = ""
             validate(schema("Source"), dto, output=True)

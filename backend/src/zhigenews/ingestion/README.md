@@ -5,30 +5,17 @@
 hold a per-source lease and persist the returned source state and attempt after
 the call. The adapter does not access a database or schedule work itself.
 
-Dependencies are `httpx` and `feedparser`. The bundled NewsNow catalog is fixed
-at `0f95b2c998dffbfd2ddbc51b47b5809887dc6b97`, imported from the upstream
-`shared/sources.json`; its MIT license is in `NEWSNOW-LICENSE`. Redirect aliases
-are resolved before fetching. Catalog changes must be explicitly reviewed and
-imported rather than silently taking newer metadata on startup.
+Only RSS / Atom subscriptions are supported. Dependencies are `httpx` and `feedparser`.
 
 `configured_interval_seconds` is an administrator setting. The effective
-interval is the maximum of it, the pinned NewsNow source interval, and RSS
-`ttl`. HTTP cache hints and bounded exponential failure backoff may postpone
+interval is the maximum of it and RSS `ttl`. HTTP cache hints and bounded exponential failure backoff may postpone
 `next_fetch_at` further. `Retry-After` is respected. Positive jitter never
 causes earlier polling.
 
 ## Default sources
 
-`default_sources()` provides 388 enabled, unverified sources:
+`default_sources()` provides 341 enabled, unverified RSS sources:
 
-- 47 NewsNow sources from the **More / 更多** menu at
-  <https://newsnow.busiyi.world/c/hottest>, captured on 2026-09-19.
-  `DEFAULT_NEWSNOW_SOURCE_IDS` in `catalog.py` pins this selection separately
-  from the full upstream metadata catalog. Redirect aliases are omitted, as
-  are the five `disable: "cf"` entries absent from that public deployment
-  (36kr-quick, 36kr-renqi, bilibili-hot-video, bilibili-ranking, kuaishou).
-  Each source keeps its upstream polling interval. The base URL remains
-  configurable through `NEWSNOW_BASE_URL`.
 - 341 RSS sources in `default-rss-sources.json`: the existing China News
   immediate feed plus all 340 feed URLs in the table at
   <https://juejin.cn/post/7459966392429101067>, captured on 2026-09-19.
@@ -37,7 +24,7 @@ causes earlier polling.
   with the same name remain separate. Three unnamed rows use their URL as
   the display name. The article's preview links are not feed URLs.
 
-The three original source IDs are unchanged. New RSS IDs were generated from
+RSS source IDs are unchanged. The additional RSS IDs were generated from
 the hostname and the first 12 SHA-256 hex characters of the original URL, then
 saved in the JSON file; keep these IDs stable when editing entries. This is a
 source inventory, not a claim that all endpoints currently return valid feeds.
@@ -56,7 +43,7 @@ already in the database; use the admin Sources page for those changes.
 
 Each source configuration has a separate root at
 `{kind}/{source_db_id}/configs/{identity_hash}/`. The identity uses the
-normalized source kind, URL and NewsNow source ID. `source_news_directory`
+normalized source kind, URL and optional source identifier. `source_news_directory`
 computes that root without reading articles, so a run can authorize only
 enabled configurations. Changing a source URL cannot expose earlier
 configuration files through the new root.
@@ -103,12 +90,11 @@ complete feed. Agent startup never builds a news index.
 Normalized evidence includes `id`, `evidence_id`, `external_id`, `source_id`,
 `source`, `source_type`, `title`, `url`, `summary`, `content`, `published_at`,
 `fetched_at`, `first_seen_at`, and `snapshot_id`. Unknown publication time is
-null. The NewsNow `updatedTime` is separately recorded as upstream metadata;
-it cannot establish a story's publication time or a content change. RSS/Atom
-summaries and content remain untrusted source material.
+null. Feed update times, collection times and first-seen times cannot establish
+a story's publication time. RSS/Atom summaries and content remain untrusted source material.
 
 State fields use snake_case. Map `snapshot_id`, `snapshot_fetched_at`,
-`last_fetched_at`, `cache_age_seconds`, `stale`, and `upstream_revision` to the
+`last_fetched_at`, `cache_age_seconds`, and `stale` to the
 corresponding camelCase Source DTO fields. Calculate cache age again when
 serving a later query; the returned value describes this collection attempt.
 `last_success_at` and `last_changed_at` advance only with a new valid snapshot;
@@ -121,7 +107,7 @@ responses for conditional requests, bad XML/HTML, timeouts, rate limits,
 publication failure, byte limits and snapshot stability. Live evidence is
 recorded separately and must never be inferred from those tests.
 
-From the repository root, run the three actual HTTP probes and save metadata
+From the repository root, probe all default RSS subscriptions and save metadata
 without news text in the report:
 
 ```powershell

@@ -61,7 +61,7 @@ def test_name_search_covers_all_sources_and_pages_by_ten(api_sandbox):
     assert pages[0]["total"] == 25 and pages[0]["pageSize"] == 10
     assert pages[2]["page"] == 3 and pages[2]["totalPages"] == 3
     assert {item["id"] for page in pages for item in page["items"]} == {s["id"] for s in sources}
-    assert admin.get(BASE, params={"q": name, "kind": "newsnow"}).json()["total"] == 0
+    assert admin.get(BASE, params={"q": name, "kind": "newsnow"}).status_code == 400
     assert admin.get(BASE, params={"page": 0}).status_code == 400
 
 
@@ -194,8 +194,8 @@ def test_global_invalid_delete_includes_disabled_and_cleans_history(api_sandbox,
     healthy = create_source(api_sandbox, admin, api_sandbox.prefix + " healthy")
     result = workers.collect_source(bad["id"], collector=collector)
     snapshot = result["snapshot_id"]
-    # Another historical configuration must be cleaned too, even after a kind change.
-    historical = tmp_path / "newsnow" / bad["id"] / "configs" / "old"
+    # Another historical configuration must be cleaned too, after an RSS URL change.
+    historical = tmp_path / "rss" / bad["id"] / "configs" / "old"
     historical.mkdir(parents=True)
     (historical / "old.json").write_text("{}")
     _, _, brief_id, _ = pending_brief(api_sandbox, published=True)
@@ -215,7 +215,6 @@ def test_global_invalid_delete_includes_disabled_and_cleans_history(api_sandbox,
     assert admin.get(BASE + "/" + healthy["id"]).status_code == 200
     assert admin.get(BASE + "/" + bad["id"]).status_code == 404
     assert not (tmp_path / "rss" / bad["id"]).exists()
-    assert not (tmp_path / "newsnow" / bad["id"]).exists()
     with transaction() as session:
         assert session.get(Resource, snapshot) is None
         assert session.get(Brief, brief_id) is not None
@@ -250,3 +249,26 @@ def test_batch_disable_and_cleanup_failure_can_be_retried(api_sandbox, tmp_path,
     assert admin.get(BASE + "/" + ids[0]).json()["enabled"] is False
     assert complete_deletion(admin, [ids[0]])["succeeded"] == [ids[0]]
     assert not directory.exists()
+
+
+def test_source_writes_reject_retired_provider_and_keep_rss(api_sandbox):
+    admin = api_sandbox.admin()
+    source = create_source(api_sandbox, admin, api_sandbox.prefix + " RSS")
+    assert "upstreamInterval" not in source and "upstreamRevision" not in source
+    body = dict(name=source["name"], kind="newsnow", sourceId="weibo",
+                url="https://example.test/api/s?id=weibo", interval=600)
+    assert admin.post(BASE, json=body).status_code == 400
+    response = admin.put(BASE + "/" + source["id"], json={**body, "version": source["version"]})
+    assert response.status_code == 400
+    assert admin.get(BASE + "/" + source["id"]).json()["kind"] == "rss"
+
+
+def test_existing_rss_source_ignores_removed_catalog_metadata(api_sandbox):
+    admin = api_sandbox.admin()
+    source = create_source(api_sandbox, admin, api_sandbox.prefix + " existing RSS")
+    with transaction() as session:
+        row = session.get(Resource, source["id"])
+        row.data = {**row.data, "upstreamInterval": 0, "upstreamRevision": None}
+    response = admin.get(BASE + "/" + source["id"])
+    assert response.status_code == 200
+    assert "upstreamInterval" not in response.json() and "upstreamRevision" not in response.json()

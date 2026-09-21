@@ -71,19 +71,19 @@ def test_entire_current_workspace_is_writable_with_cas(files):
 
 def test_news_mounts_expose_only_authorized_sources(files, tmp_path):
     storage = tmp_path / "news-storage"
-    for source in ("rss-source", "newsnow-source", "disabled-source"):
+    for source in ("rss-source", "rss-other", "disabled-source"):
         (storage / source).mkdir(parents=True)
         (storage / source / "index.md").write_text("synthetic AI news", "utf-8")
     news = FileService(
         storage,
         files.roots["workspace"],
-        news_roots={source: storage / source for source in ("rss-source", "newsnow-source")},
+        news_roots={source: storage / source for source in ("rss-source", "rss-other")},
     )
-    assert [entry["name"] for entry in news.list_dir("/news")["entries"]] == ["newsnow-source", "rss-source"]
+    assert [entry["name"] for entry in news.list_dir("/news")["entries"]] == ["rss-other", "rss-source"]
     assert news.read_file("/news/rss-source/index.md")["lines"][0]["text"] == "synthetic AI news"
     assert {match["path"] for match in news.search_content("AI", "/news")["matches"]} == {
         "/news/rss-source/index.md",
-        "/news/newsnow-source/index.md",
+        "/news/rss-other/index.md",
     }
     for path in ("/news/disabled-source/index.md", "/rss/rss-source/index.md", "/workspace/../other/run"):
         with pytest.raises(HarnessError):

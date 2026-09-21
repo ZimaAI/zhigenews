@@ -8,4 +8,8 @@
 
 数据库、Redis及运行数据使用持久卷。`docker compose stop`停止本项目并保留数据。原生Python调试使用根`data/`，容器使用命名卷；同一Agent运行不得混用两种路径。
 
-此目录与`backend/`、`compose.yaml`共同纳入后端源码指纹。共享编排发生改变后，后端运行证据需重新核对。当前没有生产部署产物。
+此目录与`backend/`、`compose.yaml`共同纳入后端源码指纹。共享编排发生改变后，后端运行证据需重新核对。
+
+## 服务器部署
+
+`deploy/` 提供独立生产 Compose、双前端 Caddy 镜像和服务器部署脚本；`.github/workflows/deploy.yml` 构建并发布 GHCR 镜像后通过 SSH 更新。完整配置、首次上线、备份与回退步骤见 [部署指南](../docs/deployment.md)。

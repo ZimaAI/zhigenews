@@ -17,3 +17,5 @@
 /data/
 /backend/data/
 **/*.egg-info/
+/infra/deploy/release.env
+/infra/deploy/backend.env

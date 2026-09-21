@@ -23,6 +23,8 @@ npm run dev:admin
 
 ## 本地后端
 
+服务器部署请看 [GitHub Actions 部署指南](docs/deployment.md)：推送 main 后构建 GHCR 镜像，通过 SSH 更新单台 Linux 服务器；包含双前端 HTTPS、数据库迁移、后台 worker/beat、备份与回退步骤。生产编排位于 `infra/deploy/`，与下方本地开发编排独立。
+
 需要 Python 3.12、uv、Docker Linux engine。命令在仓库根执行：
 
 ```powershell

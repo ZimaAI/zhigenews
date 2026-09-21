@@ -1,3 +1,7 @@
 # Checkpoints hash raw bytes; preserve the line endings used by the Windows workflow.
 .project-flow/versions/*/checkpoints/**/*.json text eol=lf
 .project-flow/versions/*/checkpoints/**/*.md text eol=crlf
+
+# Deployment files are executed on Linux, including Windows checkouts.
+infra/deploy/** text eol=lf
+.github/workflows/** text eol=lf

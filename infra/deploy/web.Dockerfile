@@ -13,5 +13,6 @@ RUN npm run build && npm run test:api
 
 FROM caddy:2-alpine
 COPY infra/deploy/Caddyfile /etc/caddy/Caddyfile
+COPY infra/deploy/Caddyfile.nginx /etc/caddy/Caddyfile.nginx
 COPY --from=build /app/apps/user-web/dist /srv/user
 COPY --from=build /app/apps/admin-web/dist /srv/admin

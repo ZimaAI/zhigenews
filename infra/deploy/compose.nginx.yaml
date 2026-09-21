@@ -1,0 +1,17 @@
+# Install as /opt/zhigenews/compose.override.yaml when host Nginx terminates TLS.
+# Compose 2.30+; replace all public bindings, including UDP 443.
+services:
+  web:
+    command: [caddy, run, --config, /etc/caddy/Caddyfile.nginx, --adapter, caddyfile]
+    ports: !override
+      - "127.0.0.1:18080:80"
+    environment:
+      EDGE_PROXY_CIDRS: ${DOCKER_GATEWAY:-172.30.0.1}/32
+
+networks:
+  default:
+    ipam:
+      config: !override
+        - subnet: ${DOCKER_SUBNET:-172.30.0.0/24}
+          gateway: ${DOCKER_GATEWAY:-172.30.0.1}
+          ip_range: ${DOCKER_IP_RANGE:-172.30.0.128/25}

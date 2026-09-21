@@ -13,10 +13,14 @@ done
 # Protect manual deployments as well as Actions runs.
 exec 9>"$DEPLOY_ROOT/.deploy.lock"
 flock -n 9 || { echo 'Another deployment is running.'; exit 1; }
+compose_files=(-f "$release_dir/compose.yaml")
+if [[ -f "$DEPLOY_ROOT/compose.override.yaml" ]]; then
+  compose_files+=(-f "$DEPLOY_ROOT/compose.override.yaml")
+fi
 dc() {
   docker compose --project-name zhigenews-prod \
     --env-file "$DEPLOY_ROOT/.env" --env-file "$release_dir/release.env" \
-    -f "$release_dir/compose.yaml" "$@"
+    "${compose_files[@]}" "$@"
 }
 on_error() {
   echo 'Deployment failed; current still identifies the last successful release.' >&2

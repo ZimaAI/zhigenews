@@ -1,0 +1,18 @@
+# Install in /etc/nginx/sites-available/zhigenews and enable it.
+# Issue HTTPS certificates with certbot --nginx after DNS is reachable.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name zhigenews.zimagent.top admin.zhigenews.zimagent.top;
+
+    location / {
+        proxy_pass http://127.0.0.1:18080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        # Overwrite untrusted client-supplied forwarding headers at the edge.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_read_timeout 900s;
+    }
+}

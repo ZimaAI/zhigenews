@@ -99,6 +99,23 @@ class DeploymentTests(unittest.TestCase):
         self.assertFalse(any("stop" in call for call in self.calls))
         self.assertEqual((self.root / "current").resolve(), old)
 
+    def test_host_override_is_used_for_every_compose_operation(self):
+        override = self.root / "compose.override.yaml"
+        override.write_text("services: {}\n")
+        result = self.run_deploy()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for call in self.calls:
+            if call[:2] == ["docker", "compose"]:
+                self.assertIn(str(override), call)
+                self.assertLess(call.index(str(self.release / "compose.yaml")),
+                                call.index(str(override)))
+
+    def test_invalid_override_fails_before_stopping_services(self):
+        (self.root / "compose.override.yaml").write_text("invalid YAML")
+        result = self.run_deploy("config --quiet")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(any("stop" in call for call in self.calls))
+
     def test_backup_failure_does_not_migrate(self):
         old = self.configure_existing()
         result = self.run_deploy("mysqldump")
@@ -119,6 +136,38 @@ class DeploymentTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual((self.root / "current").resolve(), old)
         self.assertFalse((self.root / "previous").exists())
+
+
+@unittest.skipUnless(shutil.which("docker"), "Docker Compose CLI is required; no daemon needed")
+class ComposeConfigurationTests(unittest.TestCase):
+    def test_nginx_override_exposes_only_loopback_http(self):
+        deploy = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "backend.env").write_text("ADMIN_PASSWORD=synthetic-only\n")
+            result = subprocess.run(
+                ["docker", "compose", "--env-file", str(deploy / ".env.example"),
+                 "-f", str(deploy / "compose.yaml"),
+                 "-f", str(deploy / "compose.nginx.yaml"), "config", "--format", "json"],
+                env={**os.environ, "DEPLOY_ROOT": directory,
+                     "BACKEND_IMAGE": "synthetic-backend:test", "WEB_IMAGE": "synthetic-web:test",
+                     "MYSQL_PASSWORD": "synthetic", "MYSQL_ROOT_PASSWORD": "synthetic"},
+                capture_output=True, text=True, timeout=30,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            config = json.loads(result.stdout)
+            services = config["services"]
+            self.assertEqual(services["web"]["ports"], [{
+                "mode": "ingress", "host_ip": "127.0.0.1", "target": 80,
+                "published": "18080", "protocol": "tcp",
+            }])
+            for name in ["mysql", "redis", "api", "worker", "beat"]:
+                self.assertFalse(services[name].get("ports"))
+            self.assertEqual(services["api"]["environment"]["COOKIE_SECURE"], "true")
+            self.assertIn("/etc/caddy/Caddyfile.nginx", services["web"]["command"])
+            network = config["networks"]["default"]["ipam"]["config"]
+            self.assertEqual(len(network), 1)
+            self.assertEqual(network[0]["gateway"], "172.30.0.1")
+            self.assertEqual(services["web"]["environment"]["EDGE_PROXY_CIDRS"], "172.30.0.1/32")
 
 
 if __name__ == "__main__":

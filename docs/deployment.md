@@ -42,6 +42,25 @@ sudo install -d -o deploy -g deploy -m 700 /home/deploy/.ssh
 
 以下服务器命令均用 **deploy 账号**执行，除非明确标注 sudo。
 
+### 已有 Nginx 占用 80/443 的服务器
+
+宿主机已有其他站点时保留 Nginx，用可选覆盖文件将项目入口限制到回环地址：
+
+```bash
+sudo install -o deploy -g deploy -m 600 infra/deploy/compose.nginx.yaml /opt/zhigenews/compose.override.yaml
+```
+
+`deploy.sh` 自动合并此文件；未安装覆盖文件的服务器继续由容器 Caddy 直接提供 HTTPS。覆盖文件使用 Compose `!override` 完整替换端口列表，web 只发布 `127.0.0.1:18080:80`，不会保留默认 TCP/UDP 443。web 镜像同时包含 HTTP 专用的 `Caddyfile.nginx`。
+
+1. `.env` 设置两个真实域名，例如 `USER_DOMAIN=zhigenews.zimagent.top`、`ADMIN_DOMAIN=admin.zhigenews.zimagent.top`。两者都需 DNS 解析到本机。
+2. 将 [nginx.conf.example](../infra/deploy/nginx.conf.example) 安装到 `/etc/nginx/sites-available/zhigenews`，按实际域名调整，软链接到 `sites-enabled`，通过 `sudo nginx -t` 后 reload。
+3. DNS 和公网 80 可达后运行 `sudo certbot --nginx -d zhigenews.zimagent.top -d admin.zhigenews.zimagent.top --redirect`，由宿主 Nginx 处理证书和续期。确认 Certbot 的自动续期任务正常。
+4. 再触发 Actions；部署脚本仍检查两个公网 HTTPS 入口。容器启动前 Nginx 返回 502 是预期现象。
+
+Nginx 覆盖客户端传入的 `X-Forwarded-For`，Caddy 只信任固定 Docker 网关（默认 `172.30.0.1/32`），向 API 转发解析后的单一客户端 IP。API 仍只信任 Caddy 的固定地址。Nginx 关闭缓冲，Caddy 即时转发，保留 SSE 更新；生产 Cookie 和 Origin 继续使用 HTTPS。
+
+网段冲突时同步调整 `.env` 的 `DOCKER_SUBNET`、`DOCKER_IP_RANGE`、`DOCKER_GATEWAY`、`CADDY_IP`、`TRUSTED_PROXY_CIDRS`；网关须处于子网中、动态地址池外，且与 Caddy IP 不同。此模式需要支持上述配置的新版 web 镜像，不能用覆盖文件启动尚未包含 `Caddyfile.nginx` 的旧镜像。
+
 ## 3. 配置服务器密钥
 
 把两个模板复制到服务器（可从本地 scp）：
@@ -137,10 +156,14 @@ Actions 会：
 ```bash
 export DEPLOY_ROOT=/opt/zhigenews
 dc() {
+  local files=(-f "$DEPLOY_ROOT/current/compose.yaml")
+  if [[ -f "$DEPLOY_ROOT/compose.override.yaml" ]]; then
+    files+=(-f "$DEPLOY_ROOT/compose.override.yaml")
+  fi
   docker compose -p zhigenews-prod \
     --env-file "$DEPLOY_ROOT/.env" \
     --env-file "$DEPLOY_ROOT/current/release.env" \
-    -f "$DEPLOY_ROOT/current/compose.yaml" "$@"
+    "${files[@]}" "$@"
 }
 dc ps
 dc logs --tail=100 api worker beat web
@@ -161,7 +184,7 @@ dc exec -T worker celery -A zhigenews.workers:celery_app inspect ping
 | Docker 卷 `zhigenews-prod_redis-data` | Celery 队列和 Redis 数据 |
 | `/opt/zhigenews/data` | 新闻、运行工作区、评估文件；容器与宿主机绝对路径一致，供沙箱绑定 |
 | Docker 卷 `zhigenews-prod_caddy-data` / `caddy-config` | TLS 证书及 Caddy 状态 |
-| `/opt/zhigenews/.env`、`backend.env`、`.initialized` | 基础配置、业务密钥、首次初始化标记 |
+| `/opt/zhigenews/.env`、`backend.env`、`.initialized`、可选 `compose.override.yaml` | 基础配置、业务密钥、首次初始化标记、宿主代理覆盖配置 |
 | `/opt/zhigenews/backups` | 每次更新前的数据库 SQL 备份 |
 | `/opt/zhigenews/releases`、`current`、`previous` | 部署文件、镜像 digest、成功版本记录 |
 
@@ -182,7 +205,7 @@ sudo tar -C /opt/zhigenews -czf "$backup/app-files.tar.gz" data .env backend.env
 dc up -d --wait api worker beat web
 ```
 
-首次只有一个成功版本时没有 `previous`，从 tar 参数中删去它。任一步失败时先处理错误，再恢复服务；不要把不完整备份当成恢复点。
+Nginx 模式还需将 `compose.override.yaml` 加入 tar 参数，并另行备份宿主 Nginx 站点配置和证书。首次只有一个成功版本时没有 `previous`，从 tar 参数中删去它。任一步失败时先处理错误，再恢复服务；不要把不完整备份当成恢复点。
 
 **部署失败：** Actions 会失败并显示服务状态，`current` 不前移；但容器可能已停止或部分更新，旧链接不代表旧服务仍正常。拉取或预检查失败发生在停机前，可修正配置后重试；迁移或启动失败先检查对应 release 的日志。
 

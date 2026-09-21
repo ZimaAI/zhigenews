@@ -85,7 +85,6 @@ onMounted(load);
       <EmptyState v-else-if="!hasSubscription" title="选择你关注的话题"><RouterLink class="button button--primary" to="/settings">设置订阅</RouterLink></EmptyState>
       <EmptyState v-else-if="!brief" title="还没有简报"><button class="button button--primary" :disabled="busy || generating || remaining > 0" @click="generate">{{ generating ? '正在生成…' : '生成第一份简报' }}</button></EmptyState>
       <template v-else>
-        <div v-if="brief.generationStatus === 'partial'" class="alert"><span>部分来源暂不可用，已保留完成的内容。<template v-if="brief.missingSources.length">缺失来源：{{ brief.missingSources.join('、') }}。</template></span></div>
         <div v-if="brief.items.length" class="feed-toolbar"><div class="topic-tabs" role="group" aria-label="按话题筛选新闻"><button v-for="topic in ['全部', ...topics]" :key="topic" :aria-pressed="selectedTopic === topic" :class="{ selected: selectedTopic === topic }" @click="selectedTopic = topic"><component :is="topic === '全部' ? LayoutGrid : Hash" :size="14" :stroke-width="1.8" aria-hidden="true" />{{ topic }}</button></div></div>
         <section v-if="items.length" class="news-list" aria-label="本期新闻"><NewsArticle v-for="item in items" :key="item.id" :item="item" /></section>
         <EmptyState v-else-if="!brief.items.length" title="本期没有匹配的新闻"><RouterLink class="button" to="/settings">调整订阅</RouterLink></EmptyState>

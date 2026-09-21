@@ -2939,8 +2939,7 @@
           "items",
           "generationStatus",
           "deliveryStatus",
-          "generatedAt",
-          "missingSources"
+          "generatedAt"
         ],
         "properties": {
           "id": {
@@ -2977,13 +2976,6 @@
           "generatedAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "missingSources": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "未取得有效证据的来源名称；部分完成时向读者明确缺失。"
           }
         },
         "description": "用户阅读投影；不含内部运行关联、模型配置或偏好技术快照。"

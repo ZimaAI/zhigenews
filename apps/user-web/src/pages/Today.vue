@@ -7,43 +7,30 @@ import NewsArticle from '../components/NewsArticle.vue';
 import GenerationProgress from '../components/GenerationProgress.vue';
 import LoadingState from '../components/LoadingState.vue';
 import { useRequestState } from '../useRequestState';
-const brief = ref<Brief | null>(null), preferences = ref<Preferences | null>(null), progress = ref<Progress | null>(null);
+import { useGeneration } from '../useGeneration';
+const brief = ref<Brief | null>(null), preferences = ref<Preferences | null>(null);
 const loading = ref(true), busy = ref(false), selectedTopic = ref('全部');
 const { error, remaining, fail, clear } = useRequestState();
+const { progress, reconnecting, accept: updateProgress, poll } = useGeneration(brief, exception => { retryAction = poll; fail(exception); });
 const hasSubscription = computed(() => !!preferences.value && !!(preferences.value.topics.length || preferences.value.keywords.length));
-const generating = computed(() => !!progress.value && ['queued', 'running', 'cancelling'].includes(progress.value.status));
+const generating = computed(() => reconnecting.value || !!progress.value && ['queued', 'running', 'cancelling'].includes(progress.value.status));
 const topics = computed(() => [...new Set(brief.value?.items.map(item => item.topic) || [])]);
 const items = computed(() => (brief.value?.items || []).filter(item => selectedTopic.value === '全部' || selectedTopic.value === item.topic));
 const controller = new AbortController();
-let pollTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingIntent: { key: string; preferenceVersion: number } | null = null;
 let retryAction: () => Promise<void> = load;
 watch(() => brief.value?.id, () => { selectedTopic.value = '全部'; });
-onBeforeUnmount(() => { controller.abort(); clearTimeout(pollTimer); });
-async function updateProgress(value: Progress | null) {
-  progress.value = value;
-  clearTimeout(pollTimer);
-  if (value && ['completed', 'partial'].includes(value.status) && value.briefId && brief.value?.id !== value.briefId) {
-    brief.value = await api<Brief>('getBrief', { path: { id: value.briefId }, signal: controller.signal });
-  }
-  if (generating.value && !controller.signal.aborted) pollTimer = setTimeout(poll, 2000);
-}
-async function poll() {
-  if (!progress.value || controller.signal.aborted || remaining.value) return;
-  try { await updateProgress(await api<Progress>('getGenerationProgress', { path: { id: progress.value.id }, signal: controller.signal })); }
-  catch (exception) { if (!controller.signal.aborted) { retryAction = poll; fail(exception); } }
-}
+onBeforeUnmount(() => { controller.abort(); });
 async function load() {
   if (remaining.value) return;
   clear(); retryAction = load;
   try {
-    const [pref, page, current] = await Promise.all([
+    const [pref, page] = await Promise.all([
       api<Preferences>('getPreferences', { signal: controller.signal }),
       api<BriefPage>('listBriefs', { query: { limit: 1 }, signal: controller.signal }),
-      api<Progress | null>('getCurrentGeneration', { signal: controller.signal }),
     ]);
     preferences.value = pref; brief.value = page.items[0] || null;
-    await updateProgress(current);
+    await poll();
   } catch (exception) { if (!controller.signal.aborted) fail(exception); }
   finally { loading.value = false; }
 }
@@ -56,7 +43,8 @@ async function generate() {
     pendingIntent = null; await updateProgress(value);
   } catch (exception) {
     if (!controller.signal.aborted) {
-      fail(exception);
+      fail(exception instanceof ApiError && [401, 403, 409, 429].includes(exception.status)
+        ? exception : new Error('暂时无法提交，请重试'));
       if (exception instanceof ApiError && exception.status >= 400 && exception.status < 500) {
         pendingIntent = null;
         if (exception.code === 'VERSION_CONFLICT' || exception.code === 'INVALID_STATE') retryAction = load;
@@ -80,7 +68,7 @@ onMounted(load);
     <div v-if="error" class="alert alert--danger" role="alert"><span>{{ error }}</span><button class="button button--ghost" :disabled="busy || remaining > 0" @click="retry">{{ remaining ? `${remaining} 秒后可重试` : '重试' }}</button></div>
     <LoadingState v-if="loading" />
     <template v-else>
-      <GenerationProgress v-if="progress" :progress="progress" :busy="busy || remaining > 0" @cancel="cancel" @retry="generate" />
+      <GenerationProgress v-if="progress || reconnecting" :progress="progress" :reconnecting="reconnecting" :busy="busy || remaining > 0" @cancel="cancel" @retry="generate" />
       <EmptyState v-if="!preferences && !brief" error title="暂时无法读取简报" description="恢复连接后重试加载。" />
       <EmptyState v-else-if="!hasSubscription" title="选择你关注的话题"><RouterLink class="button button--primary" to="/settings">设置订阅</RouterLink></EmptyState>
       <EmptyState v-else-if="!brief" title="还没有简报"><button class="button button--primary" :disabled="busy || generating || remaining > 0" @click="generate">{{ generating ? '正在生成…' : '生成第一份简报' }}</button></EmptyState>

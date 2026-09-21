@@ -94,6 +94,7 @@ def test_thinking_real_agent_preserves_reasoning_and_finishes_with_auto_tools(
         assert [entry["function"]["name"] for entry in payload["tools"]] == ["BriefOutput"]
         final = {
             "title": "Synthetic provider final", "items": [], "limitations": ["No supplied news"],
+            "summary": "No matching news.",
         }
         return provider_response(content=json.dumps(final)) if json_final else provider_response(
             name="BriefOutput", args=final
@@ -146,7 +147,8 @@ def test_disabled_thinking_keeps_required_tool_choice_and_drops_reasoning():
 
 
 @pytest.mark.parametrize(("content", "finish_reason", "expected_error"), [
-    ('{"title":"Actual JSON fixture","items":[]}', "stop", None),
+    ('{"title":"Actual JSON fixture","summary":"No matching news.","items":[]}', "stop", None),
+    ('{"title":"Missing reader overview","items":[]}', "stop", "STRUCTURED_OUTPUT_MISSING"),
     ('{"title":"Incomplete fixture"', "length", "MODEL_OUTPUT_INCOMPLETE"),
     ('{"title":"Incomplete fixture"', "stop", "STRUCTURED_OUTPUT_MISSING"),
     ("Ordinary prose has no validated brief", "stop", "STRUCTURED_OUTPUT_MISSING"),
@@ -171,7 +173,7 @@ def test_thinking_final_text_requires_complete_valid_actual_json(
 
 
 def test_thinking_json_still_requires_existing_evidence(tmp_path):
-    content = json.dumps({"title": "Synthetic invalid evidence", "items": [{
+    content = json.dumps({"title": "Synthetic invalid evidence", "summary": "Synthetic overview.", "items": [{
         "evidence_id": "invented", "summary": "Synthetic", "reason": "Synthetic", "topic": "AI",
     }]})
     request = HarnessRequest(

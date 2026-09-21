@@ -42,6 +42,8 @@ class ScriptedModel(BaseChatModel):
 
 
 def ai_call(name, args, call_id):
+    if name == "BriefOutput":
+        args = {"summary": "Synthetic reader overview.", **args}
     return AIMessage(
         content="",
         tool_calls=[{"name": name, "args": args, "id": call_id, "type": "tool_call"}],
@@ -708,6 +710,7 @@ def test_stale_duplicate_cannot_hide_fresh_evidence():
     }
     output = BriefOutput(
         title="test",
+        summary="Synthetic reader overview.",
         items=[
             {"evidence_id": ident, "summary": "Summary", "reason": "Match", "topic": "AI"}
             for ident in evidence

@@ -68,6 +68,11 @@ def resource(session, ident, kind, lock=False):
 
 
 def progress(run):
+    phase = None
+    if run.status in ACTIVE:
+        phase = "publishing" if run.private.get("outputBriefId") else (
+            "researching" if run.private.get("harnessStarted") else "preparing"
+        )
     return dict(
         id=run.id,
         status=run.status,
@@ -75,7 +80,10 @@ def progress(run):
         remainingSeconds=run.remaining_seconds,
         updatedAt=iso(run.updated_at),
         briefId=run.brief_id,
-        error=run.error,
+        error="生成失败，请重试" if run.status == "failed" else "",
+        phase=phase,
+        phaseStartedAt=run.private.get("phaseStartedAt", iso(run.updated_at)) if phase else None,
+        emptyResult=bool(run.private.get("emptyResult")),
     )
 
 

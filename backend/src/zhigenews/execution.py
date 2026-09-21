@@ -269,7 +269,10 @@ def execute_run(run_id):
         started_at = utcnow()
         run.lease_token, run.lease_until = token, started_at + timedelta(seconds=90)
         run.status, run.updated_at = "running", started_at
-        run.private = {**run.private, "fixedAt": run.private.get("fixedAt") or iso(started_at)}
+        run.private = {
+            **run.private, "fixedAt": run.private.get("fixedAt") or iso(started_at),
+            "phaseStartedAt": iso(started_at),
+        }
 
     def cancelled():
         with transaction() as session:
@@ -321,7 +324,7 @@ def execute_run(run_id):
                 )
             with transaction() as session:
                 run = session.scalar(select(Run).where(Run.id == run_id).with_for_update())
-                run.private = {**run.private, "harnessStarted": True}
+                run.private = {**run.private, "harnessStarted": True, "phaseStartedAt": iso(utcnow())}
             result = HarnessRunner(get_settings().database_url).run(
                 request, event_sink=run_sink(run_id, token), cancelled=cancelled, resume=resume
             )
@@ -336,6 +339,23 @@ def execute_run(run_id):
                 existing = session.scalar(select(Brief).where(Brief.run_id == run_id))
                 if existing:
                     return
+                missing = list(dict.fromkeys(private["missingSources"] + result.limitations))
+                status = "partial" if missing else "completed"
+                run.input_tokens, run.output_tokens = (
+                    result.usage.get("inputTokens"), result.usage.get("outputTokens"),
+                )
+                run.cost, run.elapsed_seconds = (
+                    result.usage.get("cost"), result.usage.get("elapsedSeconds", 0),
+                )
+                run.private = {**run.private, "limitations": missing}
+                if not result.items:
+                    # A normal empty result ends the run without publishing an empty edition.
+                    run.private = {**run.private, "emptyResult": True}
+                    run.status, run.error = status, ""
+                    run.percent, run.remaining_seconds = 100, 0
+                    run.updated_at = utcnow()
+                    run.lease_token = run.lease_until = None
+                    return
                 date = run.created_at.replace(tzinfo=UTC).astimezone(CN).date().isoformat()
                 version = (
                     session.scalar(
@@ -344,16 +364,12 @@ def execute_run(run_id):
                     or 0
                 ) + 1
                 brief_id = uid("brief_")
-                missing = list(dict.fromkeys(private["missingSources"] + result.limitations))
-                status = "partial" if missing else "completed"
                 data = dict(
                     id=brief_id,
                     title=result.title,
                     date=date,
                     version=version,
-                    summary="\n".join(result.limitations)
-                    if result.limitations
-                    else f"整理了 {len(result.items)} 条与你相关的新闻",
+                    summary=result.summary,
                     items=result.items,
                     generationStatus=status,
                     deliveryStatus="pending",
@@ -371,15 +387,10 @@ def execute_run(run_id):
                 session.add(delivery)
                 session.flush()
                 add_outbox(session, "delivery", delivery.id)
-                run.private = {**run.private, "outputBriefId": brief_id, "generatedStatus": status}
-                run.input_tokens, run.output_tokens = (
-                    result.usage.get("inputTokens"),
-                    result.usage.get("outputTokens"),
-                )
-                run.cost, run.elapsed_seconds = (
-                    result.usage.get("cost"),
-                    result.usage.get("elapsedSeconds", 0),
-                )
+                run.private = {
+                    **run.private, "outputBriefId": brief_id, "generatedStatus": status,
+                    "phaseStartedAt": iso(utcnow()),
+                }
                 run.percent = 95
                 run.remaining_seconds = None
                 run.lease_until = utcnow() + timedelta(seconds=90)

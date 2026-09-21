@@ -46,11 +46,13 @@ pytestmark = pytest.mark.mysql
 FIXED_AT = "2026-01-02T01:00:00Z"
 
 
-def final_response(*, empty=False, evidence_id="synthetic-evidence-1"):
+def final_response(*, empty=False, evidence_id="synthetic-evidence-1", limitations=None):
     return ai_call(
         "BriefOutput",
         {
             "title": "Synthetic no-match brief" if empty else "Synthetic execution brief",
+            "summary": "暂无相关新闻。" if empty else "新工具让新闻整理更方便。",
+            "limitations": limitations or [],
             "items": []
             if empty
             else [
@@ -161,7 +163,7 @@ def execution_case():
             session.execute(delete(Brief).where(Brief.user_id == user_id))
             session.execute(delete(RunEvent).where(RunEvent.run_id == run_id))
             session.execute(delete(MessageJournal).where(MessageJournal.thread_id == run_id))
-            session.execute(delete(Run).where(Run.id == run_id))
+            session.execute(delete(Run).where(Run.user_id == user_id))
             session.execute(delete(Resource).where(Resource.owner_id == user_id))
             session.execute(delete(User).where(User.id == user_id))
         # Remove only this fixture's server-generated directory under the configured run root.
@@ -310,19 +312,55 @@ def test_new_run_discovers_collected_news_without_preloading_and_uses_actual_sta
     assert not (workspace / "inputs" / "evidence.jsonl").exists()
 
 
-def test_no_match_remains_empty_instead_of_fabricating_news(execution_case, monkeypatch):
+@pytest.mark.parametrize("has_previous", [False, True])
+@pytest.mark.parametrize("filtered", [False, True])
+def test_no_match_remains_empty_instead_of_fabricating_news(execution_case, monkeypatch, has_previous, filtered):
     case = execution_case
     with transaction() as session:
         run = session.get(Run, case.run_id)
-        run.private = {**run.private, "evidence": [], "snapshotIds": []}
-    patch_model(monkeypatch, ScriptedModel(responses=[final_response(empty=True)]))
+        if filtered:
+            evidence = [{**item, "published_at": "2025-01-01T00:00:00Z"} for item in run.private["evidence"]]
+            run.private = {**run.private, "evidence": evidence}
+        else:
+            run.private = {**run.private, "evidence": [], "snapshotIds": []}
+        if has_previous:
+            session.add(Run(id=case.run_id + "old", user_id=case.user_id, business_key=case.run_id + "old",
+                            status="completed", preferences=run.preferences, config=run.config, private={}))
+            session.flush()
+            session.add(Brief(id=case.run_id + "old", user_id=case.user_id, run_id=case.run_id + "old",
+                              date="2026-01-01", version=1, published=True,
+                              data={"title": "Previous brief", "items": [{"id": "old-news"}]}))
+    patch_model(monkeypatch, ScriptedModel(responses=[final_response(empty=not filtered)]))
     execution.execute_run(case.run_id)
     snapshot = rows(case)
-    assert snapshot.run.percent == 95, [event.data for event in snapshot.events]
-    assert snapshot.briefs[0].data["items"] == []
+    assert snapshot.run.status == ("partial" if filtered else "completed"), [event.data for event in snapshot.events]
+    assert snapshot.run.percent == 100 and snapshot.run.lease_token is None
+    assert not snapshot.briefs and not snapshot.deliveries
+    assert progress(snapshot.run)["emptyResult"] and progress(snapshot.run)["briefId"] is None
+    execution.execute_run(case.run_id)  # Replay must not create an empty edition either.
+    with transaction() as session:
+        previous = list(session.scalars(select(Brief).where(Brief.user_id == case.user_id)))
+        assert len(previous) == int(has_previous)
+        if has_previous:
+            assert previous[0].published and previous[0].data == {"title": "Previous brief", "items": [{"id": "old-news"}]}
+        assert not list(session.scalars(select(Outbox).where(Outbox.target_id == case.run_id)))
+
+
+def test_partial_brief_keeps_reader_overview_separate_from_diagnostics(execution_case, monkeypatch):
+    case = execution_case
+    limitation = "UTC window; missing source; internal diagnostic"
+    patch_model(monkeypatch, ScriptedModel(responses=[final_response(limitations=[limitation])]))
+    execution.execute_run(case.run_id)
+    snapshot = rows(case)
+    assert progress(snapshot.run)["phase"] == "publishing"
+    assert snapshot.briefs[0].data["summary"] == "新工具让新闻整理更方便。"
+    assert limitation in snapshot.briefs[0].data["missingSources"]
+    markdown = (case.workspace / "output" / "brief.md").read_text("utf-8")
+    assert "新工具让新闻整理更方便。" in markdown and limitation not in markdown
     publish_delivery(snapshot.deliveries[0].id)
-    final = rows(case)
-    assert final.run.percent == 100 and final.briefs[0].data["items"] == []
+    finished = progress(rows(case).run)
+    assert finished["status"] == "partial" and finished["phase"] is None
+    assert not finished["emptyResult"] and finished["error"] == ""
 
 
 def test_tool_error_can_be_handled_by_real_model_tool_loop(execution_case, monkeypatch):
@@ -584,4 +622,7 @@ def test_actual_tool_event_payloads_are_bounded_and_redacted(execution_case, mon
         "updatedAt",
         "briefId",
         "error",
+        "phase",
+        "phaseStartedAt",
+        "emptyResult",
     }

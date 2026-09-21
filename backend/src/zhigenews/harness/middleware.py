@@ -277,6 +277,7 @@ class RuntimeMiddleware(AgentMiddleware):
                 content=prompt
                 + "\n本次运行已进入最终整理阶段。停止继续检索或调用研究工具，立即调用 BriefOutput 工具，"
                 "根据已有证据提交简报；只保留有来源支持的内容，把尚未核实的信息或资料不足写入 limitations。"
+                "仍须提交面向读者的报纸式 title、1–2句本期导语 summary 及2–3句白话新闻摘要，正文不含系统信息。"
                 "没有匹配证据时返回空 items 并说明，不得编造新闻。"
             ),
         )

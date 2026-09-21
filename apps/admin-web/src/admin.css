@@ -36,6 +36,7 @@
 @media (max-width: 767px) { .admin-scroll-hint { display: block; } .admin-run-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); } .admin-kv { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); } .admin-kv dd { margin-bottom: var(--space-3); } .admin-toolbar { align-items: stretch; } .admin-toolbar .field { flex-basis: 100%; } }
 .admin-login-container { padding: 24px 16px; }
 .admin-login-brand { margin-bottom: 24px; font-size: 18px; }
+.admin-mobile-brand { display: none; }
 .app-shell--admin .toast { display: flex; align-items: center; gap: 12px; }
 .app-shell--admin .section-heading h2 { display: inline-flex; align-items: center; gap: 8px; }
 .admin-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-block: 20px; }
@@ -53,6 +54,7 @@
 .source-progress-items small { display: block; margin-top: var(--space-1); }
 .source-result summary { cursor: pointer; min-height: var(--touch-target); padding-block: var(--space-2); }
 @media (max-width: 767px) {
+  .admin-mobile-brand { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex-shrink: 0; }
   .app-shell--admin .app-body { padding-bottom: 0; }
   .app-shell--admin .toast { bottom: 16px; }
   .app-shell--admin .topbar > .meta { font-size: 10px; }

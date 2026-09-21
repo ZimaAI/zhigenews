@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { BookOpen, History, Newspaper } from 'lucide-vue-next';
+import BrandLogo from '@ui/BrandLogo.vue';
+import { History, Newspaper } from 'lucide-vue-next';
 import { sessionState } from '../state';
 const route = useRoute();
 const name = computed(() => sessionState.session?.name || '匿名读者');
@@ -12,7 +13,7 @@ const active = (path: string) => route.path === path || route.path.startsWith(`$
   <a class="skip-link" href="#reader-main">跳转到主要内容</a>
   <div class="reader-shell">
     <header class="reader-masthead">
-      <RouterLink to="/today" class="reader-brand" aria-label="知更 · 今日简报"><BookOpen :size="27" :stroke-width="1.8" aria-hidden="true" /><span>知更</span></RouterLink>
+      <RouterLink to="/today" class="reader-brand" aria-label="知更 · 今日简报"><BrandLogo decorative /><span>知更</span></RouterLink>
       <div class="reader-utilities"><RouterLink v-if="sessionState.session?.onboardingCompleted" to="/settings" class="reader-account" :class="{ selected: active('/settings') }" aria-label="个人设置" :title="name + ' · 个人设置'" :aria-current="active('/settings') ? 'page' : undefined">{{ name.slice(0, 1) }}</RouterLink></div>
     </header>
     <div class="reader-canvas">
@@ -24,7 +25,7 @@ const active = (path: string) => route.path === path || route.path.startsWith(`$
 <style scoped>
 .reader-shell { width: min(var(--width-page), calc(100% - 64px)); margin: 0 auto 32px; }
 .reader-masthead { min-height: 80px; display: flex; align-items: center; gap: 24px; }
-.reader-brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--color-primary); }
+.reader-brand { min-height: 44px; display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--color-primary); }
 .reader-brand > span { color: var(--color-text); font-size: 22px; font-weight: 650; line-height: 1.2; }
 .reader-utilities { margin-left: auto; display: flex; align-items: center; gap: 24px; }
 .reader-account { width: 40px; height: 40px; border: 1px solid var(--color-primary-border); border-radius: 50%; display: grid; place-items: center; background: var(--color-primary-soft); color: var(--color-primary); text-decoration: none; font-size: 14px; font-weight: 600; }

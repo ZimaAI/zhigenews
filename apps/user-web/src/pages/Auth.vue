@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ArrowRight, Feather, LoaderCircle, RefreshCw } from 'lucide-vue-next';
+import BrandLogo from '@ui/BrandLogo.vue';
+import { ArrowRight, LoaderCircle, RefreshCw } from 'lucide-vue-next';
 import { sessionState, enterSession, restoreSession } from '../state';
 import { useRequestState } from '../useRequestState';
 const router = useRouter(), route = useRoute();
@@ -26,11 +27,11 @@ onMounted(() => { if (!error.value) void enter(); });
 <template>
   <main class="auth-page">
     <a class="skip-auth" href="#entry-card">跳转到进入状态</a>
-    <div class="auth-brand"><Feather :size="28" aria-hidden="true" /><span>知更<span class="brand-en">QUIET BRIEF</span></span></div>
+    <div class="auth-brand"><BrandLogo decorative /><span>知更<span class="brand-en">QUIET BRIEF</span></span></div>
     <div class="auth-layout">
       <section class="auth-intro"><p class="eyebrow">LESS NOISE. MORE SIGNAL.</p><h1>每天，读一点<br />真正关心的事。</h1><p>你的兴趣，你的阅读节奏。</p><div class="auth-preview"><span>有来源的 AI 新闻简报</span><p>为你保留值得关注的进展。</p></div></section>
       <section id="entry-card" class="auth-card" :aria-busy="busy">
-        <div class="entry-icon"><Feather :size="24" aria-hidden="true" /></div>
+        <div class="entry-icon"><BrandLogo :size="48" decorative /></div>
         <h2>你的阅读空间</h2><p class="muted">无需注册，即刻开始。</p>
         <template v-if="error"><p class="alert alert--danger" role="alert">{{ error }}</p><button class="button button--primary auth-submit" :disabled="busy || remaining > 0" @click="enter"><RefreshCw :size="16" aria-hidden="true" />{{ busy ? '正在进入…' : remaining > 0 ? remaining + ' 秒后可重试' : '重新进入' }}</button></template>
         <div v-else class="entry-status" role="status"><LoaderCircle :size="18" class="entry-loading" aria-hidden="true" /><span>正在为你打开…</span><ArrowRight :size="16" aria-hidden="true" /></div>
@@ -53,7 +54,7 @@ onMounted(() => { if (!error.value) void enter(); });
 .auth-preview { margin-top: 40px; padding-left: 20px; border-left: 2px solid var(--color-primary-border); }
 .auth-preview p { margin: 8px 0; font-size: 14px; color: var(--color-text-muted); }
 .auth-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-card); padding: 32px; }
-.entry-icon { display: grid; place-items: center; width: 48px; height: 48px; background: var(--color-primary-soft); color: var(--color-primary); border-radius: var(--radius-card); margin-bottom: 24px; }
+.entry-icon { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 24px; }
 .auth-card h2 { margin: 0 0 8px; font-size: 24px; }
 .auth-card > .muted { margin: 0 0 32px; font-size: 14px; }
 .entry-status { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; background: var(--color-primary-soft); border-radius: var(--radius-control); color: var(--color-primary); font-size: 14px; }

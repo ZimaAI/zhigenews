@@ -503,7 +503,7 @@ class HarnessRunner:
                         **({
                             "/news": "只读授权新闻目录，每个子目录对应一个来源。可自主列目录和关键词检索。",
                             "/news/{source_id}/index.json": "采集后维护的索引；含 source_id、request_url、maintained_at、window_start、window_end 和 items。items 提供标题、URL、发布时间、evidence_id 及 file/line 定位。",
-                            "/news/{source_id}/parsed": "按日期组织的不可变 JSONL 新闻记录，包含摘要、正文及来源信息；按索引 file/line 读取。固定评估记录也可由索引指向 records.jsonl。",
+                            "/news/{source_id}/parsed": "按日期组织的不可变 JSONL 新闻记录，包含摘要、正文及来源信息；按索引 file/line 读取。旧运行的固定记录也可由索引指向 records.jsonl。",
                             "/news/{source_id}/raw": "实际采集的原始响应文件，仅在需要核对原始资料时读取。",
                             "/news/{source_id}/manifests": "快照元信息及 raw/parsed 文件路径；latest.json 指向最新采集快照，不代表所有窗口内新闻。",
                         } if request.news_roots is not None else {

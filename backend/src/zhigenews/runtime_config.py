@@ -50,7 +50,7 @@ def agent_config() -> dict:
 
 
 def _model_snapshot(settings: Settings, role: str) -> dict:
-    prefix = {"main": "", "summary": "summary_", "evaluation": "evaluation_"}[role]
+    prefix = {"main": "", "summary": "summary_"}[role]
 
     def value(field):
         primary = getattr(settings, "openai_" + field)
@@ -96,11 +96,3 @@ def runtime_models(settings: Settings | None = None) -> dict:
         "modelId": _model_snapshot(settings, "main"),
         "summaryModelId": _model_snapshot(settings, "summary"),
     }
-
-
-def evaluation_judge(settings: Settings | None = None) -> dict | None:
-    """An omitted judge model keeps evaluation on its rule-based scorers."""
-    settings = settings or get_settings()
-    if not settings.evaluation_openai_model.strip():
-        return None
-    return _model_snapshot(settings, "evaluation")

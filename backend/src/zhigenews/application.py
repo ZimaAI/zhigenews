@@ -23,7 +23,7 @@ from .db import (
     utcnow,
 )
 from .errors import AppError
-from .runtime_config import agent_config, evaluation_judge, runtime_models
+from .runtime_config import agent_config, runtime_models
 from .security import (
     ADMIN_COOKIE,
     audit,
@@ -403,14 +403,6 @@ class Application:
             generatedAt=iso(utcnow()),
         )
 
-    def listing(self, kind):
-        rows = self.db.scalars(
-            select(Resource)
-            .where(Resource.kind == kind)
-            .order_by(Resource.created_at.desc(), Resource.id.desc())
-        )
-        return paginated([self.source_view(r) if kind == "source" else r.data for r in rows], self.params)
-
     def source_view(self, row):
         data = source_state(row)
         data["version"] = row.data.get("version", 0)
@@ -466,17 +458,8 @@ class Application:
             invalidTotal=invalid_total,
         )
 
-    def listEvalCases(self):
-        return self.listing("case")
-
-    def listEvaluations(self):
-        return self.listing("evaluation")
-
     def getSource(self):
         return self.source_view(resource(self.db, self.ident, "source"))
-
-    def getEvaluation(self):
-        return resource(self.db, self.ident, "evaluation").data
 
     def source_data(self, old=None):
         b = deepcopy(self.body)
@@ -569,84 +552,6 @@ class Application:
         from .source_deletions import current_job
 
         return {"job": current_job(self.db)}
-
-    def write_case(self, row=None):
-        body = deepcopy(self.body)
-        if row:
-            data = {**row.data, **body, "revision": row.data["revision"] + 1}
-        else:
-            snapshots = [
-                s.data["snapshotId"]
-                for s in self.db.scalars(select(Resource).where(Resource.kind == "source"))
-                if s.data.get("snapshotId")
-            ]
-            data = {
-                "id": uid("case_"),
-                "preferenceSnapshot": dict(version=0, role=body["preference"], topics=[], keywords=[]),
-                "fixedAt": iso(utcnow()),
-                "sourceSnapshotIds": snapshots,
-                **body,
-                "revision": 1,
-            }
-        for sid in data["sourceSnapshotIds"]:
-            resource(self.db, sid, "snapshot")
-        if row:
-            row.data = data
-        else:
-            self.db.add(Resource(id=data["id"], kind="case", data=data))
-        return data
-
-    def createEvalCase(self):
-        return self.write_case()
-
-    def saveEvalCase(self):
-        return self.write_case(resource(self.db, self.ident, "case", True))
-
-    def runEvaluation(self):
-        from .evaluation import freeze_dataset
-
-        config = agent_config()
-        models = runtime_models()
-        judge = evaluation_judge()
-        cases = [deepcopy(c.data) for c in self.db.scalars(select(Resource).where(Resource.kind == "case"))]
-        if not cases:
-            raise AppError("EMPTY_DATASET", "请先保存评估用例")
-        sources = {
-            s: resource(self.db, s, "snapshot").private["items"]
-            for c in cases
-            for s in c["sourceSnapshotIds"]
-        }
-        frozen = freeze_dataset(cases, sources)
-        ident = uid("eval_")
-        data = dict(
-            id=ident,
-            name="评估 " + iso(utcnow()),
-            configVersion=config["version"],
-            status="queued",
-            relevance=None,
-            faithfulness=None,
-            citations=None,
-            cost=None,
-            latency=None,
-            cases=len(cases),
-            createdAt=iso(utcnow()),
-            datasetVersion=frozen.version,
-            scorerVersion="rules-v1",
-            modelId=models["modelId"]["data"]["modelId"],
-            results=[],
-        )
-        data["scorerVersion"] = "rules-v1+judge-v1-" + (
-            digest(canonical(judge["data"]))[:24] if judge else "unavailable"
-        )
-        private = dict(
-            snapshot=dict(cases=cases, sources=sources),
-            config=config,
-            models=models,
-            judge=judge,
-        )
-        self.db.add(Resource(id=ident, kind="evaluation", data=data, private=private))
-        add_outbox(self.db, "evaluation", ident)
-        return dict(evaluationId=ident)
 
     def listAdminRuns(self):
         query = select(Run).order_by(Run.created_at.desc(), Run.id.desc())

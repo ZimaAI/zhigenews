@@ -95,7 +95,7 @@ docker run --rm python:3.12-slim python -c 'import base64,secrets; print(base64.
 
 `backend.env` 必填：`SECRET_ENCRYPTION_KEY`、`IP_HASH_KEY`（至少 32 字符）、`ADMIN_EMAIL`、`ADMIN_PASSWORD`（至少 12 字符）、`OPENAI_BASE_URL`、`OPENAI_MODEL`、`OPENAI_API_KEY`、`TAVILY_API_KEY`。
 
-`backend.env` 使用 **raw** 格式：写 `KEY=value`，不在值外包引号、不写行尾注释；`$` 和 `#` 可以直接作为密码内容。生产数据库、Redis、运行目录、Cookie 和 Origin 由 Compose 设置，不从此文件覆盖。可按 [后端模板](../backend/.env.example) 追加摘要模型和评估模型配置；LangSmith 默认关闭，需要时配置后开启。
+`backend.env` 使用 **raw** 格式：写 `KEY=value`，不在值外包引号、不写行尾注释；`$` 和 `#` 可以直接作为密码内容。生产数据库、Redis、运行目录、Cookie 和 Origin 由 Compose 设置，不从此文件覆盖。可按 [后端模板](../backend/.env.example) 追加摘要模型配置；LangSmith 默认关闭，需要时配置后开启。
 
 `SECRET_ENCRYPTION_KEY` 必须与数据库一起长期保存，丢失或更换会导致已有加密凭据和任务快照无法解密。已初始化数据库的 MySQL 密码不会随 `.env` 自动修改；改密码需要先在数据库中变更。管理员只在首次初始化时创建；修改 `ADMIN_PASSWORD` 不会重置已有账号。
 
@@ -182,7 +182,7 @@ dc exec -T worker celery -A zhigenews.workers:celery_app inspect ping
 | --- | --- |
 | Docker 卷 `zhigenews-prod_mysql-data` | 业务数据库、会话、任务、checkpoint |
 | Docker 卷 `zhigenews-prod_redis-data` | Celery 队列和 Redis 数据 |
-| `/opt/zhigenews/data` | 新闻、运行工作区、评估文件；容器与宿主机绝对路径一致，供沙箱绑定 |
+| `/opt/zhigenews/data` | 新闻与运行工作区；容器与宿主机绝对路径一致，供沙箱绑定 |
 | Docker 卷 `zhigenews-prod_caddy-data` / `caddy-config` | TLS 证书及 Caddy 状态 |
 | `/opt/zhigenews/.env`、`backend.env`、`.initialized`、可选 `compose.override.yaml` | 基础配置、业务密钥、首次初始化标记、宿主代理覆盖配置 |
 | `/opt/zhigenews/backups` | 每次更新前的数据库 SQL 备份 |

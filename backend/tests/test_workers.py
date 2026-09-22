@@ -366,9 +366,9 @@ def test_blocked_or_cancelled_publication_never_reports_completion(sandbox):
 
 def test_recovery_routes_existing_brief_to_delivery_without_rerunning_model(sandbox):
     _, run_id, _, delivery_id = pending_brief(sandbox)
-    recovered = workers.recover_runs(run_ids=[run_id], evaluation_ids=[])
+    recovered = workers.recover_runs(run_ids=[run_id])
     assert recovered == [{"kind": "delivery", "id": delivery_id}]
-    assert workers.recover_runs(run_ids=[run_id], evaluation_ids=[]) == []
+    assert workers.recover_runs(run_ids=[run_id]) == []
     with transaction() as session:
         commands = list(session.scalars(select(Outbox).where(Outbox.target_id.in_([run_id, delivery_id]))))
         assert len(commands) == 1 and commands[0].kind == "delivery"
@@ -386,7 +386,7 @@ def test_recovery_finishes_abandoned_cancellation_before_requeue(sandbox, lease_
         if lease_seconds is not None:
             run.lease_token = "synthetic-abandoned-worker"
             run.lease_until = now + timedelta(seconds=lease_seconds)
-    assert workers.recover_runs(run_ids=[run_id], evaluation_ids=[], now=now) == []
+    assert workers.recover_runs(run_ids=[run_id], now=now) == []
     with transaction() as session:
         run = session.get(Run, run_id)
         assert run.status == "cancelled" and run.lease_token is None and run.lease_until is None

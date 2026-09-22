@@ -1,7 +1,7 @@
 """Synthetic model, real create_agent/MySQL/files/publication integration.
 
 Only the external model factory is replaced. These checks do not certify a live
-provider, Tavily, news quality, or real-model evaluation scores.
+provider, Tavily, or news quality.
 """
 
 import json

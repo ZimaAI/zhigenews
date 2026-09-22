@@ -100,7 +100,7 @@ class ApiSandbox:
                     resource_ids.add(record.id)
             target_ids = set(run_ids) | set(brief_ids) | set(delivery_ids) | resource_ids | set(deletion_ids)
             for record in session.scalars(select(Idempotency)):
-                if record.response.get("id") in target_ids or record.response.get("evaluationId") in target_ids:
+                if record.response.get("id") in target_ids:
                     session.delete(record)
             session.execute(delete(Outbox).where(Outbox.target_id.in_(target_ids)))
             session.execute(delete(SourceDeletionItem).where(SourceDeletionItem.job_id.in_(deletion_ids)))

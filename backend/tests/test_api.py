@@ -51,9 +51,6 @@ def verified_config(sandbox, monkeypatch, **overrides):
         summary_openai_model="",
         summary_openai_base_url="",
         summary_openai_api_key="",
-        evaluation_openai_model="",
-        evaluation_openai_base_url="",
-        evaluation_openai_api_key="",
     )
     values.update(overrides)
     configured = Settings(_env_file=None, **values)
@@ -456,7 +453,7 @@ def test_read_endpoints_return_contract_pagination_and_no_private_keys(api_sandb
         assert payload["items"] == []
     for path, schema_name in [
         ("/admin/sources", "SourcePage"), ("/admin/runs", "AgentRunPage"),
-        ("/admin/evaluations", "EvaluationPage"), ("/admin/anonymous-accounts", "AnonymousAccountPage"),
+        ("/admin/anonymous-accounts", "AnonymousAccountPage"),
         ("/admin/abuse-events", "AbuseEventPage"), ("/admin/deliveries", "DeliveryPage"),
     ]:
         payload = assert_dto(admin.get(BASE + path, params={"limit": 1}), schema_name)

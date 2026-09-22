@@ -27,7 +27,7 @@ from .sources import pending_deletion, source_state
 
 logger = logging.getLogger(__name__)
 SOURCE_LEASE_SECONDS = 120
-TASK_NAMES = {kind: "zhigenews." + kind for kind in ("source", "run", "evaluation", "delivery", "source_deletion")}
+TASK_NAMES = {kind: "zhigenews." + kind for kind in ("source", "run", "delivery", "source_deletion")}
 
 celery_app = Celery("zhigenews", broker=get_settings().redis_url, backend=get_settings().redis_url)
 celery_app.conf.update(
@@ -58,7 +58,11 @@ def dispatch_outbox(*, outbox_ids=None, send=None, limit=100):
     """Publish before marking sent; an uncertain publish may safely be repeated."""
     with transaction() as session:
         query = (
-            select(Outbox).where(Outbox.sent_at.is_(None)).order_by(Outbox.created_at, Outbox.id).limit(limit)
+            select(Outbox)
+            # Retired task kinds must not fill the batch ahead of active work.
+            .where(Outbox.sent_at.is_(None), Outbox.kind.in_(TASK_NAMES))
+            .order_by(Outbox.created_at, Outbox.id)
+            .limit(limit)
         )
         if outbox_ids is not None:
             query = query.where(Outbox.id.in_(outbox_ids))
@@ -66,10 +70,6 @@ def dispatch_outbox(*, outbox_ids=None, send=None, limit=100):
     sent, failed = [], []
     sender = send or celery_app.send_task
     for ident, kind, target in pending:
-        if kind not in TASK_NAMES:
-            failed.append(ident)
-            logger.error("Unknown outbox task kind %s for %s", kind, ident)
-            continue
         try:
             sender(TASK_NAMES[kind], args=[target], task_id=ident)
         except Exception:
@@ -136,7 +136,7 @@ def schedule_due(*, source_ids=None, user_ids=None, now=None, limit=100):
     return {"sources": queued_sources, "runs": queued_runs, "failures": failures}
 
 
-def recover_runs(*, run_ids=None, evaluation_ids=None, now=None, limit=100):
+def recover_runs(*, run_ids=None, now=None, limit=100):
     """Restore abandoned work without rerunning a model after a brief exists."""
     now = _date(now) or utcnow()
     queued = []
@@ -175,31 +175,6 @@ def recover_runs(*, run_ids=None, evaluation_ids=None, now=None, limit=100):
                 add_outbox(session, kind, target)
                 queued.append({"kind": kind, "id": target})
             run.private = {**run.private, "lastRecoveryQueuedAt": iso(now)}
-    with transaction() as session:
-        query = select(Resource).where(
-            Resource.kind == "evaluation",
-            Resource.data["status"].as_string().in_(("queued", "running")),
-            Resource.lease_until.is_(None) | (Resource.lease_until <= now),
-        )
-        if evaluation_ids is not None:
-            query = query.where(Resource.id.in_(evaluation_ids))
-        for row in session.scalars(
-            query.order_by(Resource.created_at).limit(limit).with_for_update(skip_locked=True)
-        ):
-            if row.data["status"] not in ("queued", "running") or row.lease_until and row.lease_until > now:
-                continue
-            last_queued = _date(row.private.get("lastRecoveryQueuedAt"))
-            if last_queued and last_queued > now - timedelta(seconds=60):
-                continue
-            pending = session.scalar(
-                select(Outbox.id)
-                .where(Outbox.kind == "evaluation", Outbox.target_id == row.id, Outbox.sent_at.is_(None))
-                .limit(1)
-            )
-            if not pending:
-                add_outbox(session, "evaluation", row.id)
-                queued.append({"kind": "evaluation", "id": row.id})
-            row.private = {**row.private, "lastRecoveryQueuedAt": iso(now)}
     return queued
 
 
@@ -554,22 +529,6 @@ def run_task(self, run_id):
     from .execution import execute_run
 
     result = execute_run(run_id)
-    if isinstance(result, dict) and result.get("status") == "busy":
-        raise self.retry(countdown=result.get("retry_after", 30), max_retries=None)
-    return result
-
-
-@celery_app.task(
-    bind=True,
-    name="zhigenews.evaluation",
-    autoretry_for=(OperationalError,),
-    retry_backoff=True,
-    max_retries=5,
-)
-def evaluation_task(self, evaluation_id):
-    from .execution import execute_evaluation
-
-    result = execute_evaluation(evaluation_id)
     if isinstance(result, dict) and result.get("status") == "busy":
         raise self.retry(countdown=result.get("retry_after", 30), max_retries=None)
     return result

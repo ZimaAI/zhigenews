@@ -6,8 +6,7 @@ import pytest
 from test_api import verified_config
 
 from zhigenews.contract import CONTRACT, schema, validate
-from zhigenews.db import Brief, Delivery, Resource, Run, RunEvent, iso, transaction, utcnow
-from zhigenews.security import decrypt
+from zhigenews.db import Brief, Delivery, Run, RunEvent, iso, transaction, utcnow
 
 pytestmark = pytest.mark.mysql
 
@@ -50,7 +49,7 @@ class ContractProbe:
 
 def test_all_active_operations_return_their_real_http_contract(api_sandbox, monkeypatch):
     probe = ContractProbe(api_sandbox)
-    config = verified_config(api_sandbox, monkeypatch)
+    verified_config(api_sandbox, monkeypatch)
     user, admin = api_sandbox.anonymous(), api_sandbox.admin()
     probe.call("ensureAnonymousSession", user)
     identity = probe.call("getSession", user).json()["userId"]
@@ -105,37 +104,6 @@ def test_all_active_operations_return_their_real_http_contract(api_sandbox, monk
     events = probe.call("adminRunEvents", admin, ident=generation["id"], headers={"Last-Event-ID": "1"})
     assert "id: 1\n" not in events.text and "id: 2\n" in events.text
     assert "event: run.event\n" in events.text
-
-    case_write = {"name": api_sandbox.prefix + " fixed case", "preference": "Agent", "expected": "Evidence remains fixed", "sourceSnapshotIds": [], "fixedAt": timestamp}
-    case = probe.call("createEvalCase", admin, body=case_write).json()
-    api_sandbox.resource(case["id"])
-    updated = probe.call("saveEvalCase", admin, ident=case["id"], body={"name": case["name"], "preference": "Agent", "expected": "Updated synthetic expectation"}).json()
-    assert updated["fixedAt"] == case["fixedAt"] and updated["revision"] == 2
-    probe.call("listEvalCases", admin)
-    probe.call("runEvaluation", admin, body={"configVersion": config["version"]}, status=400)
-    accepted = probe.call("runEvaluation", admin, body={}).json()
-    evaluation_id = api_sandbox.resource(accepted["evaluationId"])
-    evaluation = probe.call("getEvaluation", admin, ident=evaluation_id).json()
-    assert evaluation["relevance"] is None and evaluation["citations"] is None
-    assert evaluation["configVersion"] == config["version"]
-    assert evaluation["modelId"] == "synthetic-test-model"
-    probe.call("listEvaluations", admin)
-    with transaction() as session:
-        private = session.get(Resource, evaluation_id).private
-        frozen = private["snapshot"]
-        own = next(row for row in frozen["cases"] if row["id"] == case["id"])
-        assert own["revision"] == 2 and own["sourceSnapshotIds"] == []
-        assert private["config"] == config and private["judge"] is None
-        for model in private["models"].values():
-            assert model["data"]["modelId"] == "synthetic-test-model"
-            assert decrypt(model["encryptedSecret"]) == "synthetic-model-secret-" + api_sandbox.prefix
-            assert model["encryptedSecret"] not in str(evaluation)
-        assert "synthetic-model-secret-" not in str(evaluation)
-        assert config["systemPrompt"] not in str(evaluation)
-    probe.call("saveEvalCase", admin, ident=case["id"], body={"name": case["name"], "preference": "Different", "expected": "Later edit"})
-    with transaction() as session:
-        frozen = session.get(Resource, evaluation_id).private["snapshot"]
-        assert next(row for row in frozen["cases"] if row["id"] == case["id"])["revision"] == 2
 
     probe.call("getOverview", admin)
     probe.call("listAnonymousAccounts", admin)

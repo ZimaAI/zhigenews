@@ -7,7 +7,6 @@ const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/overview', component: () => import('./pages/Overview.vue') },
   { path: '/sources/:id?', component: () => import('./pages/Sources.vue') },
   { path: '/runs/:id?', component: () => import('./pages/Runs.vue') },
-  { path: '/evaluations/:id?', component: () => import('./pages/Evaluations.vue') },
   { path: '/users', component: () => import('./pages/Users.vue') },
   { path: '/deliveries', component: () => import('./pages/Deliveries.vue') },
   { path: '/login', component: () => import('./pages/Login.vue') },

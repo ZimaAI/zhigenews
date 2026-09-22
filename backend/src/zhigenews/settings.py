@@ -27,11 +27,6 @@ class Settings(BaseSettings):
     summary_openai_api_key: str = ""
     summary_openai_context_window: int | None = Field(default=None, ge=1024)
     summary_openai_thinking_enabled: bool | None = None
-    evaluation_openai_base_url: str = ""
-    evaluation_openai_model: str = ""
-    evaluation_openai_api_key: str = ""
-    evaluation_openai_context_window: int | None = Field(default=None, ge=1024)
-    evaluation_openai_thinking_enabled: bool | None = None
     tavily_api_key: str = ""
     langsmith_tracing: bool = False
     langsmith_api_key: SecretStr = SecretStr("")

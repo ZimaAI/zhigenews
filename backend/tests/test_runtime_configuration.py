@@ -41,8 +41,7 @@ def test_model_settings_load_from_env_file(tmp_path, model_settings):
         "OPENAI_CONTEXT_WINDOW=131072\n"
         "OPENAI_THINKING_ENABLED=true\n"
         "SUMMARY_OPENAI_MODEL=synthetic-file-summary\n"
-        "SUMMARY_OPENAI_THINKING_ENABLED=false\n"
-        "EVALUATION_OPENAI_MODEL=synthetic-file-judge\n",
+        "SUMMARY_OPENAI_THINKING_ENABLED=false\n",
         encoding="utf-8",
     )
     settings = Settings(_env_file=path)
@@ -54,7 +53,6 @@ def test_model_settings_load_from_env_file(tmp_path, model_settings):
     assert snapshots["summaryModelId"]["data"]["modelId"] == "synthetic-file-summary"
     assert snapshots["summaryModelId"]["data"]["thinkingEnabled"] is False
     assert security.decrypt(snapshots["modelId"]["encryptedSecret"]) == "synthetic-file-key"
-    assert runtime_config.evaluation_judge(settings)["data"]["modelId"] == "synthetic-file-judge"
 
 
 def test_default_context_window_is_inherited_by_summary(model_settings):
@@ -117,27 +115,7 @@ def test_missing_main_model_setting_has_clear_service_unavailable_error(model_se
     assert "synthetic-main-key" not in error.value.message
 
 
-def test_judge_is_optional_and_can_override_main_settings(model_settings):
-    assert runtime_config.evaluation_judge() is None
-    model_settings.evaluation_openai_model = "synthetic-judge"
-    inherited = runtime_config.evaluation_judge()
-    assert inherited["data"]["modelId"] == "synthetic-judge"
-    assert inherited["data"]["endpoint"] == model_settings.openai_base_url
-    assert inherited["data"]["contextWindow"] == 65536
-    assert inherited["data"]["thinkingEnabled"] is True
-    assert security.decrypt(inherited["encryptedSecret"]) == "synthetic-main-key"
-    model_settings.evaluation_openai_base_url = "https://judge.invalid/v1"
-    model_settings.evaluation_openai_api_key = "synthetic-judge-key"
-    model_settings.evaluation_openai_context_window = 32768
-    model_settings.evaluation_openai_thinking_enabled = False
-    overridden = runtime_config.evaluation_judge()
-    assert overridden["data"]["endpoint"] == "https://judge.invalid/v1"
-    assert overridden["data"]["contextWindow"] == 32768
-    assert overridden["data"]["thinkingEnabled"] is False
-    assert security.decrypt(overridden["encryptedSecret"]) == "synthetic-judge-key"
-
-
-@pytest.mark.parametrize("prefix", ["", "summary_", "evaluation_"])
+@pytest.mark.parametrize("prefix", ["", "summary_"])
 def test_context_window_rejects_invalid_configuration(model_settings, prefix):
     with pytest.raises(ValidationError):
         Settings(_env_file=None, **{prefix + "openai_context_window": 0})

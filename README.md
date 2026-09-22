@@ -71,7 +71,7 @@ docker compose --profile app run --rm api python -m zhigenews.cli init
 docker compose --profile app up -d api worker beat
 ```
 
-服务使用同一 MySQL 与 Redis。单独的 beat 扫描持久计划与 outbox，Celery worker 执行采集、Agent、评估和发布。容器数据位于 `zhigenews_runtime` 卷；API/worker统一挂载到同一绝对路径，使可信worker启动的隔离bash容器能够只读绑定本次工作区。Docker socket仅供可信worker创建沙箱，绝不挂载进Agent沙箱。沙箱无网络、非root、只读根和持久挂载、资源/输出/超时受限；不可用时不回退宿主shell。
+服务使用同一 MySQL 与 Redis。单独的 beat 扫描持久计划与 outbox，Celery worker 执行采集、Agent 和发布。容器数据位于 `zhigenews_runtime` 卷；API/worker统一挂载到同一绝对路径，使可信worker启动的隔离bash容器能够只读绑定本次工作区。Docker socket仅供可信worker创建沙箱，绝不挂载进Agent沙箱。沙箱无网络、非root、只读根和持久挂载、资源/输出/超时受限；不可用时不回退宿主shell。
 
 本机 API 可搭配 Linux worker/beat 完成生成，生成工作区统一使用容器数据路径。本机 solo Worker 仅用于逐步调试，不要与容器 worker 同时消费队列，或让两类 worker 接续同一运行的文件目录。`docker compose stop`保留数据；本项目不提供自动删除数据卷或无损数据库降级承诺。
 
@@ -81,13 +81,13 @@ docker compose --profile app up -d api worker beat
 
 从仍支持 NewsNow 的旧版本升级时，先在旧管理员页面筛选该类型，停止采集并删除全部对应来源，等待后台删除任务全部完成后再部署本版本。清理包含来源配置、采集记录与文件，历史简报保留；不要运行初始化来代替清理。
 
-`POST /auth/anonymous`自动签发HttpOnly匿名Cookie，管理员使用独立登录Cookie。所有写请求发送 `X-Zhige-Request: 1`；有Origin时必须在ALLOWED_ORIGINS白名单。创建生成、采集、评估与发布重试发送稳定 `Idempotency-Key`（8–128字符），同键不同body返回409。429遵循Retry-After。
+`POST /auth/anonymous`自动签发HttpOnly匿名Cookie，管理员使用独立登录Cookie。所有写请求发送 `X-Zhige-Request: 1`；有Origin时必须在ALLOWED_ORIGINS白名单。创建生成、采集与发布重试发送稳定 `Idempotency-Key`（8–128字符），同键不同body返回409。429遵循Retry-After。
 
-模型连接统一在 `backend/.env` 配置，字段示例见 [backend/.env.example](backend/.env.example)。`OPENAI_BASE_URL`、`OPENAI_MODEL`、`OPENAI_API_KEY` 指定主模型；`SUMMARY_OPENAI_*` 可覆盖摘要模型，未设置时继承主模型；`EVALUATION_OPENAI_MODEL` 启用可选评估模型。管理员端不再提供模型与连接、Agent 配置页面和管理 API，无需在页面验证或发布配置。
+模型连接统一在 `backend/.env` 配置，字段示例见 [backend/.env.example](backend/.env.example)。`OPENAI_BASE_URL`、`OPENAI_MODEL`、`OPENAI_API_KEY` 指定主模型；`SUMMARY_OPENAI_*` 可覆盖摘要模型，未设置时继承主模型。管理员端不再提供模型与连接、Agent 配置页面和管理 API，无需在页面验证或发布配置。
 
-Agent 预算、工具、摘要阈值、子任务并发和系统提示词集中在 [runtime_config.py](backend/src/zhigenews/runtime_config.py) 的常量中维护。运行与评估自动使用当前部署配置，并保存私有快照；已有数据库模型和 Agent 配置不再影响新任务，历史运行仍可查询。API key 在任务快照中加密，不通过公开接口返回。修改 `.env` 后重启本机 API，并重新创建容器 worker/beat；修改代码常量后重新构建镜像并重启 API、worker、beat。
+Agent 预算、工具、摘要阈值、子任务并发和系统提示词集中在 [runtime_config.py](backend/src/zhigenews/runtime_config.py) 的常量中维护。运行自动使用当前部署配置，并保存私有快照；已有数据库模型和 Agent 配置不再影响新任务，历史运行仍可查询。API key 在任务快照中加密，不通过公开接口返回。修改 `.env` 后重启本机 API，并重新创建容器 worker/beat；修改代码常量后重新构建镜像并重启 API、worker、beat。
 
-`OPENAI_THINKING_ENABLED` 控制主模型深度思考，默认关闭；`OPENAI_CONTEXT_WINDOW` 设置上下文窗口，默认 258000 token。摘要仅在估算上下文预算达到窗口的 90% 时触发，不设固定 token 或消息条数阈值；预算包含消息、已有摘要、系统提示词、工具等开销与输出预留。摘要和评估模型可用对应前缀单独配置。深度思考会消耗额外时间与输出 Token，运行时间上限在 Agent 常量中调整。用户只看公开进度，完整事件/SSE只对管理员开放。`submitted`只表示站内发布，不表示已读。
+`OPENAI_THINKING_ENABLED` 控制主模型深度思考，默认关闭；`OPENAI_CONTEXT_WINDOW` 设置上下文窗口，默认 258000 token。摘要仅在估算上下文预算达到窗口的 90% 时触发，不设固定 token 或消息条数阈值；预算包含消息、已有摘要、系统提示词、工具等开销与输出预留。摘要模型可用 `SUMMARY_OPENAI_*` 单独配置。深度思考会消耗额外时间与输出 Token，运行时间上限在 Agent 常量中调整。用户只看公开进度，完整事件/SSE只对管理员开放。`submitted`只表示站内发布，不表示已读。
 
 当前代码已适配 `deepseek-v4-flash`、`deepseek-v4-pro`、`deepseek-flash`、`MiniMax-M3`，以及 `gpt-5.1`、`gpt-5.2`、`gpt-5.4`、`gpt-5.5` 和对应日期快照。MiniMax 使用其 API 的 adaptive/disabled 模式，GPT 使用 medium/none；未适配的模型开启时会返回明确的配置错误。参见 [MiniMax 接口说明](https://platform.minimax.io/docs/api-reference/text-openai-api)。
 
@@ -97,7 +97,7 @@ DeepSeek 的思考模式使用自动工具选择，并在内部保留模型协�
 
 ### LangSmith 追踪
 
-正式 LangGraph Agent 已接入 LangSmith 自动追踪，主图名为 `zhigenews.agent`，子图名为 `zhigenews.subagent`。模型、工具及摘要调用保留父子层级；`run_id`、`agent_thread_id`、`resumed` 元数据可关联站内运行。命令行模型探针和评估裁判也会记录追踪。
+正式 LangGraph Agent 已接入 LangSmith 自动追踪，主图名为 `zhigenews.agent`，子图名为 `zhigenews.subagent`。模型、工具及摘要调用保留父子层级；`run_id`、`agent_thread_id`、`resumed` 元数据可关联站内运行。命令行模型探针也会记录追踪。
 
 在现有 `backend/.env` 中设置以下字段，保留其他配置：
 
@@ -119,7 +119,7 @@ docker compose --profile app up -d --force-recreate worker beat
 uv run --project backend python -m zhigenews.cli environment
 ```
 
-环境检查只显示配置状态与项目名，不输出 key。运行下方 `verify_live.py` 探针，或在用户端生成一份简报，然后在 [LangSmith](https://smith.langchain.com/) 的 `my-first-agent` 项目查看新 trace。模型探针名为 `zhigenews.live_model_probe`，评估裁判名为 `zhigenews.evaluation_judge`；评估运行附带 `evaluation_id`。
+环境检查只显示配置状态与项目名，不输出 key。运行下方 `verify_live.py` 探针，或在用户端生成一份简报，然后在 [LangSmith](https://smith.langchain.com/) 的 `my-first-agent` 项目查看新 trace。模型探针名为 `zhigenews.live_model_probe`。
 
 启用后会上传提示词、新闻证据、可见模型输出和工具输入输出，便于排查运行过程；上传前移除结构化私有思考字段及已识别的密钥。模型内部协议重放与检查点保持原状。自动化测试使用离线模拟导出，不会向真实项目发送 synthetic 数据。接入与配置方式参见 [LangChain/LangGraph 追踪文档](https://docs.langchain.com/langsmith/trace-with-langchain) 和 [敏感数据过滤文档](https://docs.langchain.com/langsmith/mask-inputs-outputs)。
 
@@ -142,3 +142,7 @@ Get-Content backend/scripts/verify_runtime.py -Raw | docker compose exec -T work
 
 
 Agent 执行预算由 `backend/src/zhigenews/runtime_config.py` 管理：默认最多 1000 个执行步骤，模型调用和工具调用各计一步（含摘要模型和子 Agent），达到上限即终止任务并报告 `BUDGET_EXHAUSTED`。运行时间默认 600 秒，联网搜索默认最多 20 次；断点恢复继承已使用预算。模型单次输出 Token 上限为对应模型上下文窗口的四分之一，默认窗口 258,000 时为 64,500。执行图内部节点不作为业务步骤计数，其递归保护上限随执行预算调整。
+
+### 评估实验已移除
+
+当前正式应用不再提供固定样例、评估实验、评分及 A/B 比较，后续将重新实现。旧 `/admin/eval-cases` 与 `/admin/evaluations` API 返回 404，`EVALUATION_OPENAI_*` 配置不再使用。部署时重新构建并重启 API、worker、beat 及管理员前端，使旧执行进程退出。已有实验数据和文件保留，待发送的旧任务不再调度。发布基线、旧原型和交接证据作为历史资料保留，当前功能以正式代码与运行契约为准。

@@ -1,6 +1,6 @@
 <div align="center">
 
-<h1>🐦 知更 · ZhigeNews</h1>
+<h1><img src="packages/ui/src/assets/zhige-robin.svg" alt="知更绿色鸟 logo" width="40" height="40" /> 知更 · ZhigeNews</h1>
 
 <p><strong>基于 Agent 的新闻推送平台，让值得关注的新闻主动找到你。</strong></p>
 
@@ -43,8 +43,6 @@
 **知更（ZhigeNews）是一个基于 Agent 的新闻推送平台。** 你只需描述感兴趣的话题、关键词和背景，Agent 就会从订阅的新闻来源中寻找相关报道，结合联网搜索整理信息，生成包含标题、导语、新闻摘要和原文引用的个性化简报，并按设定时间推送到站内。
 
 项目采用前后端分离架构：用户端用于发现话题、管理偏好和阅读简报，管理员端用于维护新闻来源、查看任务和排查运行过程；后端通过 LangChain / LangGraph 编排 Agent，由 Celery 执行采集、生成和发布任务。
-
-> 当前版本为 v1.0.0，处于最终验收阶段。真实模型、Tavily 与完整业务链路的验收进度见 [实现与验收入口](docs/releases/v1.0.0/IMPLEMENTATION.md)。
 
 ## ✨ 核心特性
 

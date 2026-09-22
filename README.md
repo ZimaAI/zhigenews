@@ -1,148 +1,211 @@
-# 知更 · v1.0.0
+<div align="center">
 
-基于 FastAPI、MySQL、LangChain/LangGraph 的个性化新闻简报。当前实施基线为 **v1.0.0/b003**，后端交接为 **h001**。b003只记录用户确认的验收安排：先完成前后端实现，真实外部模型、Tavily及最终业务验收由用户随后进行。原型位于 `docs/releases/v1.0.0/draft/prototype/`，其模拟数据与正式应用隔离。
+<h1>🐦 知更 · ZhigeNews</h1>
 
-当前阶段与剩余工作请读 [.project-flow/RESUME.md](.project-flow/RESUME.md)，实际验收结果以版本 evidence/ 中的日志为准。不能把自动化测试中的 synthetic 模型结果视为真实模型或 Tavily 服务通过。
+<p><strong>基于 Agent 的新闻推送平台，让值得关注的新闻主动找到你。</strong></p>
 
-2026-09-19 按用户决定移除当前长期记忆机制：保存偏好和发布简报不再生成记忆，任务不再同步或读取记忆 Store，摘要中间件只渲染会话摘要，记忆查询/删除接口已移除。显式偏好、简报记录和 MySQL checkpoint 保留；已有记忆数据不再使用，本次不自动删除，未来另行设计长期记忆。
+<p>
+  <img src="https://img.shields.io/badge/新闻推送-15803D?style=flat-square" alt="新闻推送" />
+  <img src="https://img.shields.io/badge/AI_Agent-0F766E?style=flat-square" alt="AI 智能体" />
+  <img src="https://img.shields.io/badge/个性化简报-059669?style=flat-square" alt="个性化简报" />
+  <img src="https://img.shields.io/badge/RSS_%2F_Atom-F97316?style=flat-square" alt="RSS / Atom" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT License" /></a>
+</p>
 
-## 正式前端
+<p>
+  <img src="https://img.shields.io/badge/Vue-3-4FC08D?style=flat-square&amp;logo=vuedotjs&amp;logoColor=white" alt="Vue 3" />
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 5" />
+  <img src="https://img.shields.io/badge/Vite-7-646CFF?style=flat-square&amp;logo=vite&amp;logoColor=white" alt="Vite 7" />
+  <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&amp;logo=python&amp;logoColor=white" alt="Python 3.12" />
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&amp;logo=fastapi&amp;logoColor=white" alt="FastAPI" />
+  <br />
+  <img src="https://img.shields.io/badge/LangChain_%2F_LangGraph-1C3C3C?style=flat-square&amp;logo=langchain&amp;logoColor=white" alt="LangChain / LangGraph" />
+  <img src="https://img.shields.io/badge/MySQL-8.4-4479A1?style=flat-square&amp;logo=mysql&amp;logoColor=white" alt="MySQL 8.4" />
+  <img src="https://img.shields.io/badge/Redis-8-FF4438?style=flat-square&amp;logo=redis&amp;logoColor=white" alt="Redis 8" />
+  <img src="https://img.shields.io/badge/Celery-37814A?style=flat-square&amp;logo=celery&amp;logoColor=white" alt="Celery" />
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&amp;logo=docker&amp;logoColor=white" alt="Docker" />
+</p>
 
-使用Node.js24，在仓库根运行`npm ci`。分别在两个终端执行：
+<p>
+  <a href="#-项目简介">📖 项目简介</a> ·
+  <a href="#-核心特性">✨ 核心特性</a> ·
+  <a href="#-项目结构">🏗️ 项目结构</a> ·
+  <a href="#-快速开始">🚀 快速开始</a> ·
+  <a href="#-许可证">📄 许可证</a>
+</p>
 
-```powershell
-npm run dev:user
-npm run dev:admin
+<img src="docs/assets/zhigenews-readme-poster.png" alt="知更 ZhigeNews：个性化新闻简报" width="100%" />
+
+</div>
+
+## 📖 项目简介
+
+**知更（ZhigeNews）是一个基于 Agent 的新闻推送平台。** 你只需描述感兴趣的话题、关键词和背景，Agent 就会从订阅的新闻来源中寻找相关报道，结合联网搜索整理信息，生成包含标题、导语、新闻摘要和原文引用的个性化简报，并按设定时间推送到站内。
+
+项目采用前后端分离架构：用户端用于发现话题、管理偏好和阅读简报，管理员端用于维护新闻来源、查看任务和排查运行过程；后端通过 LangChain / LangGraph 编排 Agent，由 Celery 执行采集、生成和发布任务。
+
+> 当前版本为 v1.0.0，处于最终验收阶段。真实模型、Tavily 与完整业务链路的验收进度见 [实现与验收入口](docs/releases/v1.0.0/IMPLEMENTATION.md)。
+
+## ✨ 核心特性
+
+| 特性 | 说明 |
+| --- | --- |
+| **个性化新闻发现** | 通过自然语言设置关注话题、关键词与背景，按用户偏好筛选新闻，支持主动生成简报。 |
+| **Agent 自主编排** | 基于 LangChain / LangGraph 执行检索、阅读和整理，支持子 Agent 分工、上下文摘要与 MySQL 检查点恢复。 |
+| **多来源采集与搜索** | 支持 RSS / Atom 订阅采集，内置新闻来源目录，并通过 Tavily 补充联网检索。 |
+| **有据可查的简报** | 保留新闻来源、原文链接和证据引用，发布前校验简报结构与引用，方便回到原报道核实信息。 |
+| **每日定时推送** | 按北京时间设置每日站内推送时间，后台完成生成与发布，历史简报可随时回看。 |
+| **独立管理控制台** | 管理新闻来源与采集状态，查看任务进度、运行事件和发布结果，支持失败排查与重试。 |
+| **可观测的隔离执行** | 通过 SSE 查看运行事件，可选接入 LangSmith 追踪；Agent 的 Shell 工具在 Docker 沙箱内运行，并受执行预算约束。 |
+| **可自行部署** | 提供 Docker Compose 编排和 GitHub Actions 部署流程，模型连接通过后端环境变量配置。 |
+
+## 🏗️ 项目结构
+
+### 📂 目录结构
+
+```text
+zhigenews/
+├── apps/
+│   ├── user-web/                 # 用户端：偏好、简报、推送设置
+│   └── admin-web/                # 管理端：来源、任务、运行记录
+├── packages/
+│   ├── api-client/               # 共享 API 契约、客户端与 SSE 支持
+│   └── ui/                       # 共享组件、品牌资源与样式变量
+├── backend/
+│   ├── src/zhigenews/
+│   │   ├── gateway.py            # FastAPI HTTP / SSE 入口
+│   │   ├── application.py        # 应用业务服务
+│   │   ├── workers.py            # Celery 任务、调度与发布
+│   │   ├── execution.py          # Agent 运行与结果处理
+│   │   ├── runtime_config.py     # Agent 提示词、工具与预算
+│   │   ├── harness/              # Agent 运行时、检查点与沙箱
+│   │   └── ingestion/            # RSS / Atom 采集与新闻索引
+│   ├── migrations/               # 数据库迁移
+│   └── tests/                    # 后端测试
+├── infra/deploy/                 # 生产编排、HTTPS 与部署脚本
+├── .github/workflows/            # GitHub Actions 自动部署
+├── scripts/                     # 前端契约生成等工程脚本
+├── docs/                        # 开发、部署、设计与版本文档
+│   └── releases/v1.0.0/draft/prototype/  # 独立原型（模拟数据）
+└── compose.yaml                 # 本地 MySQL、Redis 与后端编排
 ```
 
-用户端为 [127.0.0.1:5173](http://127.0.0.1:5173)，管理员端为 [127.0.0.1:5174](http://127.0.0.1:5174)。两端均代理真实后端18000端口；用户自动取得匿名Cookie，管理员使用`backend/.env`的账号密码独立登录。
+### 🧩 系统架构
 
-`npm run build`检查契约、类型并分别构建两个应用；也可单独执行`build:user`、`build:admin`。生产输出为`apps/user-web/dist`和`apps/admin-web/dist`，停止相应dev进程后用`npm run preview:user`/`preview:admin`在原端口预览。共享API客户端由活动后端契约生成，`npm run check:contract`检查一致性，`npm run test:api`验证传输及SSE恢复；h001交接快照保持封存。
+```mermaid
+flowchart TB
+    subgraph clients[前端应用 · Vue 3 / TypeScript]
+        user[用户端<br/>新闻偏好 · 简报阅读 · 推送设置]
+        admin[管理员端<br/>来源管理 · 任务与运行监控]
+    end
 
-完整启动、模型配置和用户验收步骤见 [实现与验收入口](docs/releases/v1.0.0/IMPLEMENTATION.md)。模型/Tavily密钥保留在后端，不放入VITE前端变量。
+    api[FastAPI<br/>业务 API · 身份认证 · SSE]
+    db[(MySQL<br/>业务数据 · 待投递任务 · 检查点)]
+    beat[Celery Beat<br/>扫描到期计划与待投递任务]
+    queue[(Redis<br/>任务队列)]
 
-## 本地后端
+    subgraph execution[Celery Worker · 后台执行]
+        collect[新闻采集<br/>RSS / Atom]
+        agent[Agent 编排<br/>LangChain / LangGraph]
+        publish[简报校验与站内发布]
+    end
 
-服务器部署请看 [GitHub Actions 部署指南](docs/deployment.md)：推送 main 后构建 GHCR 镜像，通过 SSH 更新单台 Linux 服务器；包含双前端 HTTPS、数据库迁移、后台 worker/beat、备份与回退步骤。生产编排位于 `infra/deploy/`，与下方本地开发编排独立。
+    files[(共享运行文件<br/>新闻索引 · 证据 · 工作区)]
+    rss[RSS / Atom 新闻来源]
+    external[外部服务<br/>模型 API · Tavily 搜索]
+    sandbox[Docker 沙箱<br/>隔离执行 Shell 工具]
+    trace[LangSmith<br/>可选追踪]
 
-需要 Python 3.12、uv、Docker Linux engine。命令在仓库根执行：
+    user & admin <-->|HTTP / SSE| api
+    api <--> db
+    beat <--> db
+    beat --> queue
+    queue --> collect & agent & publish
+    rss --> collect
+    collect --> files
+    files --> agent
+    agent <--> external
+    agent --> sandbox
+    agent <--> db
+    agent -.-> trace
+    publish <--> db
+```
 
-```powershell
+API 将生成请求持久化，Beat 将到期任务投递到 Redis，Worker 执行采集、Agent 生成和站内发布。新闻索引与运行证据保存在共享文件卷，业务记录和 Agent 检查点保存在 MySQL；前端通过 API 读取简报及进度，管理员可订阅详细运行事件。
+
+## 🚀 快速开始
+
+以下使用 **Docker 运行后端，宿主机运行前端**。准备 Git、Node.js 24（最低 22.12）、Python 3.12、[uv](https://docs.astral.sh/uv/) 和支持 Linux 容器的 Docker Compose；Windows 可使用 Docker Desktop 的 Linux engine。所有命令均在仓库根目录执行。
+
+### 📦 1. 获取代码与依赖
+
+```sh
+git clone https://github.com/ZimaAI/zhigenews.git
+cd zhigenews
+npm ci
 uv sync --project backend --frozen
-docker compose up -d mysql redis
-uv run --project backend alembic -c backend/alembic.ini upgrade head
 ```
 
-复制 [backend/.env.example](backend/.env.example) 到 `backend/.env`，设置加密密钥、IP哈希密钥、管理员密码及模型/Tavily配置。当前开发工作区已生成本地安全密钥和随机管理员密码，保存在被 Git 忽略的 `backend/.env`，不要覆盖已有值。初始化从配置创建管理员，不打印密码：
+### ⚙️ 2. 配置环境变量
 
-```powershell
-uv run --project backend python -m zhigenews.cli init
-docker compose --profile app build api
-docker compose --profile app up -d --wait worker beat
-uv run --project backend uvicorn zhigenews.gateway:app --host 127.0.0.1 --port 18000
+将 [backend/.env.example](backend/.env.example) 复制为 `backend/.env`；已有配置时直接编辑，保留原有密钥。填写以下字段：
+
+| 配置项 | 用途 |
+| --- | --- |
+| `SECRET_ENCRYPTION_KEY` | Fernet 加密密钥，用于保护敏感配置。 |
+| `IP_HASH_KEY` | 独立的随机密钥，用于 IP 哈希。 |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | 初始化管理员账号，密码至少 12 个字符。 |
+| `OPENAI_BASE_URL` / `OPENAI_MODEL` / `OPENAI_API_KEY` | 模型服务地址、模型名称与 API 密钥；模型需支持工具调用。 |
+| `TAVILY_API_KEY` | Agent 联网补充搜索使用的 API 密钥。 |
+
+可用下面两条命令分别生成 `SECRET_ENCRYPTION_KEY` 和 `IP_HASH_KEY`，将输出填入对应字段：
+
+```sh
+uv run --project backend python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+uv run --project backend python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-数据库仅本机 `127.0.0.1:13316`，Redis `127.0.0.1:56386`。开发容器示例使用本地开发数据库密码；正式环境需设置自己的服务凭据。API为 `http://127.0.0.1:18000/api/v1`，健康探针 `/healthz`，契约 `/openapi.json`。
+本地数据库与 Redis 配置可沿用模板；Compose 会为容器设置内部连接地址。模型及搜索密钥只配置在后端。摘要模型和 LangSmith 追踪为可选配置，详见 [开发与运维指南](docs/development.md#配置与接口)。
 
-本机 API 与容器 worker/beat 共用上述 MySQL 和 Redis。生成请求由 API 入库，beat 将持久任务投递到队列，worker 执行生成与发布；仅启动 API 无法完成简报。运行文件由 Linux worker 写入 `zhigenews_runtime` 卷，供 Docker 沙箱使用。修改后端代码后重新构建镜像并启动 worker/beat，确保执行器使用新代码。
+### 🐳 3. 启动后端
 
-来源新闻索引升级：容器 worker 启动前自动运行 `python -m zhigenews.cli migrate-news`，将匹配当前来源配置的旧快照复制到新目录并建立索引，保留原文件和证据 ID，无需等待下一次联网采集。独立启动 worker 时，先使用同一 `DATA_DIR` 执行该命令；重复执行不会重复迁移。
-
-## VS Code 启动与断点调试
-
-用 VS Code 打开仓库根目录，安装工作区推荐的 Python、Python Debugger、Vue - Official 扩展，并准备 Node.js 22.12+、Python 3.12、uv 与 Microsoft Edge。先启动 Docker Desktop 的 Linux engine，后端准备任务需要 MySQL/Redis。
-
-1. 首次使用先按上文配置 `backend/.env`，再通过「终端 → 运行任务」执行 `frontend: install`（根目录 `npm ci`）和 `backend: init`。后者会依次同步 Python 依赖、等待 MySQL/Redis 就绪、执行迁移并初始化数据库；已有 `.env` 不会被覆盖。前端依赖仅需首次安装或锁文件更新后重新安装，F5 不重复安装。
-2. 在「运行和调试」选择 **后端：API（18001）**，按 F5 启动。准备任务会先同步依赖、启动 MySQL/Redis、执行迁移，再构建当前后端镜像并启动 Linux worker/beat，随后启动本机 API。在 `backend/src/zhigenews/gateway.py` 的 `health()` 内设置断点，访问 `http://127.0.0.1:18001/healthz` 即可命中。启动后自动打开 `/docs`；Shift+F5 停止调试。调试端口使用 18001，避免与 Docker API 的 18000 冲突。为保持断点稳定，未启用自动重载，修改代码后重启调试。
-3. 异步任务可分别启动 **Worker（本机 solo）** 和 **Beat（本机调度）**。先停止容器中的 worker/beat（`docker compose --profile app stop worker beat`），避免争抢相同队列或重复调度。本机进程共用根目录工作路径及 `.env`；Beat 状态保存在被忽略的 `backend/.venv/`。Windows 的 solo 入口供逐步调试，涉及 Docker 沙箱挂载的完整生成流程仍使用下方 Linux 容器栈。调试结束后可用 `docker compose --profile app up -d worker beat` 恢复容器任务服务。
-4. **后端：CLI** 支持选择 `environment`、`init`、`collect`、`tick` 并设置断点；后两项会执行真实工作。`backend: lint`、`backend: test` 可从任务菜单运行，测试所需服务与环境变量见「验证」章节。测试资源管理器也支持运行与调试 pytest；如曾选过其他 Python，执行「Python: Select Interpreter」选择 `backend/.venv`。
-5. 选择 **全栈：用户端 + API**、**全栈：管理员端 + API** 或 **全栈：双前端 + API**，按 F5 同时启动本机 API、正式前端 Vite 和 Edge 调试，并通过 API 的准备任务启动 Linux worker/beat，支持实际生成简报。用户端为 `http://127.0.0.1:5173`，管理员端为 `http://127.0.0.1:5174`；可以在 `apps/*/src` 的 Vue/TypeScript 与 `backend/src` 的 Python 中设置断点。API 首次准备可能晚于浏览器打开，待后端就绪后刷新页面。
-6. **前端：用户端 / 管理员端（正式应用）** 可单独启动浏览器调试，需要另外启动 **后端：API（18001）**。前端调试任务通过进程变量 `ZHIGENEWS_API_TARGET=http://127.0.0.1:18001` 指定代理；普通 `npm run dev:*` 和 `preview:*` 仍默认连接 18000。断点也支持共享 `packages/` 源码。联合调试停止一个会话时会停止其余调试会话；Vite 后台任务需通过「终端 → 终止任务」停止。切换普通开发、调试或原型前先停止旧 Vite，避免端口占用或复用错误的代理目标。
-7. **原型：用户端 / 管理端（模拟数据）** 保留为独立入口，会自动安装原型 npm 依赖、启动 Vite 并打开 Edge。用户端为 5173，管理端为 5174；管理端同时启动用户端以提供模拟会话接口。原型没有接入正式后端，与正式前端不能同时占用相同端口。
-
-API 调试入口执行 `backend: api prepare`，包含基础准备、镜像构建和容器 worker/beat 启动；本机 Worker、Beat 和 CLI 调试入口仍只执行 `backend: prepare`（同步依赖、启动数据库与缓存、迁移），方便独立调试。准备任务不会重复初始化管理员。调试结束后数据库、缓存和容器 worker/beat 继续运行；停止后台任务可执行 `docker compose --profile app stop worker beat`。配置见 [.vscode/launch.json](.vscode/launch.json)、[.vscode/tasks.json](.vscode/tasks.json)；配置字段遵循 [VS Code Python 调试文档](https://code.visualstudio.com/docs/python/debugging)、[联合调试文档](https://code.visualstudio.com/docs/debugtest/debugging-configuration) 与 [浏览器调试文档](https://code.visualstudio.com/docs/nodejs/browser-debugging)。
-
-## Linux API / worker / scheduler
-
-```powershell
+```sh
+docker compose up -d --wait mysql redis
 docker compose --profile app build api
 docker compose --profile app run --rm api alembic upgrade head
 docker compose --profile app run --rm api python -m zhigenews.cli init
 docker compose --profile app up -d api worker beat
 ```
 
-服务使用同一 MySQL 与 Redis。单独的 beat 扫描持久计划与 outbox，Celery worker 执行采集、Agent 和发布。容器数据位于 `zhigenews_runtime` 卷；API/worker统一挂载到同一绝对路径，使可信worker启动的隔离bash容器能够只读绑定本次工作区。Docker socket仅供可信worker创建沙箱，绝不挂载进Agent沙箱。沙箱无网络、非root、只读根和持久挂载、资源/输出/超时受限；不可用时不回退宿主shell。
+初始化会创建管理员并添加默认 RSS 来源。`api`、`worker`、`beat` 共同完成生成与推送，三者都需要启动。
 
-本机 API 可搭配 Linux worker/beat 完成生成，生成工作区统一使用容器数据路径。本机 solo Worker 仅用于逐步调试，不要与容器 worker 同时消费队列，或让两类 worker 接续同一运行的文件目录。`docker compose stop`保留数据；本项目不提供自动删除数据卷或无损数据库降级承诺。
+### 🌐 4. 启动前端并体验
 
-## 配置与接口
+分别打开两个终端，在仓库根目录运行：
 
-订阅来源仅支持 RSS / Atom；初始化默认目录包含 341 个 RSS 订阅，管理员可添加、停用或删除。联网补充搜索独立于订阅采集。已生成简报保留原始来源和引用，不会因移除来源而改写。
-
-从仍支持 NewsNow 的旧版本升级时，先在旧管理员页面筛选该类型，停止采集并删除全部对应来源，等待后台删除任务全部完成后再部署本版本。清理包含来源配置、采集记录与文件，历史简报保留；不要运行初始化来代替清理。
-
-`POST /auth/anonymous`自动签发HttpOnly匿名Cookie，管理员使用独立登录Cookie。所有写请求发送 `X-Zhige-Request: 1`；有Origin时必须在ALLOWED_ORIGINS白名单。创建生成、采集与发布重试发送稳定 `Idempotency-Key`（8–128字符），同键不同body返回409。429遵循Retry-After。
-
-模型连接统一在 `backend/.env` 配置，字段示例见 [backend/.env.example](backend/.env.example)。`OPENAI_BASE_URL`、`OPENAI_MODEL`、`OPENAI_API_KEY` 指定主模型；`SUMMARY_OPENAI_*` 可覆盖摘要模型，未设置时继承主模型。管理员端不再提供模型与连接、Agent 配置页面和管理 API，无需在页面验证或发布配置。
-
-Agent 预算、工具、摘要阈值、子任务并发和系统提示词集中在 [runtime_config.py](backend/src/zhigenews/runtime_config.py) 的常量中维护。运行自动使用当前部署配置，并保存私有快照；已有数据库模型和 Agent 配置不再影响新任务，历史运行仍可查询。API key 在任务快照中加密，不通过公开接口返回。修改 `.env` 后重启本机 API，并重新创建容器 worker/beat；修改代码常量后重新构建镜像并重启 API、worker、beat。
-
-`OPENAI_THINKING_ENABLED` 控制主模型深度思考，默认关闭；`OPENAI_CONTEXT_WINDOW` 设置上下文窗口，默认 258000 token。摘要仅在估算上下文预算达到窗口的 90% 时触发，不设固定 token 或消息条数阈值；预算包含消息、已有摘要、系统提示词、工具等开销与输出预留。摘要模型可用 `SUMMARY_OPENAI_*` 单独配置。深度思考会消耗额外时间与输出 Token，运行时间上限在 Agent 常量中调整。用户只看公开进度，完整事件/SSE只对管理员开放。`submitted`只表示站内发布，不表示已读。
-
-当前代码已适配 `deepseek-v4-flash`、`deepseek-v4-pro`、`deepseek-flash`、`MiniMax-M3`，以及 `gpt-5.1`、`gpt-5.2`、`gpt-5.4`、`gpt-5.5` 和对应日期快照。MiniMax 使用其 API 的 adaptive/disabled 模式，GPT 使用 medium/none；未适配的模型开启时会返回明确的配置错误。参见 [MiniMax 接口说明](https://platform.minimax.io/docs/api-reference/text-openai-api)。
-
-DeepSeek 的思考模式使用自动工具选择，并在内部保留模型协议要求的思考上下文，公开进度和管理员消息记录不展示私有思维链。最终简报仍须通过结构、引用与来源校验。参见 [DeepSeek 思考与工具调用说明](https://api-docs.deepseek.com/guides/thinking_mode/)。
-
-## 验证
-
-### LangSmith 追踪
-
-正式 LangGraph Agent 已接入 LangSmith 自动追踪，主图名为 `zhigenews.agent`，子图名为 `zhigenews.subagent`。模型、工具及摘要调用保留父子层级；`run_id`、`agent_thread_id`、`resumed` 元数据可关联站内运行。命令行模型探针也会记录追踪。
-
-在现有 `backend/.env` 中设置以下字段，保留其他配置：
-
-```dotenv
-LANGSMITH_TRACING=true
-LANGSMITH_API_KEY=<你的 LangSmith API key>
-LANGSMITH_PROJECT=my-first-agent
-LANGSMITH_ENDPOINT=https://api.smith.langchain.com
-LANGSMITH_WORKSPACE_ID=
+```sh
+# 终端一：用户端
+npm run dev:user
 ```
 
-组织级 API key 需要填入对应 `LANGSMITH_WORKSPACE_ID`；其他区域或自托管服务使用对应 endpoint。密钥仅保存在后端。未填 key 时追踪不启动，设置 `LANGSMITH_TRACING=false` 可关闭。配置由后端 Settings 显式传入 SDK，本机运行无需额外手工导出环境变量；进程环境变量优先于 `.env`。
-
-执行 `uv sync --project backend --frozen`，重启本机 API，并执行以下命令更新容器 worker/beat；若 API 也在容器中运行，在最后一行追加 `api`：
-
-```powershell
-docker compose --profile app build api
-docker compose --profile app up -d --force-recreate worker beat
-uv run --project backend python -m zhigenews.cli environment
+```sh
+# 终端二：管理员端
+npm run dev:admin
 ```
 
-环境检查只显示配置状态与项目名，不输出 key。运行下方 `verify_live.py` 探针，或在用户端生成一份简报，然后在 [LangSmith](https://smith.langchain.com/) 的 `my-first-agent` 项目查看新 trace。模型探针名为 `zhigenews.live_model_probe`。
+| 入口 | 地址 |
+| --- | --- |
+| 用户端 | [http://127.0.0.1:5173](http://127.0.0.1:5173) |
+| 管理员端 | [http://127.0.0.1:5174](http://127.0.0.1:5174) |
+| API 文档 | [http://127.0.0.1:18000/docs](http://127.0.0.1:18000/docs) |
+| 健康检查 | [http://127.0.0.1:18000/healthz](http://127.0.0.1:18000/healthz) |
 
-启用后会上传提示词、新闻证据、可见模型输出和工具输入输出，便于排查运行过程；上传前移除结构化私有思考字段及已识别的密钥。模型内部协议重放与检查点保持原状。自动化测试使用离线模拟导出，不会向真实项目发送 synthetic 数据。接入与配置方式参见 [LangChain/LangGraph 追踪文档](https://docs.langchain.com/langsmith/trace-with-langchain) 和 [敏感数据过滤文档](https://docs.langchain.com/langsmith/mask-inputs-outputs)。
+打开用户端，设置新闻偏好并生成第一份简报；管理员端使用 `.env` 中配置的账号登录，可检查来源采集和任务执行情况。
 
-### 自动化与外部依赖检查
+**部署到服务器：** 按 [部署指南](docs/deployment.md) 配置 Linux 服务器、双域名及 GitHub Actions Secrets，使用 `infra/deploy/` 的生产编排。推送 `main` 或手动触发工作流后，将构建 GHCR 镜像并经 SSH 部署，包含 HTTPS、数据库迁移、备份和回退流程。
 
-```powershell
-$env:HARNESS_TEST_MYSQL_URL='mysql+pymysql://zhigenews:local-development@127.0.0.1:13316/zhigenews'
-$env:HARNESS_TEST_DOCKER='1'
-uv run --project backend pytest backend/tests -q
-uv run --project backend ruff check backend
-uv run --project backend python backend/scripts/verify_live.py --report .project-flow/versions/v1.0.0/evidence/live-services.json
-Get-Content backend/scripts/verify_runtime.py -Raw | docker compose exec -T worker python -
-```
+更多开发、VS Code 调试、测试与配置说明见 [开发与运维指南](docs/development.md)；前端构建可执行 `npm run build`。
 
-测试使用独立测试标识并清理其记录；MySQL、Docker验收须实际开启对应环境，skipped不算通过。`verify_live.py`最多一次模型工具调用和一次Tavily检索，缺少配置明确返回blocked。完整系统验收还要求真实生成、发布、调度与两个正式前端，不能以这些依赖探针代替。
+## 📄 许可证
 
-全套测试前先停止beat/worker，避免调度消费测试outbox，完成后再启动。迁移测试还需设置`MIGRATION_ADMIN_DATABASE_URL`指向本地MySQL管理员连接；仅创建/清理随机命名的`zg_migration_test_*`临时库。`verify_runtime.py`验证容器HTTP、队列与嵌套沙箱，并清理自己的synthetic reader；它不验证外部模型。
-
-详细规范见 [基线索引](docs/releases/v1.0.0/baselines/b003/snapshot/spec/00-index.md)，运行事件仅记录可展示结果、耗时和脱敏工具摘要，不采集模型私有思维链。
-
-
-Agent 执行预算由 `backend/src/zhigenews/runtime_config.py` 管理：默认最多 1000 个执行步骤，模型调用和工具调用各计一步（含摘要模型和子 Agent），达到上限即终止任务并报告 `BUDGET_EXHAUSTED`。运行时间默认 600 秒，联网搜索默认最多 20 次；断点恢复继承已使用预算。模型单次输出 Token 上限为对应模型上下文窗口的四分之一，默认窗口 258,000 时为 64,500。执行图内部节点不作为业务步骤计数，其递归保护上限随执行预算调整。
-
-### 评估实验已移除
-
-当前正式应用不再提供固定样例、评估实验、评分及 A/B 比较，后续将重新实现。旧 `/admin/eval-cases` 与 `/admin/evaluations` API 返回 404，`EVALUATION_OPENAI_*` 配置不再使用。部署时重新构建并重启 API、worker、beat 及管理员前端，使旧执行进程退出。已有实验数据和文件保留，待发送的旧任务不再调度。发布基线、旧原型和交接证据作为历史资料保留，当前功能以正式代码与运行契约为准。
+本项目采用 [MIT License](LICENSE) 开源。

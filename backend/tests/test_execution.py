@@ -363,6 +363,71 @@ def test_partial_brief_keeps_reader_overview_separate_from_diagnostics(execution
     assert not finished["emptyResult"] and finished["error"] == ""
 
 
+@pytest.mark.parametrize("keep_valid", [True, False])
+def test_bad_evidence_is_filtered_before_save_and_publication(execution_case, monkeypatch, keep_valid):
+    case = execution_case
+    with transaction() as session:
+        run = session.get(Run, case.run_id)
+        good = run.private["evidence"][0]
+        run.private = {**run.private, "evidence": [
+            good,
+            {**good, "id": "bad-url", "url": "https://[broken"},
+            {**good, "id": "bad-provenance", "snapshot_id": None},
+        ]}
+    ids = ["missing", "bad-url", "bad-provenance"]
+    if keep_valid:
+        ids.append(good["id"])
+    response = ai_call("BriefOutput", {
+        "title": "Rejected story headline", "summary": "Rejected story overview",
+        "items": [{"evidence_id": ident, "summary": "Retained summary" if ident == good["id"] else "Rejected story",
+                   "reason": "Matches", "topic": "Agent"} for ident in ids],
+    }, "synthetic-filtered-final")
+    model = patch_model(monkeypatch, ScriptedModel(responses=[response]))
+    execution.execute_run(case.run_id)
+    snapshot = rows(case)
+    report = json.loads(next(e.data["output"] for e in snapshot.events if e.data["title"] == "新闻证据校验完成"))
+    assert report == {
+        "submitted": len(ids), "retained": int(keep_valid), "rejected": 3,
+        "rejections": [
+            {"evidence_id": "missing", "reason": "EVIDENCE_NOT_FOUND"},
+            {"evidence_id": "bad-url", "reason": "INVALID_URL"},
+            {"evidence_id": "bad-provenance", "reason": "MISSING_PROVENANCE"},
+        ],
+    }
+    assert snapshot.run.error == "" and snapshot.run.private["limitations"]
+    artifact = json.loads((case.workspace / "output/brief.json").read_text("utf-8"))
+    markdown = (case.workspace / "output/brief.md").read_text("utf-8")
+    assert "Rejected story" not in markdown
+    if keep_valid:
+        assert len(snapshot.briefs) == len(snapshot.deliveries) == 1
+        brief, delivery = snapshot.briefs[0], snapshot.deliveries[0]
+        assert brief.data["generationStatus"] == "partial"
+        assert [item["id"] for item in brief.data["items"]] == [good["id"]]
+        assert brief.data["title"] == artifact["title"] == good["title"]
+        assert brief.data["summary"] == artifact["summary"] == "Retained summary"
+        assert brief.data["items"] == artifact["items"]
+        execution.execute_run(case.run_id)  # Replay while publication is pending.
+        assert publish_delivery(delivery.id)["status"] == "submitted"
+        publish_delivery(delivery.id)
+    else:
+        assert not snapshot.briefs and not snapshot.deliveries
+        assert artifact["items"] == []
+        assert artifact["summary"] == "本次暂无可发布的新闻。"
+    execution.execute_run(case.run_id)
+    finished = rows(case)
+    assert finished.run.status == "partial" and finished.run.error == ""
+    assert finished.run.percent == 100
+    assert progress(finished.run)["emptyResult"] is (not keep_valid)
+    assert len(finished.briefs) == len(finished.deliveries) == int(keep_valid)
+    assert model.position == 1
+    if keep_valid:
+        assert finished.briefs[0].published and finished.deliveries[0].attempts == 1
+        public = public_brief(finished.briefs[0])
+        validate(schema("Brief"), public, output=True)
+        assert public["items"] == [{k: v for k, v in artifact["items"][0].items()
+                                    if k not in ("reason", "citations")}]
+
+
 def test_tool_error_can_be_handled_by_real_model_tool_loop(execution_case, monkeypatch):
     model = patch_model(
         monkeypatch,

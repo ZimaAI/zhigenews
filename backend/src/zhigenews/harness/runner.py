@@ -104,6 +104,16 @@ def _evidence_id(item: dict) -> str:
     return str(item.get("evidence_id") or item.get("id"))
 
 
+def _evidence_time(value) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
 def validate_items(
     output: BriefOutput,
     evidence: dict,
@@ -111,36 +121,51 @@ def validate_items(
     fixed_at: datetime | None = None,
     window_hours: int = 24,
     resolve_evidence: Callable[[str], dict | None] | None = None,
-) -> list[dict]:
-    results, seen = [], set()
+) -> tuple[list[dict], list[dict]]:
+    """Filter individual evidence defects; storage/runtime errors still propagate."""
+    results, rejected, seen = [], [], set()
     fixed_at = fixed_at or datetime.now(timezone.utc)
     for selected in output.items:
+        def reject(reason):
+            rejected.append({"evidence_id": selected.evidence_id, "reason": reason})
+
         source = evidence.get(selected.evidence_id)
         if not source and resolve_evidence:
             source = resolve_evidence(selected.evidence_id)
         if not source:
-            raise HarnessError("INVALID_EVIDENCE", "简报引用了不在本次来源快照或搜索记录中的证据。")
+            reject("EVIDENCE_NOT_FOUND")
+            continue
         url = source.get("url", "")
-        if urlsplit(url).scheme not in ("http", "https") or not urlsplit(url).hostname:
-            raise HarnessError("INVALID_EVIDENCE", "引用缺少有效原文 URL。")
+        try:
+            parsed_url = urlsplit(url) if isinstance(url, str) else None
+            valid_url = (
+                parsed_url is not None and parsed_url.scheme in ("http", "https")
+                and bool(parsed_url.hostname) and not any(char.isspace() for char in url)
+            )
+            if valid_url:
+                parsed_url.port  # Invalid ports raise ValueError just like malformed IPv6 hosts.
+        except ValueError:
+            valid_url = False
+        if not valid_url:
+            reject("INVALID_URL")
+            continue
         canonical = url.split("#")[0].rstrip("/")
         if canonical in seen:
+            reject("DUPLICATE_URL")
             continue
         published = source.get("published_at", source.get("publishedAt"))
-        if not isinstance(published, str):
-            continue
-        try:
-            published_time = datetime.fromisoformat(published.replace("Z", "+00:00"))
-            if published_time.tzinfo is None:
-                continue
-        except ValueError:
+        published_time = _evidence_time(published)
+        if published_time is None:
+            reject("INVALID_PUBLISHED_AT")
             continue
         if not fixed_at - timedelta(hours=window_hours) <= published_time <= fixed_at:
+            reject("OUTSIDE_WINDOW")
             continue
         fetched = source.get("fetched_at", source.get("fetchedAt"))
         snapshot = source.get("snapshot_id", source.get("snapshotId"))
-        if not fetched or not snapshot:
-            raise HarnessError("INVALID_EVIDENCE", "证据缺少实际采集时间或快照标识。")
+        if _evidence_time(fetched) is None or not isinstance(snapshot, str) or not snapshot.strip():
+            reject("MISSING_PROVENANCE")
+            continue
         seen.add(canonical)
         results.append(
             {
@@ -166,7 +191,7 @@ def validate_items(
                 ],
             }
         )
-    return results
+    return results, rejected
 
 
 class HarnessRunner:
@@ -534,15 +559,35 @@ class HarnessRunner:
             raise HarnessError("STRUCTURED_OUTPUT_MISSING", "模型没有调用 BriefOutput 工具提交完整简报。")
         if not isinstance(output, BriefOutput):
             output = BriefOutput.model_validate(output)
-        items = validate_items(
+        items, rejected = validate_items(
             output,
             evidence,
             fixed_at=fixed_at,
             window_hours=24,
             resolve_evidence=request.resolve_evidence,
         )
-        if len(items) < len(output.items):
-            output.limitations.append("重复、发布时间无效或超出运行时间窗的新闻已排除。")
+        validation = {
+            "submitted": len(output.items), "retained": len(items),
+            "rejected": len(rejected), "rejections": rejected,
+        }
+        context.emit("evidence_validated", resultSummary=json.dumps(validation, ensure_ascii=False))
+        if rejected:
+            reasons = {
+                "EVIDENCE_NOT_FOUND": "引用记录不存在", "INVALID_URL": "原文 URL 无效",
+                "MISSING_PROVENANCE": "溯源信息缺失或无效", "INVALID_PUBLISHED_AT": "发布时间无效",
+                "OUTSIDE_WINDOW": "超出运行时间窗", "DUPLICATE_URL": "重复新闻",
+            }
+            details = "、".join(
+                f"{label} {sum(item['reason'] == reason for item in rejected)} 条"
+                for reason, label in reasons.items() if any(item["reason"] == reason for item in rejected)
+            )
+            output.limitations.append(
+                f"提交 {len(output.items)} 条，保留 {len(items)} 条，剔除 {len(rejected)} 条：{details}。"
+            )
+            # The original headline/overview may describe rejected stories. Lead with retained copy
+            # without another model call that could jeopardize the already usable result.
+            output.title = (items[0]["title"] or "本期新闻简报")[:300] if items else "暂无可用新闻"
+            output.summary = items[0]["summary"][:2000] if items else "本次暂无可发布的新闻。"
         markdown = (
             "# "
             + output.title

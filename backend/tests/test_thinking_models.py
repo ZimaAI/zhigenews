@@ -172,7 +172,7 @@ def test_thinking_final_text_requires_complete_valid_actual_json(
         assert result.title == "Actual JSON fixture" and result.items == []
 
 
-def test_thinking_json_still_requires_existing_evidence(tmp_path):
+def test_thinking_json_filters_nonexistent_evidence(tmp_path):
     content = json.dumps({"title": "Synthetic invalid evidence", "summary": "Synthetic overview.", "items": [{
         "evidence_id": "invented", "summary": "Synthetic", "reason": "Synthetic", "topic": "AI",
     }]})
@@ -180,9 +180,9 @@ def test_thinking_json_still_requires_existing_evidence(tmp_path):
         "u", "r", "t", {}, {"tools": ["list_dir"]}, tmp_path / "rss", tmp_path / "workspace",
         protocol_model(lambda request: provider_response(content=content)),
     )
-    with pytest.raises(HarnessError) as exc:
-        HarnessRunner(checkpointer=InMemorySaver()).run(request)
-    assert exc.value.code == "INVALID_EVIDENCE"
+    result = HarnessRunner(checkpointer=InMemorySaver()).run(request)
+    assert result.items == [] and result.limitations
+    assert result.title == "暂无可用新闻"
 
 
 @pytest.mark.parametrize("enabled", [False, True])

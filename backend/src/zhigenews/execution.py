@@ -53,6 +53,7 @@ def append_event(session, run, event):
     title = {
         "harness_started": "开始整理",
         "harness_completed": "整理完成",
+        "evidence_validated": "新闻证据校验完成",
         "model_started": "调用模型",
         "model_completed": "模型返回",
         "tool_started": "调用工具",

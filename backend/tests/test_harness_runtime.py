@@ -716,10 +716,11 @@ def test_stale_duplicate_cannot_hide_fresh_evidence():
             for ident in evidence
         ],
     )
-    items = validate_items(
+    items, rejected = validate_items(
         output, evidence, fixed_at=datetime(2026, 9, 19, tzinfo=timezone.utc)
     )
     assert [item["id"] for item in items] == ["fresh"]
+    assert rejected == [{"evidence_id": "old", "reason": "OUTSIDE_WINDOW"}]
 
 
 @pytest.mark.parametrize("last_kind", ["model", "tool"])

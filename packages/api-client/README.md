@@ -2,6 +2,8 @@
 
 Generated DTOs and operation metadata come from the active backend contract at `backend/src/zhigenews/contracts/openapi.json`. Run `npm run generate:api` after updating that contract; `npm run check:contract` detects drift. The generated header records the source SHA-256. The accepted `v1.0.0/b003` handoff remains an immutable historical record. TypeScript preserves field names, required/optional fields, nulls, enums and references; the server validates range, length and cross-field rules.
 
+The contract and generated TypeScript use LF line endings, enforced by `.gitattributes`, so their raw-byte fingerprint and exact-text check agree between Windows and Linux builds. The API tests also check generation against an LF checkout fixture.
+
 ```ts
 import { api, ApiError, type Preferences, type GenerationProgress } from '@zhigenews/api-client'
 

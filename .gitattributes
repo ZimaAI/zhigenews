@@ -5,3 +5,7 @@
 # Deployment files are executed on Linux, including Windows checkouts.
 infra/deploy/** text eol=lf
 .github/workflows/** text eol=lf
+
+# The API generator hashes raw contract bytes and compares generated text exactly.
+backend/src/zhigenews/contracts/openapi.json text eol=lf
+packages/api-client/src/generated.ts text eol=lf

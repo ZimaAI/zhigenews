@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { ApiError, createApiClient } from '../src/client.ts';
 import { contractSha256, operationMetadata } from '../src/generated.ts';
@@ -10,6 +13,23 @@ import type { RunEvent } from '../src/generated.ts';
 function mockFetch(handler: (input: string, init: RequestInit) => Response | Promise<Response>): typeof fetch {
   return async (input, init) => handler(String(input), init || {});
 }
+
+test('committed frontend contract remains current in an LF Linux checkout', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'zhige-contract-'));
+  const files = ['scripts/frontend/generate-contract.mjs', 'backend/src/zhigenews/contracts/openapi.json', 'packages/api-client/src/generated.ts'];
+  try {
+    for (const file of files) {
+      const target = join(root, file);
+      await mkdir(dirname(target), { recursive: true });
+      const text = await readFile(new URL(`../../../${file}`, import.meta.url), 'utf8');
+      await writeFile(target, text.replaceAll('\r\n', '\n'));
+    }
+    const result = spawnSync(process.execPath, [join(root, files[0]!), '--check'], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.error?.message || result.stdout + result.stderr);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test('generated metadata covers the active backend operations and contract fingerprint', async () => {
   const bytes = await readFile(new URL('../../../backend/src/zhigenews/contracts/openapi.json', import.meta.url));

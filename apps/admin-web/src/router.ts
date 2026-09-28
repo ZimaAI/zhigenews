@@ -6,6 +6,7 @@ const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/', redirect: '/overview' },
   { path: '/overview', component: () => import('./pages/Overview.vue') },
   { path: '/sources/:id?', component: () => import('./pages/Sources.vue') },
+  { path: '/news/:sourceId?/:id?', component: () => import('./pages/News.vue') },
   { path: '/runs/:id?', component: () => import('./pages/Runs.vue') },
   { path: '/users', component: () => import('./pages/Users.vue') },
   { path: '/deliveries', component: () => import('./pages/Deliveries.vue') },

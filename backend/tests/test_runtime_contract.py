@@ -4,9 +4,11 @@ import json
 
 import pytest
 from test_api import verified_config
+from test_cached_news import collect
 
 from zhigenews.contract import CONTRACT, schema, validate
 from zhigenews.db import Brief, Delivery, Run, RunEvent, iso, transaction, utcnow
+from zhigenews.settings import get_settings
 
 pytestmark = pytest.mark.mysql
 
@@ -20,10 +22,12 @@ class ContractProbe:
             for method, operation in methods.items()
         }
 
-    def call(self, operation_id, client, *, ident=None, body=None, params=None, headers=None, status=None):
+    def call(self, operation_id, client, *, ident=None, source_id=None, body=None, params=None, headers=None, status=None):
         method, path, operation = self.operations[operation_id]
         if ident:
             path = path.replace("{id}", ident)
+        if source_id:
+            path = path.replace("{sourceId}", source_id)
         supplied_headers = dict(headers or {})
         if any(parameter["name"] == "Idempotency-Key" for parameter in operation.get("parameters", [])):
             supplied_headers.setdefault("Idempotency-Key", self.sandbox.prefix + "-" + operation_id)
@@ -47,9 +51,11 @@ class ContractProbe:
         return response
 
 
-def test_all_active_operations_return_their_real_http_contract(api_sandbox, monkeypatch):
+def test_all_active_operations_return_their_real_http_contract(api_sandbox, monkeypatch, tmp_path_factory):
     probe = ContractProbe(api_sandbox)
     verified_config(api_sandbox, monkeypatch)
+    storage = tmp_path_factory.mktemp("contract")
+    monkeypatch.setattr(get_settings(), "data_dir", storage)
     user, admin = api_sandbox.anonymous(), api_sandbox.admin()
     probe.call("ensureAnonymousSession", user)
     identity = probe.call("getSession", user).json()["userId"]
@@ -63,6 +69,9 @@ def test_all_active_operations_return_their_real_http_contract(api_sandbox, monk
     source_write = {"name": api_sandbox.prefix + " RSS", "kind": "rss", "sourceId": "", "url": "https://fixture.invalid/feed.xml", "interval": 900}
     source = probe.call("createSource", admin, body=source_write).json()
     api_sandbox.resource(source["id"])
+    news = collect(source, storage, utcnow(), [{"id": "contract", "title": "Synthetic contract news"}])
+    probe.call("listCachedNews", admin, params={"sourceId": source["id"]})
+    probe.call("getCachedNews", admin, source_id=source["id"], ident=news["items"][0]["id"])
     probe.call("getSource", admin, ident=source["id"])
     probe.call("saveSource", admin, ident=source["id"], body={**source_write, "interval": 1200, "version": source["version"]})
     probe.call("setSourceEnabled", admin, ident=source["id"], body={"enabled": False})

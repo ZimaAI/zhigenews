@@ -2337,6 +2337,148 @@
           }
         ]
       }
+    },
+    "/admin/news": {
+      "get": {
+        "operationId": "listCachedNews",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "浏览已缓存新闻",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CachedNewsPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ],
+        "description": "只读各来源当前配置的来源新闻索引，不触发采集。按请求时刻向前24小时筛选新闻发布时间（含边界），缺少发布时间、过期或未来新闻不返回。q按标题不区分大小写筛选；来源选项包括零条新闻与停用来源，count不受q或sourceId筛选影响。按发布时间倒序，每页20条；超出末页时返回末页。windowStart/windowEnd为本次请求的发布时间窗口。读取缓存失败返回503。"
+      }
+    },
+    "/admin/sources/{sourceId}/news/{id}": {
+      "get": {
+        "operationId": "getCachedNews",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "读取缓存新闻详情",
+        "x-required-role": "admin",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CachedNewsDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "adminSessionCookie": []
+          }
+        ],
+        "description": "从该来源当前索引解析不可变新闻证据；仅提供请求时刻最近24小时内的新闻。summary与content为来源缓存中的纯文本，不抓取原文、不生成摘要。新闻过期、来源不存在或证据文件已删除返回404；缓存读取失败返回503。"
+      }
     }
   },
   "components": {
@@ -3429,12 +3571,23 @@
             "description": "简短用户反馈，不含内部异常或诊断说明。"
           },
           "phase": {
-            "type": ["string", "null"],
-            "enum": ["preparing", "researching", "publishing", null],
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "preparing",
+              "researching",
+              "publishing",
+              null
+            ],
             "description": "真实业务阶段；终态为null，不根据工具次数或经过时间推算。"
           },
           "phaseStartedAt": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "emptyResult": {
@@ -4041,6 +4194,181 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "CachedNewsItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "evidenceId",
+          "sourceId",
+          "sourceName",
+          "title",
+          "url",
+          "publishedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "evidenceId": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CachedNewsDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "evidenceId",
+          "sourceId",
+          "sourceName",
+          "title",
+          "url",
+          "publishedAt",
+          "sourceUrl",
+          "snapshotId",
+          "fetchedAt",
+          "firstSeenAt",
+          "summary",
+          "content"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "evidenceId": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sourceUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "snapshotId": {
+            "type": "string"
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "firstSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      },
+      "CachedNewsSource": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "count"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "CachedNewsPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize",
+          "totalPages",
+          "windowStart",
+          "windowEnd",
+          "sources"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CachedNewsItem"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "const": 20
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "windowStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "windowEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CachedNewsSource"
+            }
           }
         }
       }

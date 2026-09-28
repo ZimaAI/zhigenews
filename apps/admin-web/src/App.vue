@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BrandLogo from '@ui/BrandLogo.vue';
-import { LayoutDashboard, Radio, Activity, Users, Send, Menu, LogOut, Settings } from 'lucide-vue-next';
+import { LayoutDashboard, Radio, Newspaper, Activity, Users, Send, Menu, LogOut, Settings } from 'lucide-vue-next';
 import Modal from '@ui/Modal.vue';
 import EmptyState from '@ui/EmptyState.vue';
 import { request, errorText, toast, notify } from './lib';
@@ -10,6 +10,7 @@ import { session, sessionError, loadSession } from './session';
 const route = useRoute(); const router = useRouter(); const menu = ref(false); const busy = ref(false);
 const nav = [
   { path: '/overview', label: '概览', icon: LayoutDashboard }, { path: '/sources', label: '新闻来源', icon: Radio },
+  { path: '/news', label: '缓存新闻', icon: Newspaper },
   { path: '/runs', label: '运行观察', icon: Activity },
   { path: '/users', label: '匿名账户', icon: Users }, { path: '/deliveries', label: '投递记录', icon: Send },
 ];

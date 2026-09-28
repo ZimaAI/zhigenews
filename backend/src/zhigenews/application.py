@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import Integer, cast, func, or_, select
 
+from .cached_news import get_cached_news, list_cached_news
 from .contract import CONTRACT, schema, validate
 from .db import (
     Brief,
@@ -37,6 +38,7 @@ from .security import (
     policy,
     public_session,
 )
+from .settings import get_settings
 from .sources import (
     batch_sources,
     is_collecting,
@@ -460,6 +462,16 @@ class Application:
 
     def getSource(self):
         return self.source_view(resource(self.db, self.ident, "source"))
+
+    def listCachedNews(self):
+        sources = self.db.scalars(select(Resource).where(Resource.kind == "source"))
+        return list_cached_news(
+            [source.data for source in sources], get_settings().data_dir, self.params, utcnow()
+        )
+
+    def getCachedNews(self):
+        source = resource(self.db, self.params["sourceId"], "source")
+        return get_cached_news(source.data, get_settings().data_dir, self.ident, utcnow())
 
     def source_data(self, old=None):
         b = deepcopy(self.body)

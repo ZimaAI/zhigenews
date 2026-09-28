@@ -81,6 +81,10 @@ docker compose --profile app up -d api worker beat
 
 订阅来源仅支持 RSS / Atom；初始化默认目录包含 341 个 RSS 订阅，管理员可添加、停用或删除。联网补充搜索独立于订阅采集。已生成简报保留原始来源和引用，不会因移除来源而改写。
 
+管理员端「缓存新闻」(`/news`) 浏览当前来源新闻索引中的近 24 小时新闻，可按来源及标题筛选并分页查看；来源详情也提供该来源的浏览入口。列表保留停用或暂无新闻的来源，来源计数不受标题筛选影响。页面显示实际查询时间范围；详情提供缓存摘要、正文、来源和原文链接，以及发布时间、采集时间、首次收录时间与证据标识。浏览只读取现有缓存，不触发联网采集；条目退出 RSS 列表后仍可在索引有效期内浏览，过期条目不作为历史档案提供。
+
+对应管理员只读 API 为 `GET /admin/news`（可选 `sourceId`、标题查询 `q` 和从 1 开始的 `page`，每页 20 条）与 `GET /admin/sources/{sourceId}/news/{id}`，均位于 `/api/v1` 下并要求管理员 Cookie。列表返回 `items`、`total`、`page`、`pageSize`、`totalPages`、`windowStart`、`windowEnd` 和含来源计数的 `sources`；详情中的 `summary` 和 `content` 是纯文本。无匹配结果返回空列表，已移除来源或不可用的新闻详情返回 404。客户端由活动 OpenAPI 契约生成，修改接口后运行 `npm run generate:api`。
+
 从仍支持 NewsNow 的旧版本升级时，先在旧管理员页面筛选该类型，停止采集并删除全部对应来源，等待后台删除任务全部完成后再部署本版本。清理包含来源配置、采集记录与文件，历史简报保留；不要运行初始化来代替清理。
 
 `POST /auth/anonymous`自动签发HttpOnly匿名Cookie，管理员使用独立登录Cookie。所有写请求发送 `X-Zhige-Request: 1`；有Origin时必须在ALLOWED_ORIGINS白名单。创建生成、采集与发布重试发送稳定 `Idempotency-Key`（8–128字符），同键不同body返回409。429遵循Retry-After。
